@@ -163,32 +163,14 @@ my_height, relative_island_abundance, dot_coords, width):
         with open("MapMaker/errors.txt", "a") as file:
             file.write("Section Generation, Process " + str(process_num) + "\n" + traceback.format_exc() + "\n")
 
-def assign_sections(process_num, section_assignment_progress, dot_coords_piece, dot_coords, island_size):
+def assign_sections(section_assignment_progress, dot_coord, dot_coords, island_size):
     try:
 
-        dot_coords_xy = []
-        for dot in dot_coords:
-            dot_coords_xy.append((dot.x, dot.y))
-        tree = scipy.spatial.KDTree(dot_coords_xy)
 
-        for i in range(len(dot_coords_piece)):
-
-            dot = dot_coords_piece[i]
-
-            if dot.type == "Land Start":
-                expansions = random.randint(island_size // 2, island_size * 2)
-                for ii in range(expansions):
-                    expansion_dot = dot_coords[tree.query([dot.x, dot.y], k = [ii + 1])[1][0]]
-                    if expansion_dot.type == "Water":
-                        expansion_dot.type = "Land"
-                    else:
-                        ii -= 1
-
-            section_assignment_progress[process_num] = (i + 1) / len(dot_coords_piece) * 100
 
     except Exception:
         with open("MapMaker/errors.txt", "a") as file:
-            file.write("Section Assignment, Process " + str(process_num) + "\n" + traceback.format_exc() + "\n")
+            file.write("Section Assignment, Process Pool\n" + traceback.format_exc() + "\n")
 
 def generate_image(process_num, reps, image_generation_progress,
 image_results, processes, dot_coords, width, height):
@@ -325,22 +307,7 @@ if __name__ == "__main__":
 
     # Section Assignment
 
-    piece_size = len(dot_coords) // processes
-    dot_coords_pieces = [dot_coords[i : i + piece_size] for i in range(0, len(dot_coords), piece_size)]
-    dot_coords_pieces.append(dot_coords[i : len(dot_coords) - 1])
 
-    for i in range(processes - 1):
-        process_list.append(multiprocessing.Process(target = assign_sections,
-            args = (i, section_assignment_progress, dot_coords_pieces[i],
-            dot_coords, island_size)))
-    process_list.append(multiprocessing.Process(target = assign_sections,
-        args = (processes - 1, section_assignment_progress,
-        dot_coords_pieces[-1], dot_coords, island_size)))
-    for process in process_list:
-        process.start()
-    for process in process_list:
-        process.join()
-    process_list = []
 
     # Image Generation
 
