@@ -163,10 +163,10 @@ my_height, relative_island_abundance, dot_coords, width):
         with open("MapMaker/errors.txt", "a") as file:
             file.write("Section Generation, Process " + str(process_num) + "\n" + traceback.format_exc() + "\n")
 
-def assign_sections(section_assignment_progress, dot_coord, dot_coords, island_size):
+def assign_sections(dot_coord_num, section_assignment_progress, dot_coords, island_size):
     try:
 
-
+        print()
 
     except Exception:
         with open("MapMaker/errors.txt", "a") as file:
@@ -307,7 +307,8 @@ if __name__ == "__main__":
 
     # Section Assignment
 
-
+    with multiprocessing.Pool(processes) as pool:
+        pool.map(assign_sections, )
 
     # Image Generation
 
