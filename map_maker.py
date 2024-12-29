@@ -1,11 +1,12 @@
 # Imports
 import multiprocessing
 import os
-from PIL import Image
+import PIL.Image
 import random
 import scipy
 import time
 import traceback
+
 
 # Classes
 class Dot:
@@ -13,6 +14,7 @@ class Dot:
         self.x = x
         self.y = y
         self.type = dot_type
+
 
 # Text Colors
 ANSI_GREEN = "\u001b[38;5;2m"
@@ -130,14 +132,14 @@ biome_generation_progress, image_generation_progress):
                 (total_image_generation_progress + "%").rjust(7)
             )
 
-            time.sleep(0.1)
+            time.sleep(02.1)
 
             if (total_setup_progress == total_section_generation_progress == total_section_assignment_progress ==
             total_biome_generation_progress == total_image_generation_progress == "100.00") or total_image_generation_progress == "100.00":
                 break
 
     except Exception:
-        with open("MapMaker/errors.txt", "w") as file:
+        with open("errors.txt", "w") as file:
             file.write("Timer\n" + traceback.format_exc() + "\n")
 
 def generate_sections(process_num, reps, section_generation_progress, sec_height, 
@@ -160,7 +162,7 @@ my_height, relative_island_abundance, dot_coords, width):
         dot_coords.extend(local_dot_coords)
 
     except Exception:
-        with open("MapMaker/errors.txt", "a") as file:
+        with open("errors.txt", "a") as file:
             file.write("Section Generation, Process " + str(process_num) + "\n" + traceback.format_exc() + "\n")
 
 def assign_sections(process_num, section_assignment_progress, dot_coords_piece, dot_coords, island_size):
@@ -178,23 +180,24 @@ def assign_sections(process_num, section_assignment_progress, dot_coords_piece, 
             if dot.type == "Land Start":
                 expansions = random.randint(island_size // 2, island_size * 2)
                 for ii in range(expansions):
-                    expansion_dot = dot_coords[tree.query([dot.x, dot.y], k = [ii + 1])[1][0]]
+                    dd, ii_ = tree.query([dot.x, dot.y], k = [ii + 1])
+                    expansion_dot = dot_coords[ii_[0]]
+                    print(expansion_dot.type)
                     if expansion_dot.type == "Water":
                         expansion_dot.type = "Land"
-                    else:
-                        ii -= 1
+                    print(expansion_dot.type + "\n")
 
             section_assignment_progress[process_num] = (i + 1) / len(dot_coords_piece) * 100
 
     except Exception:
-        with open("MapMaker/errors.txt", "a") as file:
+        with open("errors.txt", "a") as file:
             file.write("Section Assignment, Process " + str(process_num) + "\n" + traceback.format_exc() + "\n")
 
 def generate_image(process_num, reps, image_generation_progress,
 image_results, processes, dot_coords, width, height):
     try:
 
-        image_section = Image.new("RGB", (width, reps), "white")
+        image_section = PIL.Image.new("RGB", (width, reps), "white")
         pixels = image_section.load()
         dot_coords_xy = []
         for dot in dot_coords:
@@ -210,28 +213,28 @@ image_results, processes, dot_coords, width, height):
 
                 match(pixel_type):
                     case "Land":
-                        pixels[x, y] = (0, 102, 0) # type: ignore
+                        pixels[x, y] = (0, 102, 0)
                     case "Land Start":
-                        pixels[x, y] = (50, 50, 50) # type: ignore
+                        pixels[x, y] = (50, 50, 50)
                     case "Water":
-                        pixels[x, y] = (0, 0, 204) # type: ignore
+                        pixels[x, y] = (0, 0, 204)
                     case "Lake":
-                        pixels[x, y] = (0, 0, 204) # type: ignore
+                        pixels[x, y] = (0, 0, 204)
                     case "Error":
-                        pixels[x, y] = (255, 0, 255) # type: ignore
+                        pixels[x, y] = (255, 0, 255)
 
             image_generation_progress[process_num] = ((y + 1) * width) / (reps * width) * 100
         
         image_results.append(image_section)
     
     except Exception:
-        with open("MapMaker/errors.txt", "a") as file:
+        with open("errors.txt", "a") as file:
             file.write("Image Generation, Process " + str(process_num) + "\n" + traceback.format_exc() + "\n")
 
 
 if __name__ == "__main__":
 
-    with open("MapMaker/errors.txt", "w") as file:
+    with open("errors.txt", "w") as file:
         file.write("")
 
     command = "clear"
@@ -360,9 +363,9 @@ if __name__ == "__main__":
     for process in process_list:
         process.join()
     process_list = []
-    image = Image.new("RGB", (width, height))
+    image = PIL.Image.new("RGB", (width, height))
     down_shift = 0
     for result in image_results:
         image.paste(result, (0, down_shift))
         down_shift += section_height
-    image.save("MapMaker/result.png")
+    image.save("result.png")
