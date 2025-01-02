@@ -132,7 +132,7 @@ biome_generation_progress, image_generation_progress):
                 (total_image_generation_progress + "%").rjust(7)
             )
 
-            time.sleep(02.1)
+            time.sleep(0.1)
 
             if (total_setup_progress == total_section_generation_progress == total_section_assignment_progress ==
             total_biome_generation_progress == total_image_generation_progress == "100.00") or total_image_generation_progress == "100.00":
@@ -182,10 +182,8 @@ def assign_sections(process_num, section_assignment_progress, dot_coords_piece, 
                 for ii in range(expansions):
                     dd, ii_ = tree.query([dot.x, dot.y], k = [ii + 1])
                     expansion_dot = dot_coords[ii_[0]]
-                    print(expansion_dot.type)
                     if expansion_dot.type == "Water":
                         expansion_dot.type = "Land"
-                    print(expansion_dot.type + "\n")
 
             section_assignment_progress[process_num] = (i + 1) / len(dot_coords_piece) * 100
 
@@ -206,10 +204,13 @@ image_results, processes, dot_coords, width, height):
 
         start_num = process_num * (height // processes)
         for y in range(reps):
+
+            indexes = tree.query([(x, y + start_num) for x in range(width)])[1]
+
             for x in range(width):
                 
                 pixel_type = "Error"
-                pixel_type = dot_coords[tree.query([(x, y + start_num)])[1][0]].type
+                pixel_type = dot_coords[indexes[x]].type
 
                 match(pixel_type):
                     case "Land":
@@ -328,7 +329,7 @@ if __name__ == "__main__":
 
     # Section Assignment
 
-    piece_size = len(dot_coords) // processes
+    """    piece_size = len(dot_coords) // processes
     dot_coords_pieces = [dot_coords[i : i + piece_size] for i in range(0, len(dot_coords), piece_size)]
     dot_coords_pieces.append(dot_coords[i : len(dot_coords) - 1])
 
@@ -343,7 +344,7 @@ if __name__ == "__main__":
         process.start()
     for process in process_list:
         process.join()
-    process_list = []
+    process_list = []"""
 
     # Image Generation
 
