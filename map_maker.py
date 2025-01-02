@@ -195,23 +195,8 @@ def generate_sections(coords):
             "generate_sections", traceback.format_exc(), notes = ("Input: " + str(coords), )
         )
 
-def parallel_copy(dots, processes):
-
-    chunk_size = len(dots) // processes
-    chunks = [dots[i:i + chunk_size] for i in range(0, len(dots), chunk_size)]
-    
-    with multiprocessing.Pool(processes) as pool:
-        result_chunks = pool.map(copy_chunk, chunks)
-
-    # Combine all chunks into a single list
-    copied_dots = []
-    for chunk in result_chunks:
-        copied_dots.extend(chunk)
-
-    return copied_dots
-
-def copy_chunk(chunk):
-    return list(chunk)
+def copy_piece(piece):
+    return list(piece)
 
 def generate_image(start_height, section_height, process_num, local_dots):
 
@@ -373,7 +358,13 @@ if __name__ == "__main__":
             section_heights = [height_input // processes_input] * (processes_input - 1)
             section_heights.append(height_input - sum(section_heights))
 
-            local_dots = parallel_copy(dots, processes_input)
+            local_dots = []
+            pieces = [dots[i : i + len(dots) // processes_input] for i in range(0, len(dots), len(dots) // processes_input)]
+            results = pool.map(copy_piece, pieces)
+            for result in results:
+                local_dots.extend(result)
+
+            results = []
 
             for i in range(processes_input):
                 results.append(pool.apply_async(generate_image, (start_heights[i], section_heights[i], i, local_dots)))
