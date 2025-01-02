@@ -191,6 +191,24 @@ def assign_sections(process_num, section_assignment_progress, dot_coords_piece, 
         with open("errors.txt", "a") as file:
             file.write("Section Assignment, Process " + str(process_num) + "\n" + traceback.format_exc() + "\n")
 
+def parallel_copy(dot_coords, processes):
+
+    chunk_size = len(dot_coords) // processes
+    chunks = [dot_coords[i:i + chunk_size] for i in range(0, len(dot_coords), chunk_size)]
+    
+    with multiprocessing.Pool(processes) as pool:
+        result_chunks = pool.map(copy_chunk, chunks)
+
+    # Combine all chunks into a single list
+    copied_dots = []
+    for chunk in result_chunks:
+        copied_dots.extend(chunk)
+
+    return copied_dots
+
+def copy_chunk(chunk):
+    return list(chunk)
+
 def generate_image(process_num, reps, image_generation_progress,
 image_results, processes, dot_coords, width, height):
     try:
@@ -297,6 +315,8 @@ if __name__ == "__main__":
     dot_coords = multiprocessing.Manager().list([])
     process_list = []
 
+    start_time_main = time.time()
+
     # Setup
 
     process_progress = multiprocessing.Process(target = track_progress,
@@ -349,8 +369,7 @@ if __name__ == "__main__":
     # Image Generation
 
     image_results = multiprocessing.Manager().list([])
-    local_dot_coords = []
-    local_dot_coords.extend(dot_coords)
+    local_dot_coords = parallel_copy(dot_coords, processes)
 
     for i in range(processes - 1):
         process_list.append(multiprocessing.Process(target = generate_image,
@@ -370,3 +389,5 @@ if __name__ == "__main__":
         image.paste(result, (0, down_shift))
         down_shift += section_height
     image.save("result.png")
+
+    print(str(time.time() - start_time_main))
