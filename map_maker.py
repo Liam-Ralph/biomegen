@@ -191,7 +191,7 @@ def generate_sections(coords):
             "generate_sections", traceback.format_exc(), notes = ("Input: " + str(coords), )
         )
 
-def generate_image(start_height, section_height, process_num):
+def generate_image(start_height, section_height, process_num, local_dots):
 
     try:
 
@@ -205,10 +205,13 @@ def generate_image(start_height, section_height, process_num):
         tree = scipy.spatial.KDTree(dot_coords)
 
         for y in range(section_height):
+
+            indexes = tree.query([(x, y + start_height) for x in range(width.value)])[1]
+
             for x in range(width.value):
 
                 pixel_type = "Error"
-                pixel_type = dots[tree.query([(x, y + start_height)])[1][0]].type
+                pixel_type = local_dots[indexes[x]].type
 
                 match (pixel_type):
                     case "Land":
@@ -224,8 +227,8 @@ def generate_image(start_height, section_height, process_num):
                     case _:
                         pixels[x, y] = (204, 0, 82)
 
-                with lock:
-                    section_progress[3] += 1
+            with lock:
+                section_progress[3] += 1
 
         image_sections[process_num] = image_local
 
@@ -325,25 +328,34 @@ if __name__ == "__main__":
 
             num_dots = width.value * height.value // island_abundance.value
             section_progress_total[0] = num_dots
+
             results = []
+
             coords = random.sample(range(0, width.value * height.value), num_dots)
             coord_sections = [coords[i : i + num_dots // processes.value] for i in range(0, num_dots, num_dots // processes.value)]
             if num_dots % processes.value != 0:
                 coord_sections[-2].extend(coord_sections[-1])
                 coord_sections.pop()
+    
             for i in range(processes.value):
                 results.append(pool.apply_async(generate_sections, (coord_sections[i], )))
             [result.wait() for result in results]
 
             # Image Generation
 
-            section_progress_total[3] = width.value * height.value
+            section_progress_total[3] = height.value
+
             results = []
+
             start_heights = list(range(0, height.value, height.value // processes.value))
             section_heights = [height.value // processes.value] * (processes.value - 1)
             section_heights.append(height.value - sum(section_heights))
+
+            local_dots = []
+            local_dots.extend(dots)
+
             for i in range(processes.value):
-                results.append(pool.apply_async(generate_image, (start_heights[i], section_heights[i], i)))
+                results.append(pool.apply_async(generate_image, (start_heights[i], section_heights[i], i, local_dots)))
             [result.wait() for result in results]
 
             tracker_process.join()
