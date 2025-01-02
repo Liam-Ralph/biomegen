@@ -174,6 +174,8 @@ def generate_sections(coords):
 
     try:
 
+        local_dots = []
+
         for coord in coords:
 
             dot_type = "Water"
@@ -181,15 +183,35 @@ def generate_sections(coords):
                 dot_type = "Land Origin"
             elif random.randint(1, (relative_island_abundance.value - 1)) == 1:
                 dot_type = "Water Forced"
-            dots.append(Dot(coord % width.value, coord // width.value, dot_type))
+            local_dots.append(Dot(coord % width.value, coord // width.value, dot_type))
 
             with lock:
                 section_progress[0] += 1
+
+        dots.extend(local_dots)
 
     except:
         raise_error(
             "generate_sections", traceback.format_exc(), notes = ("Input: " + str(coords), )
         )
+
+def parallel_copy(dots, processes):
+
+    chunk_size = len(dots) // processes
+    chunks = [dots[i:i + chunk_size] for i in range(0, len(dots), chunk_size)]
+    
+    with multiprocessing.Pool(processes) as pool:
+        result_chunks = pool.map(copy_chunk, chunks)
+
+    # Combine all chunks into a single list
+    copied_dots = []
+    for chunk in result_chunks:
+        copied_dots.extend(chunk)
+
+    return copied_dots
+
+def copy_chunk(chunk):
+    return list(chunk)
 
 def generate_image(start_height, section_height, process_num, local_dots):
 
@@ -200,7 +222,7 @@ def generate_image(start_height, section_height, process_num, local_dots):
         )
         pixels = image_local.load()
         dot_coords = []
-        for dot in dots:
+        for dot in local_dots:
             dot_coords.append((dot.x, dot.y))
         tree = scipy.spatial.KDTree(dot_coords)
 
@@ -326,35 +348,34 @@ if __name__ == "__main__":
 
             # Section Generation
 
-            num_dots = width.value * height.value // island_abundance.value
+            num_dots = width_input * height_input // island_abundance_input
             section_progress_total[0] = num_dots
 
             results = []
 
-            coords = random.sample(range(0, width.value * height.value), num_dots)
-            coord_sections = [coords[i : i + num_dots // processes.value] for i in range(0, num_dots, num_dots // processes.value)]
-            if num_dots % processes.value != 0:
+            coords = random.sample(range(0, width_input * height_input), num_dots)
+            coord_sections = [coords[i : i + num_dots // processes_input] for i in range(0, num_dots, num_dots // processes_input)]
+            if num_dots % processes_input != 0:
                 coord_sections[-2].extend(coord_sections[-1])
                 coord_sections.pop()
     
-            for i in range(processes.value):
+            for i in range(processes_input):
                 results.append(pool.apply_async(generate_sections, (coord_sections[i], )))
             [result.wait() for result in results]
 
             # Image Generation
 
-            section_progress_total[3] = height.value
+            section_progress_total[3] = height_input
 
             results = []
 
-            start_heights = list(range(0, height.value, height.value // processes.value))
-            section_heights = [height.value // processes.value] * (processes.value - 1)
-            section_heights.append(height.value - sum(section_heights))
+            start_heights = list(range(0, height_input, height_input // processes_input))
+            section_heights = [height_input // processes_input] * (processes_input - 1)
+            section_heights.append(height_input - sum(section_heights))
 
-            local_dots = []
-            local_dots.extend(dots)
+            local_dots = parallel_copy(dots, processes_input)
 
-            for i in range(processes.value):
+            for i in range(processes_input):
                 results.append(pool.apply_async(generate_image, (start_heights[i], section_heights[i], i, local_dots)))
             [result.wait() for result in results]
 
@@ -362,7 +383,7 @@ if __name__ == "__main__":
 
             # Image Stitching
 
-            image = PIL.Image.new("RGB", (width.value, height.value), (255, 51, 133))
+            image = PIL.Image.new("RGB", (width_input, height_input), (255, 51, 133))
             shift = 0
             for section in image_sections:
                 image.paste(section, (0, shift))
