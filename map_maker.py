@@ -306,6 +306,8 @@ if __name__ == "__main__":
     processes = get_int(1, 32)
     if processes > 2:
         processes -= 2
+
+    start_time_main = time.time()
     
     setup_progress = multiprocessing.Value('d', 0.0)
     section_generation_progress = multiprocessing.Array('d', [0.0] * processes)
@@ -314,8 +316,6 @@ if __name__ == "__main__":
     image_generation_progress = multiprocessing.Array('d', [0.0] * processes)
     dot_coords = multiprocessing.Manager().list([])
     process_list = []
-
-    start_time_main = time.time()
 
     # Setup
 
@@ -390,4 +390,4 @@ if __name__ == "__main__":
         down_shift += section_height
     image.save("result.png")
 
-    print(str(time.time() - start_time_main))
+    print("{:.1f}".format(time.time() - start_time_main))
