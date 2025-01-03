@@ -134,8 +134,9 @@ biome_generation_progress, image_generation_progress):
 
             time.sleep(0.1)
 
-            if (total_setup_progress == total_section_generation_progress == total_section_assignment_progress ==
-            total_biome_generation_progress == total_image_generation_progress == "100.00") or total_image_generation_progress == "100.00":
+            if (total_setup_progress == total_section_generation_progress ==
+            total_section_assignment_progress == total_biome_generation_progress ==
+            total_image_generation_progress == "100.00") or total_image_generation_progress == "100.00": # remove later
                 break
 
     except Exception:
@@ -147,7 +148,9 @@ my_height, relative_island_abundance, dot_coords, width):
     try:
 
         start_height = sec_height * process_num
-        coords = random.sample(range(start_height * width, (start_height + my_height) * width), reps)
+        coords = (
+            random.sample(range(start_height * width, (start_height + my_height) * width), reps)
+        )
 
         local_dot_coords = []
         for i in range(reps):
@@ -163,9 +166,11 @@ my_height, relative_island_abundance, dot_coords, width):
 
     except Exception:
         with open("errors.txt", "a") as file:
-            file.write("Section Generation, Process " + str(process_num) + "\n" + traceback.format_exc() + "\n")
+            file.write("Section Generation, Process " + str(process_num) + "\n" +
+                traceback.format_exc() + "\n")
 
-def assign_sections(process_num, section_assignment_progress, dot_coords_piece, dot_coords, island_size):
+def assign_sections(process_num, section_assignment_progress,
+dot_coords_piece, dot_coords, island_size):
     try:
 
         dot_coords_xy = []
@@ -185,11 +190,14 @@ def assign_sections(process_num, section_assignment_progress, dot_coords_piece, 
                     if expansion_dot.type == "Water":
                         expansion_dot.type = "Land"
 
-            section_assignment_progress[process_num] = (i + 1) / len(dot_coords_piece) * 100
+            section_assignment_progress[process_num] = (
+                (i + 1) / len(dot_coords_piece) * 100
+            )
 
     except Exception:
         with open("errors.txt", "a") as file:
-            file.write("Section Assignment, Process " + str(process_num) + "\n" + traceback.format_exc() + "\n")
+            file.write("Section Assignment, Process " + str(process_num) + "\n" +
+                traceback.format_exc() + "\n")
 
 def parallel_copy(dot_coords, processes):
 
@@ -248,7 +256,8 @@ image_results, processes, dot_coords, width, height):
     
     except Exception:
         with open("errors.txt", "a") as file:
-            file.write("Image Generation, Process " + str(process_num) + "\n" + traceback.format_exc() + "\n")
+            file.write("Image Generation, Process " + str(process_num) + "\n" +
+                traceback.format_exc() + "\n")
 
 
 if __name__ == "__main__":
@@ -349,8 +358,10 @@ if __name__ == "__main__":
 
     # Section Assignment
 
-    """    piece_size = len(dot_coords) // processes
-    dot_coords_pieces = [dot_coords[i : i + piece_size] for i in range(0, len(dot_coords), piece_size)]
+    piece_size = len(dot_coords) // processes
+    dot_coords_pieces = [
+        dot_coords[i : i + piece_size] for i in range(0, len(dot_coords), piece_size)
+    ]
     dot_coords_pieces.append(dot_coords[i : len(dot_coords) - 1])
 
     for i in range(processes - 1):
@@ -364,7 +375,7 @@ if __name__ == "__main__":
         process.start()
     for process in process_list:
         process.join()
-    process_list = []"""
+    process_list = []
 
     # Image Generation
 
@@ -377,7 +388,8 @@ if __name__ == "__main__":
             image_results, processes, local_dot_coords, width, height)))
     process_list.append(multiprocessing.Process(target = generate_image,
         args = (processes - 1, int(height - (processes - 1) * section_height),
-        image_generation_progress, image_results, processes, local_dot_coords, width, height)))
+        image_generation_progress, image_results,
+        processes, local_dot_coords, width, height)))
     for process in process_list:
         process.start()
     for process in process_list:
