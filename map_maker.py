@@ -317,13 +317,17 @@ if __name__ == "__main__":
             results = []
 
             coords = random.sample(range(0, width * height), num_dots)
-            coord_sections = [coords[i : i + num_dots // processes] for i in range(0, num_dots, num_dots // processes)]
+            coord_sections = [
+                coords[i : i + num_dots // processes]
+                for i in range(0, num_dots, num_dots // processes)
+            ]
             if num_dots % processes != 0:
                 coord_sections[-2].extend(coord_sections[-1])
                 coord_sections.pop()
     
             for i in range(processes):
-                results.append(pool.apply_async(generate_sections, (coord_sections[i], relative_island_abundance, width)))
+                results.append(pool.apply_async(generate_sections,
+                    (coord_sections[i], relative_island_abundance, width)))
             [result.wait() for result in results]
 
             # Image Generation
@@ -337,7 +341,10 @@ if __name__ == "__main__":
             section_heights.append(height - sum(section_heights))
 
             local_dots = []
-            pieces = [dots[i : i + len(dots) // processes] for i in range(0, len(dots), len(dots) // processes)]
+            pieces = [
+                dots[i : i + len(dots) // processes]
+                for i in range(0, len(dots), len(dots) // processes)
+            ]
             results = pool.map(copy_piece, pieces)
             for result in results:
                 local_dots.extend(result)
@@ -345,7 +352,8 @@ if __name__ == "__main__":
             results = []
 
             for i in range(processes):
-                results.append(pool.apply_async(generate_image, (start_heights[i], section_heights[i], i, local_dots, width)))
+                results.append(pool.apply_async(generate_image,
+                    (start_heights[i], section_heights[i], i, local_dots, width)))
             [result.wait() for result in results]
 
             tracker_process.join()
