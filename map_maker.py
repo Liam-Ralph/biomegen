@@ -74,39 +74,23 @@ def raise_error(location, traceback_output, notes = None):
 # Multiprocessing Functions
 # (Order of use)
 
-def initialize_pool(section_progress_value,
-dots_value, width_value, height_value, processes_value, start_time_value,
-island_abundance_value, island_size_value, relative_island_abundance_value,
-image_sections_value, lock_value):
+def initialize_pool(section_progress_value, dots_value, image_sections_value, lock_value):
     
     global section_progress
     global dots
-    global width
-    global height
-    global processes
-    global start_time
-    global island_abundance
-    global island_size
-    global relative_island_abundance
-    global current_section_progress
     global image_sections
     global lock
 
     section_progress = section_progress_value
     dots = dots_value
-    width = width_value
-    height = height_value
-    processes = processes_value
-    start_time = start_time_value
-    island_abundance = island_abundance_value
-    island_size = island_size_value
-    relative_island_abundance = relative_island_abundance_value
     image_sections = image_sections_value
     lock = lock_value
 
-def track_progress(section_progress, section_progress_total, start_time, section_times):
+def track_progress(section_progress, section_progress_total, start_time):
 
     try:
+
+        section_times = [0.0, 0.0, 0.0, 0.0]
 
         while True:
 
@@ -130,7 +114,7 @@ def track_progress(section_progress, section_progress_total, start_time, section
                 if section_progress[i] == section_progress_total[i]:
                     color = ANSI_GREEN
                 else:
-                    section_times[i] = time.time() - start_time.value
+                    section_times[i] = time.time() - start_time
                     section_times[i] -= sum(section_times[ii] for ii in range(i))
                     color = ANSI_BLUE
                 print(
@@ -153,7 +137,7 @@ def track_progress(section_progress, section_progress_total, start_time, section
                 "{:.2f}% ".format(total_progress * 100).rjust(8) +
                 ANSI_GREEN + "█" * round(total_progress * 20) +
                 ANSI_BLUE + "█" * (20 - round(total_progress * 20)) +
-                ANSI_RESET + " " + format_time(time.time() - start_time.value)
+                ANSI_RESET + " " + format_time(time.time() - start_time)
             )
 
             print(str(section_progress[0]))
@@ -170,7 +154,7 @@ def track_progress(section_progress, section_progress_total, start_time, section
     except:
         raise_error("track_progress", traceback.format_exc())
 
-def generate_sections(coords):
+def generate_sections(coords, relative_island_abundance, width):
 
     try:
 
@@ -179,11 +163,11 @@ def generate_sections(coords):
         for coord in coords:
 
             dot_type = "Water"
-            if random.randint(1, relative_island_abundance.value) == 1:
+            if random.randint(1, relative_island_abundance) == 1:
                 dot_type = "Land Origin"
-            elif random.randint(1, (relative_island_abundance.value - 1)) == 1:
+            elif random.randint(1, (relative_island_abundance - 1)) == 1:
                 dot_type = "Water Forced"
-            local_dots.append(Dot(coord % width.value, coord // width.value, dot_type))
+            local_dots.append(Dot(coord % width, coord // width, dot_type))
 
             with lock:
                 section_progress[0] += 1
@@ -198,12 +182,12 @@ def generate_sections(coords):
 def copy_piece(piece):
     return list(piece)
 
-def generate_image(start_height, section_height, process_num, local_dots):
+def generate_image(start_height, section_height, process_num, local_dots, width):
 
     try:
 
         image_local = (
-            PIL.Image.new("RGB", (width.value, section_height), (255, 153, 194))
+            PIL.Image.new("RGB", (width, section_height), (255, 153, 194))
         )
         pixels = image_local.load()
         dot_coords = []
@@ -213,9 +197,9 @@ def generate_image(start_height, section_height, process_num, local_dots):
 
         for y in range(section_height):
 
-            indexes = tree.query([(x, y + start_height) for x in range(width.value)])[1]
+            indexes = tree.query([(x, y + start_height) for x in range(width)])[1]
 
-            for x in range(width.value):
+            for x in range(width):
 
                 pixel_type = "Error"
                 pixel_type = local_dots[indexes[x]].type
@@ -257,10 +241,10 @@ if __name__ == "__main__":
         "Welcome to MapMaker v1.0\n" + 
         "\nMap Width:"
     )
-    width_input = get_int(100, 10_000)
+    width = get_int(100, 10_000)
 
     print("\nMap Height:")
-    height_input = get_int(100, 10_000)
+    height = get_int(100, 10_000)
 
     print(
         "\nIsland abundance controls how many islands are generated.\n" +
@@ -268,7 +252,7 @@ if __name__ == "__main__":
         "Larger numbers produce fewer islands.\n" +
         "Island Abundance:"
     )
-    island_abundance_input = get_int(50, 1000)
+    island_abundance = get_int(50, 1000)
 
     print(
         "\nIsland size controls average island size.\n" +
@@ -276,7 +260,7 @@ if __name__ == "__main__":
         "Larger numbers produce larger islands.\n" +
         "Island Size:"
     )
-    island_size_input = get_int(10, 100)
+    island_size = get_int(10, 100)
 
     print(
         "\nRelative island abundance controls the ratio of land to water.\n" +
@@ -284,7 +268,7 @@ if __name__ == "__main__":
         "Larger numbers produces more land.\n" +
         "Relative Island Abundance:"
     )
-    relative_island_abundance_input = get_int(10, 100)
+    relative_island_abundance = get_int(10, 100)
 
     print(
         "\nNow you must choose how many of your CPU's threads to use for map generation.\n" +
@@ -295,7 +279,9 @@ if __name__ == "__main__":
         "high temperatures occur. Using fewer threads may reduce temperatures.\n" +
         "Number of Threads:"
     )
-    processes_input = get_int(1, 32)
+    processes = get_int(1, 32)
+
+    start_time = time.time()
 
     clear_screen()
 
@@ -308,73 +294,65 @@ if __name__ == "__main__":
     section_progress = multiprocessing.Array(ctypes.c_int, [0, 0, 0, 0])
     section_progress_total = multiprocessing.Array(ctypes.c_int, [0, 0, 0, 0])
     dots = manager.list([])
-    width = multiprocessing.Value(ctypes.c_int, width_input)
-    height = multiprocessing.Value(ctypes.c_int, height_input)
-    processes = multiprocessing.Value(ctypes.c_int, processes_input)
-    start_time = multiprocessing.Value(ctypes.c_double, time.time())
     section_times = multiprocessing.Array(ctypes.c_double, [0.0, 0.0, 0.0, 0.0])
-    island_abundance = multiprocessing.Value(ctypes.c_int, island_abundance_input)
-    island_size = multiprocessing.Value(ctypes.c_int, island_size_input)
-    relative_island_abundance = multiprocessing.Value(ctypes.c_int, relative_island_abundance_input)
-    image_sections = manager.list([PIL.Image.new("RGB", (100, 100), (255, 0, 102))] * processes.value)
+    image_sections = manager.list([PIL.Image.new("RGB", (100, 100), (255, 0, 102))] * processes)
     lock = multiprocessing.Lock()
 
-    with multiprocessing.Pool(processes_input, initializer = initialize_pool, initargs =
-    (section_progress, dots, width, height, processes, start_time,
-    island_abundance, island_size, relative_island_abundance, image_sections, lock)) as pool:
+    with multiprocessing.Pool(processes, initializer = initialize_pool, initargs =
+    (section_progress, dots, image_sections, lock)) as pool:
 
         try:
 
             # Progress Tracking
 
             tracker_process = multiprocessing.Process(target = track_progress,
-                args = (section_progress, section_progress_total, start_time, section_times))
+                args = (section_progress, section_progress_total, start_time))
             tracker_process.start()
 
             # Section Generation
 
-            num_dots = width_input * height_input // island_abundance_input
+            num_dots = width * height // island_abundance
             section_progress_total[0] = num_dots
 
             results = []
 
-            coords = random.sample(range(0, width_input * height_input), num_dots)
-            coord_sections = [coords[i : i + num_dots // processes_input] for i in range(0, num_dots, num_dots // processes_input)]
-            if num_dots % processes_input != 0:
+            coords = random.sample(range(0, width * height), num_dots)
+            coord_sections = [coords[i : i + num_dots // processes] for i in range(0, num_dots, num_dots // processes)]
+            if num_dots % processes != 0:
                 coord_sections[-2].extend(coord_sections[-1])
                 coord_sections.pop()
     
-            for i in range(processes_input):
-                results.append(pool.apply_async(generate_sections, (coord_sections[i], )))
+            for i in range(processes):
+                results.append(pool.apply_async(generate_sections, (coord_sections[i], relative_island_abundance, width)))
             [result.wait() for result in results]
 
             # Image Generation
 
-            section_progress_total[3] = height_input
+            section_progress_total[3] = height
 
             results = []
 
-            start_heights = list(range(0, height_input, height_input // processes_input))
-            section_heights = [height_input // processes_input] * (processes_input - 1)
-            section_heights.append(height_input - sum(section_heights))
+            start_heights = list(range(0, height, height // processes))
+            section_heights = [height // processes] * (processes - 1)
+            section_heights.append(height - sum(section_heights))
 
             local_dots = []
-            pieces = [dots[i : i + len(dots) // processes_input] for i in range(0, len(dots), len(dots) // processes_input)]
+            pieces = [dots[i : i + len(dots) // processes] for i in range(0, len(dots), len(dots) // processes)]
             results = pool.map(copy_piece, pieces)
             for result in results:
                 local_dots.extend(result)
 
             results = []
 
-            for i in range(processes_input):
-                results.append(pool.apply_async(generate_image, (start_heights[i], section_heights[i], i, local_dots)))
+            for i in range(processes):
+                results.append(pool.apply_async(generate_image, (start_heights[i], section_heights[i], i, local_dots, width)))
             [result.wait() for result in results]
 
             tracker_process.join()
 
             # Image Stitching
 
-            image = PIL.Image.new("RGB", (width_input, height_input), (255, 51, 133))
+            image = PIL.Image.new("RGB", (width, height), (255, 51, 133))
             shift = 0
             for section in image_sections:
                 image.paste(section, (0, shift))
@@ -386,5 +364,5 @@ if __name__ == "__main__":
 
     print(
         ANSI_GREEN + "Generation Complete " + ANSI_RESET +
-        format_time(time.time() - start_time.value)
+        format_time(time.time() - start_time)
     )
