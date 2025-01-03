@@ -230,7 +230,9 @@ def generate_image(start_height, section_height, process_num, local_dots, width)
         )
 
 
-if __name__ == "__main__":
+# Main Function
+
+def main():
 
     with open("errors.txt", "w") as file:
         file.write("")
@@ -374,3 +376,7 @@ if __name__ == "__main__":
         ANSI_GREEN + "Generation Complete " + ANSI_RESET +
         format_time(time.time() - start_time)
     )
+
+
+if __name__ == "__main__":
+    main()
