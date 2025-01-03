@@ -54,7 +54,6 @@ def get_int(min, max):
         except ValueError:
             print("Input must be a whole number.")
             continue
-
         if min <= choice <= max:
             break
         else:
