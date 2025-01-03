@@ -39,7 +39,7 @@ def clear_screen():
     os.system(command)
 
 def format_time(time_seconds):
-    seconds = "{:.1f}".format(time_seconds % 60).rjust(4, "0")
+    seconds = f"{time_seconds:.2f}".rjust(5, "0")
     minutes = str(int(time_seconds // 60))
     return (minutes + ":" + seconds).rjust(7)
 
@@ -154,6 +154,25 @@ def track_progress(section_progress, section_progress_total, start_time):
     except:
         raise_error("track_progress", traceback.format_exc())
 
+def calc_pieces_coords(num_dots, processes, width, height):
+    
+    try:
+
+        piece_lengths = [num_dots // processes] * (processes - 1)
+        piece_lengths.append(num_dots - sum(piece_lengths))
+
+        coords = random.sample(range(0, width * height), num_dots)
+
+        coord_sections = [
+            coords[i * piece_lengths[0] : i * piece_lengths[0] + piece_lengths[i]]
+            for i in range(processes)
+        ]
+
+        return coord_sections
+
+    except:
+        raise_error("calc_sections", traceback.format_exc())
+
 def generate_sections(coords, relative_island_abundance, width):
 
     try:
@@ -179,8 +198,8 @@ def generate_sections(coords, relative_island_abundance, width):
             "generate_sections", traceback.format_exc(), notes = ("Input: " + str(coords), )
         )
 
-def copy_piece(piece):
-    return list(piece)
+def copy_piece(piece_range):
+    return dots[piece_range[0] : piece_range[1]]
 
 def generate_image(start_height, section_height, process_num, local_dots, width):
 
@@ -250,11 +269,11 @@ def main():
 
     print(
         "\nIsland abundance controls how many islands are generated.\n" +
-        "Choose a number between 50 and 1000. 100 is the default.\n" +
+        "Choose a number between 50 and 500. 100 is the default.\n" +
         "Larger numbers produce fewer islands.\n" +
         "Island Abundance:"
     )
-    island_abundance = get_int(50, 1000)
+    island_abundance = get_int(50, 500)
 
     print(
         "\nIsland size controls average island size.\n" +
@@ -296,7 +315,6 @@ def main():
     section_progress = multiprocessing.Array(ctypes.c_int, [0, 0, 0, 0])
     section_progress_total = multiprocessing.Array(ctypes.c_int, [0, 0, 0, 0])
     dots = manager.list([])
-    section_times = multiprocessing.Array(ctypes.c_double, [0.0, 0.0, 0.0, 0.0])
     image_sections = manager.list([PIL.Image.new("RGB", (100, 100), (255, 0, 102))] * processes)
     lock = multiprocessing.Lock()
 
@@ -318,14 +336,7 @@ def main():
 
             results = []
 
-            coords = random.sample(range(0, width * height), num_dots)
-            coord_sections = [
-                coords[i : i + num_dots // processes]
-                for i in range(0, num_dots, num_dots // processes)
-            ]
-            if num_dots % processes != 0:
-                coord_sections[-2].extend(coord_sections[-1])
-                coord_sections.pop()
+            coord_sections = pool.apply(calc_pieces_coords, (num_dots, processes, width, height))
     
             for i in range(processes):
                 results.append(pool.apply_async(generate_sections,
@@ -343,11 +354,13 @@ def main():
             section_heights.append(height - sum(section_heights))
 
             local_dots = []
-            pieces = [
-                dots[i : i + len(dots) // processes]
-                for i in range(0, len(dots), len(dots) // processes)
+            piece_lengths = [num_dots // processes] * (processes - 1)
+            piece_lengths.append(num_dots - sum(piece_lengths))
+            piece_ranges = [
+                [i * piece_lengths[0], i * piece_lengths[0] + piece_lengths[i]]
+                for i in range(processes)
             ]
-            results = pool.map(copy_piece, pieces)
+            results = pool.map(copy_piece, piece_ranges)
             for result in results:
                 local_dots.extend(result)
 
