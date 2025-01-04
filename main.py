@@ -211,7 +211,7 @@ def generate_sections(coords, relative_island_abundance, width):
         raise_error(
             "generate_sections", traceback.format_exc(),
             notes = (
-                "Input \"coords\": " + str(coords),
+                "Input \"coords\": (Not available)",
                 "Input \"relative_island_abundance\": " + str(relative_island_abundance),
                 "Input \"width\": " + str(width),
             )
@@ -220,13 +220,13 @@ def generate_sections(coords, relative_island_abundance, width):
 def copy_piece(piece_range):
     return dots[piece_range[0] : piece_range[1]]
 
-def assign_sections(start, length, island_size, local_dots):
+def assign_sections(island_size, origin_dots, local_dots):
 
     try:
 
         tree = scipy.spatial.KDTree([(dot.x, dot.y) for dot in local_dots])
 
-        for dot in local_dots[start : start + length]:
+        for dot in origin_dots:
 
             if dot.type == "Land Origin":
 
@@ -234,9 +234,9 @@ def assign_sections(start, length, island_size, local_dots):
                 indexes = tree.query([(dot.x, dot.y)], k = expansions + 1)[1][0]
 
                 for index in indexes:
-                    if dots[index].type == "Water":
-                        with lock:
-                            dots[index] = Dot(dots[index].x, dots[index].y, "Land")
+                    ref_dot = local_dots[index]
+                    if ref_dot.type == "Water":
+                        dots[index] = Dot(ref_dot.x, ref_dot.y, "Land")
 
             with lock:
                 section_progress[1] += 1
@@ -245,10 +245,9 @@ def assign_sections(start, length, island_size, local_dots):
         raise_error(
             "assign_sections", traceback.format_exc(),
             notes = (
-                "Input \"start\": " + str(start),
-                "Input \"length\": " + str(length),
                 "Input \"island_size\": " + str(island_size),
-                "Input \"local_dots\": " + str(local_dots)
+                "Input \"origin_dots\": (Not available, length: " + str(len(origin_dots)) + ")",
+                "Input \"local_dots\": (Not available)"
             )
         )
 
@@ -297,7 +296,7 @@ def generate_image(start_height, section_height, process_num, local_dots, width)
                 "Input \"start_height\": " + str(start_height),
                 "Input \"section_height\": " + str(section_height),
                 "Input \"process_num\": " + str(process_num),
-                "Input \"local_dots\": " + str(local_dots),
+                "Input \"local_dots\": (Not available)",
                 "Input \"width\": " + str(width)
             )
         )
@@ -395,7 +394,7 @@ def main():
 
             # Section Assignment
 
-            section_progress_total[1] = num_dots
+            section_progress_total[1] = 1
 
             results = []
 
@@ -409,15 +408,20 @@ def main():
             results = pool.map(copy_piece, piece_ranges)
             for result in results:
                 local_dots.extend(result)
+            
+            origin_dots = [dot for dot in local_dots if dot.type == "Land Origin"]
+            num_origin_dots = len(origin_dots)
+            section_progress_total[1] = num_origin_dots
 
             results = []
 
-            piece_sizes = [num_dots // processes] * (processes - 1)
-            piece_sizes.append(num_dots - sum(piece_sizes))
+            start_indexes = list(range(0, num_origin_dots, num_origin_dots // processes))
+            index_lengths = [num_origin_dots // processes] * (processes - 1)
+            index_lengths.append(num_origin_dots - sum(index_lengths))
 
             for i in range(processes):
                 results.append(pool.apply_async(assign_sections,
-                    (sum(piece_sizes[:i]), piece_sizes[i], island_size, local_dots)))
+                    (island_size, origin_dots[start_indexes[i] : start_indexes[i] + index_lengths[i]], local_dots)))
             [result.wait() for result in results]
 
             # Image Generation
