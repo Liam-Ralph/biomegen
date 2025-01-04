@@ -18,9 +18,6 @@ class Dot:
         self.y = y
         self.type = dot_type
 
-class TreeManager(multiprocessing.managers.BaseManager):
-    pass
-
 
 # Text Colors
 
@@ -39,7 +36,7 @@ def clear_screen():
     os.system(command)
 
 def format_time(time_seconds):
-    seconds = f"{time_seconds:.2f}".rjust(5, "0")
+    seconds = f"{(time_seconds % 60):.2f}".rjust(5, "0")
     minutes = str(int(time_seconds // 60))
     return (minutes + ":" + seconds).rjust(7)
 
@@ -64,11 +61,11 @@ def get_int(min, max):
 
 def raise_error(location, traceback_output, notes = None):
     with open("errors.txt", "a") as file:
-        file.write("Error at " + location + "\n" + traceback_output + "\n")
+        file.write("Error at " + location + "\n\n" + traceback_output + "\n")
         if notes != None:
             for note in notes:
-                file.write(note, "\n")
-        file.write("\n")
+                file.write(note + "\n")
+        file.write("\n\n")
 
 
 # Multiprocessing Functions
@@ -126,7 +123,7 @@ def track_progress(section_progress, section_progress_total, start_time):
                 )
 
             # Total Progress
-            total_progress /= 0.35 # remove later
+            total_progress /= 0.50 # remove later
 
             if sum(section_progress) == sum(section_progress_total):
                 color = ANSI_GREEN
@@ -142,6 +139,8 @@ def track_progress(section_progress, section_progress_total, start_time):
 
             print(str(section_progress[0]))
             print(str(section_progress_total[0]))
+            print(str(section_progress[1]))
+            print(str(section_progress_total[1]))
             print(str(section_progress[3]))
             print(str(section_progress_total[3]))
 
@@ -152,7 +151,14 @@ def track_progress(section_progress, section_progress_total, start_time):
                 time.sleep(0.1)
 
     except:
-        raise_error("track_progress", traceback.format_exc())
+        raise_error(
+            "track_progress", traceback.format_exc(),
+            notes = (
+                "Input \"section_progress\": " + str(section_progress),
+                "Input \"section_progress_total\": " + str(section_progress_total),
+                "Input \"start_time\": " + str(start_time)
+            )
+        )
 
 def calc_pieces_coords(num_dots, processes, width, height):
     
@@ -171,7 +177,15 @@ def calc_pieces_coords(num_dots, processes, width, height):
         return coord_sections
 
     except:
-        raise_error("calc_sections", traceback.format_exc())
+        raise_error(
+            "calc_sections", traceback.format_exc(),
+            notes = (
+                "Input \"num_dots\": " + str(num_dots),
+                "Input \"processes\": " + str(processes),
+                "Input \"width\": " + str(width),
+                "Input \"height\": " + str(height)
+            )
+        )
 
 def generate_sections(coords, relative_island_abundance, width):
 
@@ -195,11 +209,48 @@ def generate_sections(coords, relative_island_abundance, width):
 
     except:
         raise_error(
-            "generate_sections", traceback.format_exc(), notes = ("Input: " + str(coords), )
+            "generate_sections", traceback.format_exc(),
+            notes = (
+                "Input \"coords\": " + str(coords),
+                "Input \"relative_island_abundance\": " + str(relative_island_abundance),
+                "Input \"width\": " + str(width),
+            )
         )
 
 def copy_piece(piece_range):
     return dots[piece_range[0] : piece_range[1]]
+
+def assign_sections(start, length, island_size, local_dots):
+
+    try:
+
+        tree = scipy.spatial.KDTree([(dot.x, dot.y) for dot in local_dots])
+
+        for dot in local_dots[start : start + length]:
+
+            if dot.type == "Land Origin":
+
+                expansions = random.randint(island_size // 2, island_size * 2)
+                indexes = tree.query([(dot.x, dot.y)], k = expansions + 1)[1][0]
+
+                for index in indexes:
+                    if dots[index].type == "Water":
+                        with lock:
+                            dots[index] = Dot(dots[index].x, dots[index].y, "Land")
+
+            with lock:
+                section_progress[1] += 1
+
+    except:
+        raise_error(
+            "assign_sections", traceback.format_exc(),
+            notes = (
+                "Input \"start\": " + str(start),
+                "Input \"length\": " + str(length),
+                "Input \"island_size\": " + str(island_size),
+                "Input \"local_dots\": " + str(local_dots)
+            )
+        )
 
 def generate_image(start_height, section_height, process_num, local_dots, width):
 
@@ -209,10 +260,7 @@ def generate_image(start_height, section_height, process_num, local_dots, width)
             PIL.Image.new("RGB", (width, section_height), (255, 153, 194))
         )
         pixels = image_local.load()
-        dot_coords = []
-        for dot in local_dots:
-            dot_coords.append((dot.x, dot.y))
-        tree = scipy.spatial.KDTree(dot_coords)
+        tree = scipy.spatial.KDTree([(dot.x, dot.y) for dot in local_dots])
 
         for y in range(section_height):
 
@@ -245,7 +293,13 @@ def generate_image(start_height, section_height, process_num, local_dots, width)
     except:
         raise_error(
             "generate_image", traceback.format_exc(),
-            notes = ("Input: " + str(section_height), )
+            notes = (
+                "Input \"start_height\": " + str(start_height),
+                "Input \"section_height\": " + str(section_height),
+                "Input \"process_num\": " + str(process_num),
+                "Input \"local_dots\": " + str(local_dots),
+                "Input \"width\": " + str(width)
+            )
         )
 
 
@@ -286,7 +340,7 @@ def main():
     print(
         "\nRelative island abundance controls the ratio of land to water.\n" +
         "Choose a number between 10 and 50. 30 is the default.\n" +
-        "Larger numbers produces more land.\n" +
+        "Larger numbers produces less land.\n" +
         "Relative Island Abundance:"
     )
     relative_island_abundance = get_int(10, 100)
@@ -306,11 +360,7 @@ def main():
 
     clear_screen()
 
-    TreeManager.register("Tree", scipy.spatial.KDTree)
-
     manager = multiprocessing.Manager()
-    tree_manager = TreeManager()
-    tree_manager.start()
 
     section_progress = multiprocessing.Array(ctypes.c_int, [0, 0, 0, 0])
     section_progress_total = multiprocessing.Array(ctypes.c_int, [0, 0, 0, 0])
@@ -343,15 +393,11 @@ def main():
                     (coord_sections[i], relative_island_abundance, width)))
             [result.wait() for result in results]
 
-            # Image Generation
+            # Section Assignment
 
-            section_progress_total[3] = height
+            section_progress_total[1] = num_dots
 
             results = []
-
-            start_heights = list(range(0, height, height // processes))
-            section_heights = [height // processes] * (processes - 1)
-            section_heights.append(height - sum(section_heights))
 
             local_dots = []
             piece_lengths = [num_dots // processes] * (processes - 1)
@@ -365,6 +411,37 @@ def main():
                 local_dots.extend(result)
 
             results = []
+
+            piece_sizes = [num_dots // processes] * (processes - 1)
+            piece_sizes.append(num_dots - sum(piece_sizes))
+
+            for i in range(processes):
+                results.append(pool.apply_async(assign_sections,
+                    (sum(piece_sizes[:i]), piece_sizes[i], island_size, local_dots)))
+            [result.wait() for result in results]
+
+            # Image Generation
+
+            section_progress_total[3] = height
+
+            results = []
+
+            local_dots = []
+            piece_lengths = [num_dots // processes] * (processes - 1)
+            piece_lengths.append(num_dots - sum(piece_lengths))
+            piece_ranges = [
+                [i * piece_lengths[0], i * piece_lengths[0] + piece_lengths[i]]
+                for i in range(processes)
+            ]
+            results = pool.map(copy_piece, piece_ranges)
+            for result in results:
+                local_dots.extend(result)
+
+            results = []
+
+            start_heights = list(range(0, height, height // processes))
+            section_heights = [height // processes] * (processes - 1)
+            section_heights.append(height - sum(section_heights))
 
             for i in range(processes):
                 results.append(pool.apply_async(generate_image,
