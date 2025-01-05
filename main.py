@@ -332,19 +332,19 @@ def main():
 
     print(
         "\nIsland size controls average island size.\n" +
-        "Choose a number between 10 and 100. 20 is the default.\n" +
+        "Choose a number between 10 and 40. 20 is the default.\n" +
         "Larger numbers produce larger islands.\n" +
         "Island Size:"
     )
-    island_size = get_int(10, 100)
+    island_size = get_int(10, 40)
 
     print(
         "\nIsland abundance controls the ratio of land to water.\n" +
-        "Choose a number between 10 and 50. 30 is the default.\n" +
+        "Choose a number between 20 and 90. 50 is the default.\n" +
         "Larger numbers produces less land.\n" +
         "Island Abundance:"
     )
-    island_abundance = get_int(10, 100)
+    island_abundance = get_int(20, 90)
 
     print(
         "\nNow you must choose how many of your CPU's threads to use for map generation.\n" +
@@ -450,7 +450,7 @@ def main():
             count_land = 0
             count_water = 0
             for dot in local_dots:
-                i = 1
+                """i = 1
                 while True:
                     query = tree.query((dot.x, dot.y), k = [i])
                     dist = query[0][0]
@@ -459,11 +459,12 @@ def main():
                         if dot.type in ("Land", "Land Origin"):
                             with open("Production Files/Biome Data/Water Distances.txt", "a") as file:
                                 file.write(str(dist) + "\n")
-                            count_land += 1
-                        else:
-                            count_water += 1
                         break
-                    i += 1
+                    i += 1"""
+                if dot.type in ("Water", "Water Forced"):
+                    count_water += 1
+                else:
+                    count_land += 1
             #
 
             results = []
