@@ -9,6 +9,8 @@ import scipy
 import time
 import traceback
 
+import scipy.spatial
+
 
 # Classes
 
@@ -154,8 +156,8 @@ def track_progress(section_progress, section_progress_total, start_time):
         raise_error(
             "track_progress", traceback.format_exc(),
             notes = (
-                "Input \"section_progress\": " + str(section_progress),
-                "Input \"section_progress_total\": " + str(section_progress_total),
+                "Input \"section_progress\": (Not available)",
+                "Input \"section_progress_total\": (Not available)",
                 "Input \"start_time\": " + str(start_time)
             )
         )
@@ -187,7 +189,7 @@ def calc_pieces_coords(num_dots, processes, width, height):
             )
         )
 
-def generate_sections(coords, relative_island_abundance, width):
+def generate_sections(coords, island_abundance, width):
 
     try:
 
@@ -196,9 +198,9 @@ def generate_sections(coords, relative_island_abundance, width):
         for coord in coords:
 
             dot_type = "Water"
-            if random.randint(1, relative_island_abundance) == 1:
+            if random.randint(1, island_abundance) == 1:
                 dot_type = "Land Origin"
-            elif random.randint(1, (relative_island_abundance - 1)) == 1:
+            elif random.randint(1, (island_abundance - 1)) == 1:
                 dot_type = "Water Forced"
             local_dots.append(Dot(coord % width, coord // width, dot_type))
 
@@ -212,7 +214,7 @@ def generate_sections(coords, relative_island_abundance, width):
             "generate_sections", traceback.format_exc(),
             notes = (
                 "Input \"coords\": (Not available)",
-                "Input \"relative_island_abundance\": " + str(relative_island_abundance),
+                "Input \"island_abundance\": " + str(island_abundance),
                 "Input \"width\": " + str(width),
             )
         )
@@ -321,12 +323,12 @@ def main():
     height = get_int(100, 10_000)
 
     print(
-        "\nIsland abundance controls how many islands are generated.\n" +
+        "\nMap resolution controls the level of fine detail of the map.\n" +
         "Choose a number between 50 and 500. 100 is the default.\n" +
-        "Larger numbers produce fewer islands.\n" +
-        "Island Abundance:"
+        "Larger numbers produce lower resolutions.\n" +
+        "Map Resolution:"
     )
-    island_abundance = get_int(50, 500)
+    map_resolution = get_int(50, 500)
 
     print(
         "\nIsland size controls average island size.\n" +
@@ -337,12 +339,12 @@ def main():
     island_size = get_int(10, 100)
 
     print(
-        "\nRelative island abundance controls the ratio of land to water.\n" +
+        "\nIsland abundance controls the ratio of land to water.\n" +
         "Choose a number between 10 and 50. 30 is the default.\n" +
         "Larger numbers produces less land.\n" +
-        "Relative Island Abundance:"
+        "Island Abundance:"
     )
-    relative_island_abundance = get_int(10, 100)
+    island_abundance = get_int(10, 100)
 
     print(
         "\nNow you must choose how many of your CPU's threads to use for map generation.\n" +
@@ -380,7 +382,7 @@ def main():
 
             # Section Generation
 
-            num_dots = width * height // island_abundance
+            num_dots = width * height // map_resolution
             section_progress_total[0] = num_dots
 
             results = []
@@ -389,7 +391,7 @@ def main():
     
             for i in range(processes):
                 results.append(pool.apply_async(generate_sections,
-                    (coord_sections[i], relative_island_abundance, width)))
+                    (coord_sections[i], island_abundance, width)))
             [result.wait() for result in results]
 
             # Section Assignment
@@ -441,6 +443,29 @@ def main():
             for result in results:
                 local_dots.extend(result)
 
+            # Biome Data Computing (remove later)
+            with open("Production Files/Biome Data/Water Distances.txt", "w") as file:
+                file.write("")
+            tree = scipy.spatial.KDTree([(dot.x, dot.y) for dot in local_dots])
+            count_land = 0
+            count_water = 0
+            for dot in local_dots:
+                i = 1
+                while True:
+                    query = tree.query((dot.x, dot.y), k = [i])
+                    dist = query[0][0]
+                    index = query[1][0]
+                    if local_dots[index].type in ("Water", "Water Forced"):
+                        if dot.type in ("Land", "Land Origin"):
+                            with open("Production Files/Biome Data/Water Distances.txt", "a") as file:
+                                file.write(str(dist) + "\n")
+                            count_land += 1
+                        else:
+                            count_water += 1
+                        break
+                    i += 1
+            #
+
             results = []
 
             start_heights = list(range(0, height, height // processes))
@@ -470,6 +495,9 @@ def main():
         ANSI_GREEN + "Generation Complete " + ANSI_RESET +
         format_time(time.time() - start_time)
     )
+    print(str(count_land))
+    print(str(count_water))
+    print(str(count_water / (count_water + count_land)))
 
 
 if __name__ == "__main__":
