@@ -281,9 +281,9 @@ def generate_image(start_height, section_height, process_num, local_dots, width)
                     case "Snow":
                         colors = [245, 245, 245]
                     case "Shallow Water 1":
-                        colors = [26, 255, 255]
+                        colors = [51, 51, 255]
                     case "Shallow Water 2":
-                        colors = [0, 179, 179]
+                        colors = [26, 26, 255]
                     case "Water":
                         colors = [0, 0, 255]
                     case "Deep Water 1":
@@ -301,13 +301,13 @@ def generate_image(start_height, section_height, process_num, local_dots, width)
                     case "Jungle":
                         colors = [0, 77, 0]
                     case "Plains":
-                        colors = [26, 255, 26]
+                        colors = [0, 179, 0]
                     case "Error":
                         colors = [255, 102, 163]
                     case _:
                         colors = [204, 0, 82]
                 for i in range(len(colors)):
-                    colors[i] += random.randint(-10, 10)
+                    #colors[i] += random.randint(-10, 10)
                     if colors[i] > 255:
                         colors[i] = 255
                     elif colors[i] < 0:
@@ -495,7 +495,10 @@ def main():
                         dist = tree_water.query((dot.x, dot.y), workers = processes)[0]
                         if dist < 5:
                             type = "Plains"
-                        elif (5 < dist and dist < 25) and (equator_dist > 7):
+                        elif (
+                            ((equator_dist > 7)) or
+                            ((5 < dist and dist < 20) and (equator_dist > 7))
+                        ):
                             type = "Taiga"
                         elif (
                             ((5 < dist and dist < 10) and (equator_dist < 4)) or
@@ -512,10 +515,10 @@ def main():
                             ((30 < dist and dist < 35) and (equator_dist < 1))
                         ):
                             type = "Desert"
-                        elif dist < 25:
-                            type = "Forest"
-                        else:
+                        elif dist < 20:
                             type = "Plains"
+                        else:
+                            type = "Forest"
                 else:
                     if equator_dist > 8 or (equator_dist > 7 and random.random() <= 0.50):
                         type = "Ice"
