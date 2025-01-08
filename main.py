@@ -1,15 +1,15 @@
 # Imports
 import ctypes
+import math
 import multiprocessing
 import multiprocessing.managers
 import os
 import PIL.Image
 import random
 import scipy
+import scipy.spatial
 import time
 import traceback
-
-import scipy.spatial
 
 
 # Classes
@@ -101,9 +101,9 @@ def track_progress(section_progress, section_progress_total, start_time):
             section_names = [
                 "Section Generation", "Section Assignment", "Biome Generation", "Image Generation"
             ]
-            section_weights = [0.05, 0.15, 0.50, 0.30]
+            section_weights = [0.05, 0.25, 0.50, 0.20]
 
-            for i in range(4):
+            for i in range(len(section_names)):
                 section_total = section_progress_total[i]
                 if section_total == 0:
                     section_total = 1
@@ -113,9 +113,12 @@ def track_progress(section_progress, section_progress_total, start_time):
                 if section_progress[i] == section_progress_total[i]:
                     color = ANSI_GREEN
                 else:
-                    section_times[i] = time.time() - start_time
-                    section_times[i] -= sum(section_times[ii] for ii in range(i))
                     color = ANSI_BLUE
+
+                    if i == 0 or section_progress[i - 1] == section_progress_total[i - 1]:
+                        section_times[i] = time.time() - start_time
+                        section_times[i] -= sum(section_times[ii] for ii in range(i))
+                
                 print(
                     color + "[" + str(i + 1) + "/4] " + section_names[i].ljust(20) +
                     "{:.2f}% ".format(progress_section * 100).rjust(8) +
@@ -125,7 +128,6 @@ def track_progress(section_progress, section_progress_total, start_time):
                 )
 
             # Total Progress
-            total_progress /= 0.50 # remove later
 
             if sum(section_progress) == sum(section_progress_total):
                 color = ANSI_GREEN
@@ -139,15 +141,7 @@ def track_progress(section_progress, section_progress_total, start_time):
                 ANSI_RESET + " " + format_time(time.time() - start_time)
             )
 
-            print(str(section_progress[0]))
-            print(str(section_progress_total[0]))
-            print(str(section_progress[1]))
-            print(str(section_progress_total[1]))
-            print(str(section_progress[3]))
-            print(str(section_progress_total[3]))
-
-            if (sum(section_progress) == sum(section_progress_total) and not
-            all(value > 0 for value in section_progress)) and section_progress[3] > 0: # remove later
+            if sum(section_progress) == sum(section_progress_total):
                 break
             else:
                 time.sleep(0.1)
@@ -222,23 +216,33 @@ def generate_sections(coords, island_abundance, width):
 def copy_piece(piece_range):
     return dots[piece_range[0] : piece_range[1]]
 
-def assign_sections(island_size, origin_dots, local_dots):
+def assign_sections(start_index, index_length, map_resolution, local_dots, origin_dots, dist_multipliers):
 
     try:
 
-        tree = scipy.spatial.KDTree([(dot.x, dot.y) for dot in local_dots])
+        tree = scipy.spatial.KDTree([(dot.x, dot.y) for dot in origin_dots])
 
-        for dot in origin_dots:
+        for i in range(start_index, start_index + index_length):
 
-            if dot.type == "Land Origin":
+            dot = local_dots[i]
+            
+            if dot.type == "Water":
 
-                expansions = random.randint(island_size // 2, island_size * 2)
-                indexes = tree.query([(dot.x, dot.y)], k = expansions + 1)[1][0]
+                index = tree.query((dot.x, dot.y))[1]
 
-                for index in indexes:
-                    ref_dot = local_dots[index]
-                    if ref_dot.type == "Water":
-                        dots[index] = Dot(ref_dot.x, ref_dot.y, "Land")
+                nearest_origin_dot = origin_dots[index]
+
+                dist = (math.sqrt((nearest_origin_dot.x - dot.x) ** 2 + (nearest_origin_dot.y - dot.y) ** 2) / math.sqrt(map_resolution))
+                
+                if dist <= dist_multipliers[index]:
+                    chance = ((0.9) ** (1 / dist)) ** dist
+                else:
+                    chance = ((0.1) ** (1 / dist)) ** dist
+
+                if chance > 1.0:
+                    chance = 1.0
+                if random.random() < chance:
+                    dots[i] = Dot(dot.x, dot.y, "Land")
 
             with lock:
                 section_progress[1] += 1
@@ -247,8 +251,7 @@ def assign_sections(island_size, origin_dots, local_dots):
         raise_error(
             "assign_sections", traceback.format_exc(),
             notes = (
-                "Input \"island_size\": " + str(island_size),
-                "Input \"origin_dots\": (Not available, length: " + str(len(origin_dots)) + ")",
+                "Input \"map_resolution\": " + str(map_resolution),
                 "Input \"local_dots\": (Not available)"
             )
         )
@@ -273,18 +276,43 @@ def generate_image(start_height, section_height, process_num, local_dots, width)
                 pixel_type = local_dots[indexes[x]].type
 
                 match (pixel_type):
-                    case "Land":
-                        pixels[x, y] = (0, 204, 0)
-                    case "Land Origin":
-                        pixels[x, y] = (0, 102, 0)
+                    case "Ice":
+                        colors = [153, 221, 255]
+                    case "Snow":
+                        colors = [245, 245, 245]
+                    case "Shallow Water 1":
+                        colors = [26, 255, 255]
+                    case "Shallow Water 2":
+                        colors = [0, 179, 179]
                     case "Water":
-                        pixels[x, y] = (0, 0, 204)
-                    case "Water Forced":
-                        pixels[x, y] = (0, 0, 102)
+                        colors = [0, 0, 255]
+                    case "Deep Water 1":
+                        colors = [0, 0, 179]
+                    case "Deep Water 2":
+                        colors = [0, 0, 102]
+                    case "Sand":
+                        colors = [255, 153, 51]
+                    case "Desert":
+                        colors = [204, 102, 0]
+                    case "Forest":
+                        colors = [0, 128, 0]
+                    case "Taiga":
+                        colors = [0, 128, 43]
+                    case "Jungle":
+                        colors = [0, 77, 0]
+                    case "Plains":
+                        colors = [26, 255, 26]
                     case "Error":
-                        pixels[x, y] = (255, 102, 163)
+                        colors = [255, 102, 163]
                     case _:
-                        pixels[x, y] = (204, 0, 82)
+                        colors = [204, 0, 82]
+                for i in range(len(colors)):
+                    colors[i] += random.randint(-10, 10)
+                    if colors[i] > 255:
+                        colors[i] = 255
+                    elif colors[i] < 0:
+                        colors[i] = 0
+                pixels[x, y] = tuple(colors)
 
             with lock:
                 section_progress[3] += 1
@@ -331,20 +359,20 @@ def main():
     map_resolution = get_int(50, 500)
 
     print(
-        "\nIsland size controls average island size.\n" +
-        "Choose a number between 10 and 40. 20 is the default.\n" +
-        "Larger numbers produce larger islands.\n" +
-        "Island Size:"
-    )
-    island_size = get_int(10, 40)
-
-    print(
         "\nIsland abundance controls the ratio of land to water.\n" +
-        "Choose a number between 20 and 90. 50 is the default.\n" +
+        "Choose a number between 10 and 90. 50 is the default.\n" +
         "Larger numbers produces less land.\n" +
         "Island Abundance:"
     )
-    island_abundance = get_int(20, 90)
+    island_abundance = get_int(10, 90)
+
+    print(
+        "\nIsland size controls average island size.\n" +
+        "Choose a number between 1 and 10. 5 is the default.\n" +
+        "Larger numbers produce larger islands.\n" +
+        "Island Size:"
+    )
+    island_size = get_int(0, 100)
 
     print(
         "\nNow you must choose how many of your CPU's threads to use for map generation.\n" +
@@ -364,7 +392,7 @@ def main():
     manager = multiprocessing.Manager()
 
     section_progress = multiprocessing.Array(ctypes.c_int, [0, 0, 0, 0])
-    section_progress_total = multiprocessing.Array(ctypes.c_int, [0, 0, 0, 0])
+    section_progress_total = multiprocessing.Array(ctypes.c_int, [1, 1, 1, 1])
     dots = manager.list([])
     image_sections = manager.list([PIL.Image.new("RGB", (100, 100), (255, 0, 102))] * processes)
     lock = multiprocessing.Lock()
@@ -383,6 +411,7 @@ def main():
             # Section Generation
 
             num_dots = width * height // map_resolution
+
             section_progress_total[0] = num_dots
 
             results = []
@@ -395,8 +424,8 @@ def main():
             [result.wait() for result in results]
 
             # Section Assignment
-
-            section_progress_total[1] = 1
+            
+            section_progress_total[1] = num_dots
 
             results = []
 
@@ -410,21 +439,101 @@ def main():
             results = pool.map(copy_piece, piece_ranges)
             for result in results:
                 local_dots.extend(result)
-            
-            origin_dots = [dot for dot in local_dots if dot.type == "Land Origin"]
-            num_origin_dots = len(origin_dots)
-            section_progress_total[1] = num_origin_dots
 
             results = []
 
-            start_indexes = list(range(0, num_origin_dots, num_origin_dots // processes))
-            index_lengths = [num_origin_dots // processes] * (processes - 1)
-            index_lengths.append(num_origin_dots - sum(index_lengths))
+            start_indexes = list(range(0, num_dots, num_dots // processes))
+            index_lengths = [num_dots // processes] * (processes - 1)
+            index_lengths.append(num_dots - sum(index_lengths))
+
+            origin_dots = [dot for dot in local_dots if dot.type == "Land Origin"]
+            dist_multipliers = [random.uniform(island_size / 2, island_size * 2) for i in range(len(origin_dots))]
 
             for i in range(processes):
                 results.append(pool.apply_async(assign_sections,
-                    (island_size, origin_dots[start_indexes[i] : start_indexes[i] + index_lengths[i]], local_dots)))
+                    (start_indexes[i], index_lengths[i], map_resolution, local_dots, origin_dots, dist_multipliers)))
             [result.wait() for result in results]
+
+            # Biome Generation
+            """for ii in (1, -1):
+                land_dots = [dot for dot in dots if dot.type == "Land"]
+                water_dots = [dot for dot in dots if dot.type == "Water"]
+                tree1 = scipy.spatial.KDTree([(dot.x, dot.y) for dot in land_dots])
+                tree2 = scipy.spatial.KDTree([(dot.x, dot.y) for dot in water_dots])
+                for i in range(0, len(dots), ii):
+                    dot = dots[i]
+                    if dot.type == "Land":
+                        dist = tree1.query((dot.x, dot.y), k = 3, workers = processes)[0]
+                        dist2 = tree2.query((dot.x, dot.y), k = 3, workers = processes)[0]
+                    elif dot.type == "Water":
+                        dist = tree2.query((dot.x, dot.y), k = 3, workers = processes)[0]
+                        dist2 = tree1.query((dot.x, dot.y), k = 3, workers = processes)[0]
+                    if dot.type in ("Land", "Water") and sum(dist) < sum(dist2):
+                        if True or random.random() <= 0.99:
+                            items = ["Land", "Water"]
+                            items.remove(dot.type)
+                            dots[i] = Dot(dot.x, dot.y, items[0])
+            for i in range(len(dots)):
+                dot = dots[i]
+                if dot.type == "Water":
+                    dots[i] = Dot(dot.x, dot.y, "Land")
+                elif dot.type == "Land":
+                    dots[i] = Dot(dot.x, dot.y, "Water")"""
+
+
+
+            tree_land = scipy.spatial.KDTree([(dot.x, dot.y) for dot in dots if dot.type in ("Land", "Land Origin")])
+            tree_water = scipy.spatial.KDTree([(dot.x, dot.y) for dot in dots if dot.type in ("Water", "Water Forced")])
+            for i in range(len(dots)):
+                dot = dots[i]
+                equator_dist = abs(dot.y - height / 2) / height * 20
+                type = "Error"
+                if dot.type in ("Land", "Land Origin"):
+                    if equator_dist > 8 or (equator_dist > 7 and random.random() <= 0.50):
+                        type = "Snow"
+                    else:
+                        dist = tree_water.query((dot.x, dot.y), workers = processes)[0]
+                        if dist < 5:
+                            type = "Plains"
+                        elif (5 < dist and dist < 25) and (equator_dist > 7):
+                            type = "Taiga"
+                        elif (
+                            ((5 < dist and dist < 10) and (equator_dist < 4)) or
+                            ((10 < dist and dist < 15) and (equator_dist < 3)) or
+                            ((15 < dist and dist < 20) and (equator_dist < 2)) or
+                            ((20 < dist and dist < 25) and (equator_dist < 1))
+                        ):
+                            type = "Jungle"
+                        elif (
+                            ((dist > 50) and (equator_dist < 5)) or
+                            ((45 < dist and dist < 50) and (equator_dist < 4)) or
+                            ((40 < dist and dist < 45) and (equator_dist < 3)) or
+                            ((35 < dist and dist < 40) and (equator_dist < 2)) or
+                            ((30 < dist and dist < 35) and (equator_dist < 1))
+                        ):
+                            type = "Desert"
+                        elif dist < 25:
+                            type = "Forest"
+                        else:
+                            type = "Plains"
+                else:
+                    if equator_dist > 8 or (equator_dist > 7 and random.random() <= 0.50):
+                        type = "Ice"
+                    else:
+                        dist = tree_land.query((dot.x, dot.y), workers = processes)[0]
+                        if dist < 10:
+                            type = "Shallow Water 1"
+                        elif dist < 15:
+                            type = "Shallow Water 2"
+                        elif dist < 30:
+                            type = "Water"
+                        elif dist < 45:
+                            type = "Deep Water 1"
+                        else:
+                            type = "Deep Water 2"
+                dots[i] = Dot(dot.x, dot.y, type)
+
+            section_progress[2] = 1
 
             # Image Generation
 
@@ -442,30 +551,6 @@ def main():
             results = pool.map(copy_piece, piece_ranges)
             for result in results:
                 local_dots.extend(result)
-
-            # Biome Data Computing (remove later)
-            with open("Production Files/Biome Data/Water Distances.txt", "w") as file:
-                file.write("")
-            tree = scipy.spatial.KDTree([(dot.x, dot.y) for dot in local_dots])
-            count_land = 0
-            count_water = 0
-            for dot in local_dots:
-                """i = 1
-                while True:
-                    query = tree.query((dot.x, dot.y), k = [i])
-                    dist = query[0][0]
-                    index = query[1][0]
-                    if local_dots[index].type in ("Water", "Water Forced"):
-                        if dot.type in ("Land", "Land Origin"):
-                            with open("Production Files/Biome Data/Water Distances.txt", "a") as file:
-                                file.write(str(dist) + "\n")
-                        break
-                    i += 1"""
-                if dot.type in ("Water", "Water Forced"):
-                    count_water += 1
-                else:
-                    count_land += 1
-            #
 
             results = []
 
@@ -496,9 +581,6 @@ def main():
         ANSI_GREEN + "Generation Complete " + ANSI_RESET +
         format_time(time.time() - start_time)
     )
-    print(str(count_land))
-    print(str(count_water))
-    print(str(count_water / (count_water + count_land)))
 
 
 if __name__ == "__main__":
