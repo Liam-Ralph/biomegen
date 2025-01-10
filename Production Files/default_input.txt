@@ -3,7 +3,7 @@ Calculation Speed Test Inputs
 1920
 1080
 100
-70
+50
 3
 16
 

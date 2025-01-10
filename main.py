@@ -283,7 +283,7 @@ def generate_image(start_height, section_height, process_num, local_dots, width)
                     case "Shallow Water":
                         colors = [0, 0, 255]
                     case "Water":
-                        colors = [0, 0, 204]
+                        colors = [0, 0, 179]
                     case "Deep Water":
                         colors = [0, 0, 128]
                     case "Sand":
@@ -305,7 +305,7 @@ def generate_image(start_height, section_height, process_num, local_dots, width)
                     case _:
                         colors = [204, 0, 82]
                 for i in range(len(colors)):
-                    #colors[i] += random.randint(-10, 10)
+                    colors[i] += indexes[x] % 20 - 10
                     if colors[i] > 255:
                         colors[i] = 255
                     elif colors[i] < 0:
@@ -519,14 +519,14 @@ def main():
                     land_dist = tree.query((dot.x, dot.y), workers = processes)[0]
 
                     if (
-                        (land_dist < 15 and equator_dist > 7) or
-                        (land_dist < 25 and equator_dist > 8) or
-                        (land_dist < 40 and equator_dist > 9)
+                        (land_dist < 20 and equator_dist > 9) or
+                        (land_dist < 15 and equator_dist > 8) or
+                        (land_dist < 8 and equator_dist > 7)
                     ):
                         dot_type = "Ice"
-                    elif land_dist < 15:
+                    elif land_dist < 8:
                         dot_type = "Shallow Water"
-                    elif land_dist < 30:
+                    elif land_dist < 20:
                         dot_type = "Water"
                     else:
                         dot_type = "Deep Water"
@@ -537,8 +537,7 @@ def main():
             tree = scipy.spatial.KDTree([(dot.x, dot.y) for dot in biome_origin_dots])
             for i in range(len(dots)):
                 dot = dots[i]
-                if dot.type == "Land":
-                    dots[i] = Dot(dot.x, dot.y, biome_origin_dots[tree.query((dot.x, dot.y), workers = processes)[1]].type)
+                dots[i] = Dot(dot.x, dot.y, biome_origin_dots[tree.query((dot.x, dot.y), workers = processes)[1]].type)
 
             section_progress[2] = 1
 
