@@ -280,28 +280,26 @@ def generate_image(start_height, section_height, process_num, local_dots, width)
                         colors = [153, 221, 255]
                     case "Snow":
                         colors = [245, 245, 245]
-                    case "Shallow Water 1":
-                        colors = [51, 51, 255]
-                    case "Shallow Water 2":
-                        colors = [26, 26, 255]
-                    case "Water":
+                    case "Shallow Water":
                         colors = [0, 0, 255]
-                    case "Deep Water 1":
-                        colors = [0, 0, 179]
-                    case "Deep Water 2":
-                        colors = [0, 0, 102]
+                    case "Water":
+                        colors = [0, 0, 204]
+                    case "Deep Water":
+                        colors = [0, 0, 128]
                     case "Sand":
                         colors = [255, 153, 51]
                     case "Desert":
-                        colors = [204, 102, 0]
+                        colors = [255, 185, 109]
                     case "Forest":
                         colors = [0, 128, 0]
                     case "Taiga":
-                        colors = [0, 128, 43]
+                        colors = [152, 251, 152]
                     case "Jungle":
                         colors = [0, 77, 0]
                     case "Plains":
                         colors = [0, 179, 0]
+                    case "Rock":
+                        colors = [128, 128, 128]
                     case "Error":
                         colors = [255, 102, 163]
                     case _:
@@ -480,61 +478,67 @@ def main():
                 elif dot.type == "Land":
                     dots[i] = Dot(dot.x, dot.y, "Water")"""
 
-
-
-            tree_land = scipy.spatial.KDTree([(dot.x, dot.y) for dot in dots if dot.type in ("Land", "Land Origin")])
-            tree_water = scipy.spatial.KDTree([(dot.x, dot.y) for dot in dots if dot.type in ("Water", "Water Forced")])
             for i in range(len(dots)):
                 dot = dots[i]
+                if dot.type == "Land Origin":
+                    dots[i] = Dot(dot.x, dot.y, "Land")
+                elif dot.type == "Water Forced":
+                    dots[i] = Dot(dot.x, dot.y, "Water")
+
+            tree = (
+                scipy.spatial.KDTree([(dot.x, dot.y) for dot in dots if dot.type == "Land"])
+            )
+            biome_origin_dot_indexes = random.sample(range(len(dots)), len(dots) // 10)
+            for i in biome_origin_dot_indexes:
+                dot = dots[i]
                 equator_dist = abs(dot.y - height / 2) / height * 20
-                type = "Error"
-                if dot.type in ("Land", "Land Origin"):
-                    if equator_dist > 8 or (equator_dist > 7 and random.random() <= 0.50):
-                        type = "Snow"
+
+                if dot.type == "Land":
+
+                    if equator_dist < 1:
+                        probs = ["Rock"] + ["Desert"] * 4 + ["Jungle"] * 4 + ["Plains"]
+                    elif equator_dist < 2:
+                        probs = ["Rock"] + ["Desert"] * 2 + ["Jungle"] * 4 + ["Plains"] * 3
+                    elif equator_dist < 3:
+                        probs = (
+                            ["Rock"] + ["Desert"] + ["Jungle"] * 2 + ["Forest"] * 2 + ["Plains"] * 4
+                        )
+                    elif equator_dist < 7:
+                        probs = ["Rock"] +  ["Forest"] * 4 + ["Plains"] * 5
+                    elif equator_dist < 8:
+                        probs = ["Rock"] +  ["Snow"] * 2 + ["Taiga"] * 4 + ["Forest"] * 3
+                    elif equator_dist < 9:
+                        probs = ["Snow"] * 6 + ["Taiga"] * 4
                     else:
-                        dist = tree_water.query((dot.x, dot.y), workers = processes)[0]
-                        if dist < 5:
-                            type = "Plains"
-                        elif (
-                            ((equator_dist > 7)) or
-                            ((5 < dist and dist < 20) and (equator_dist > 7))
-                        ):
-                            type = "Taiga"
-                        elif (
-                            ((5 < dist and dist < 10) and (equator_dist < 4)) or
-                            ((10 < dist and dist < 15) and (equator_dist < 3)) or
-                            ((15 < dist and dist < 20) and (equator_dist < 2)) or
-                            ((20 < dist and dist < 25) and (equator_dist < 1))
-                        ):
-                            type = "Jungle"
-                        elif (
-                            ((dist > 50) and (equator_dist < 5)) or
-                            ((45 < dist and dist < 50) and (equator_dist < 4)) or
-                            ((40 < dist and dist < 45) and (equator_dist < 3)) or
-                            ((35 < dist and dist < 40) and (equator_dist < 2)) or
-                            ((30 < dist and dist < 35) and (equator_dist < 1))
-                        ):
-                            type = "Desert"
-                        elif dist < 20:
-                            type = "Plains"
-                        else:
-                            type = "Forest"
+                        probs = ["Snow"] * 10
+
+                    dot_type = probs[random.randint(0, 9)]
+
                 else:
-                    if equator_dist > 8 or (equator_dist > 7 and random.random() <= 0.50):
-                        type = "Ice"
+
+                    land_dist = tree.query((dot.x, dot.y), workers = processes)[0]
+
+                    if (
+                        (land_dist < 15 and equator_dist > 7) or
+                        (land_dist < 25 and equator_dist > 8) or
+                        (land_dist < 40 and equator_dist > 9)
+                    ):
+                        dot_type = "Ice"
+                    elif land_dist < 15:
+                        dot_type = "Shallow Water"
+                    elif land_dist < 30:
+                        dot_type = "Water"
                     else:
-                        dist = tree_land.query((dot.x, dot.y), workers = processes)[0]
-                        if dist < 10:
-                            type = "Shallow Water 1"
-                        elif dist < 15:
-                            type = "Shallow Water 2"
-                        elif dist < 30:
-                            type = "Water"
-                        elif dist < 45:
-                            type = "Deep Water 1"
-                        else:
-                            type = "Deep Water 2"
-                dots[i] = Dot(dot.x, dot.y, type)
+                        dot_type = "Deep Water"
+                
+                dots[i] = Dot(dot.x, dot.y, dot_type)
+
+            biome_origin_dots = [dots[i] for i in biome_origin_dot_indexes]
+            tree = scipy.spatial.KDTree([(dot.x, dot.y) for dot in biome_origin_dots])
+            for i in range(len(dots)):
+                dot = dots[i]
+                if dot.type == "Land":
+                    dots[i] = Dot(dot.x, dot.y, biome_origin_dots[tree.query((dot.x, dot.y), workers = processes)[1]].type)
 
             section_progress[2] = 1
 
