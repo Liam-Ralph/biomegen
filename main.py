@@ -349,9 +349,10 @@ def main():
     height = get_int(100, 10_000)
 
     print(
-        "\nMap resolution controls the level of fine detail of the map.\n" +
+        "\nMap resolution controls the section size of the map.\n" +
         "Choose a number between 50 and 500. 100 is the default.\n" +
-        "Larger numbers produce lower resolutions.\n" +
+        "Larger numbers produce lower resolutions,\n" +
+        "while higher numbers take longer and have less variation.\n" + 
         "Map Resolution:"
     )
     map_resolution = get_int(50, 500)
@@ -366,11 +367,35 @@ def main():
 
     print(
         "\nIsland size controls average island size.\n" +
-        "Choose a number between 1 and 10. 5 is the default.\n" +
+        "Choose a number between 1 and 10. 3 is the default.\n" +
         "Larger numbers produce larger islands.\n" +
         "Island Size:"
     )
-    island_size = get_int(0, 100)
+    island_size = get_int(0, 10)
+
+    print(
+        "\nCoastline smoothing controls how clean coastlines look.\n" +
+        "Integers between 1 and 100 cause smoother coastlines, fewer islands,\n" +
+        "and fewer lakes. Decimals between 0 and 1 cause minimal smoothing.\n" +
+        "A value of 0 causes no smoothing. Larger numbers produce more smoothing\n" +
+        "Coastline Smoothing:"
+    )
+    while True:
+
+        choice = input()
+
+        try:
+            choice = float(choice)
+        except ValueError:
+            print("Input must be a number.")
+            continue
+
+        if 0 <= choice <= 100:
+            break
+        else:
+            print("Input must be between", min, "and", max, "(both inclusive).")
+
+    coastline_smoothing = choice
 
     print(
         "\nNow you must choose how many of your CPU's threads to use for map generation.\n" +
@@ -382,6 +407,8 @@ def main():
         "Number of Threads:"
     )
     processes = get_int(1, 32)
+
+    num = int(input("rounds:"))
 
     start_time = time.time()
 
@@ -453,30 +480,27 @@ def main():
             [result.wait() for result in results]
 
             # Biome Generation
-            for ii in (1, -1):
-                land_dots = [dot for dot in dots if dot.type == "Land"]
-                water_dots = [dot for dot in dots if dot.type == "Water"]
-                tree1 = scipy.spatial.KDTree([(dot.x, dot.y) for dot in land_dots])
-                tree2 = scipy.spatial.KDTree([(dot.x, dot.y) for dot in water_dots])
-                for i in range(0, len(dots), ii):
-                    dot = dots[i]
-                    if dot.type == "Land":
-                        dist = tree1.query((dot.x, dot.y), k = 3, workers = processes)[0]
-                        dist2 = tree2.query((dot.x, dot.y), k = 3, workers = processes)[0]
-                    elif dot.type == "Water":
-                        dist = tree2.query((dot.x, dot.y), k = 3, workers = processes)[0]
-                        dist2 = tree1.query((dot.x, dot.y), k = 3, workers = processes)[0]
-                    if dot.type in ("Land", "Water") and sum(dist) < sum(dist2):
-                        if True or random.random() <= 0.99:
-                            items = ["Land", "Water"]
-                            items.remove(dot.type)
-                            dots[i] = Dot(dot.x, dot.y, items[0])
-            for i in range(len(dots)):
-                dot = dots[i]
-                if dot.type == "Water":
-                    dots[i] = Dot(dot.x, dot.y, "Land")
-                elif dot.type == "Land":
-                    dots[i] = Dot(dot.x, dot.y, "Water")
+            section_progress_total[2] = 5
+            if num != 0:
+                for ii in (1, -1):
+                    land_dots = [dot for dot in dots if dot.type == "Land"]
+                    water_dots = [dot for dot in dots if dot.type == "Water"]
+                    tree1 = scipy.spatial.KDTree([(dot.x, dot.y) for dot in land_dots])
+                    tree2 = scipy.spatial.KDTree([(dot.x, dot.y) for dot in water_dots])
+                    for i in range(0, len(dots), ii):
+                        dot = dots[i]
+                        if dot.type == "Land":
+                            dist = tree1.query((dot.x, dot.y), k = num, workers = processes)[0]
+                            dist2 = tree2.query((dot.x, dot.y), k = num, workers = processes)[0]
+                        elif dot.type == "Water":
+                            dist = tree2.query((dot.x, dot.y), k = num, workers = processes)[0]
+                            dist2 = tree1.query((dot.x, dot.y), k = num, workers = processes)[0]
+                        if dot.type in ("Land", "Water") and sum(dist) > sum(dist2):
+                            if random.random() <= 0.00:
+                                items = ["Land", "Water"]
+                                items.remove(dot.type)
+                                dots[i] = Dot(dot.x, dot.y, items[0])
+            section_progress[2] = 1
 
             for i in range(len(dots)):
                 dot = dots[i]
@@ -484,10 +508,12 @@ def main():
                     dots[i] = Dot(dot.x, dot.y, "Land")
                 elif dot.type == "Water Forced":
                     dots[i] = Dot(dot.x, dot.y, "Water")
+            section_progress[2] = 2
 
             tree = (
                 scipy.spatial.KDTree([(dot.x, dot.y) for dot in dots if dot.type == "Land"])
             )
+            section_progress[2] = 3
             biome_origin_dot_indexes = random.sample(range(len(dots)), len(dots) // 10)
             biome_origin_dot_indexes = [index for index in biome_origin_dot_indexes if dots[index].type == "Land"]
             for i in biome_origin_dot_indexes:
@@ -538,6 +564,7 @@ def main():
                     dot_type = "Deep Water"
                 
                 dots[i] = Dot(dot.x, dot.y, dot_type)
+            section_progress[2] = 4
 
             biome_origin_dots = [dots[i] for i in biome_origin_dot_indexes]
             tree = scipy.spatial.KDTree([(dot.x, dot.y) for dot in biome_origin_dots])
@@ -545,7 +572,7 @@ def main():
                 dot = dots[i]
                 dots[i] = Dot(dot.x, dot.y, biome_origin_dots[tree.query((dot.x, dot.y), workers = processes)[1]].type)
 
-            section_progress[2] = 1
+            section_progress[2] = 5
 
             # Image Generation
 
@@ -584,7 +611,7 @@ def main():
             for section in image_sections:
                 image.paste(section, (0, shift))
                 shift += section_heights[0]
-            image.save("result.png")
+            image.save("result3.png")
 
         except:
             raise_error("Pool Parent Process", traceback.format_exc())
