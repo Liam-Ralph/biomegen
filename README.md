@@ -1,5 +1,5 @@
 # MapMaker
-### Released January 2025 (planned)
+### Released February 2025 (planned)
 
 <br/>
 

@@ -1,4 +1,5 @@
 # Imports
+
 import ctypes
 import math
 import multiprocessing
@@ -61,7 +62,7 @@ def get_int(min, max):
 
     return choice
 
-def raise_error(location, traceback_output, notes = None):
+def raise_error(location, traceback_output, notes=None):
     with open("errors.txt", "a") as file:
         file.write("Error at " + location + "\n\n" + traceback_output + "\n")
         if notes != None:
@@ -149,7 +150,7 @@ def track_progress(section_progress, section_progress_total, start_time):
     except:
         raise_error(
             "track_progress", traceback.format_exc(),
-            notes = (
+            notes=(
                 "Input \"section_progress\": (Not available)",
                 "Input \"section_progress_total\": (Not available)",
                 "Input \"start_time\": " + str(start_time)
@@ -175,7 +176,7 @@ def calc_pieces_coords(num_dots, processes, width, height):
     except:
         raise_error(
             "calc_sections", traceback.format_exc(),
-            notes = (
+            notes=(
                 "Input \"num_dots\": " + str(num_dots),
                 "Input \"processes\": " + str(processes),
                 "Input \"width\": " + str(width),
@@ -250,7 +251,7 @@ def assign_sections(start_index, index_length, map_resolution, local_dots, origi
     except:
         raise_error(
             "assign_sections", traceback.format_exc(),
-            notes = (
+            notes=(
                 "Input \"map_resolution\": " + str(map_resolution),
                 "Input \"local_dots\": (Not available)"
             )
@@ -320,7 +321,7 @@ def generate_image(start_height, section_height, process_num, local_dots, width)
     except:
         raise_error(
             "generate_image", traceback.format_exc(),
-            notes = (
+            notes=(
                 "Input \"start_height\": " + str(start_height),
                 "Input \"section_height\": " + str(section_height),
                 "Input \"process_num\": " + str(process_num),
@@ -422,15 +423,15 @@ def main():
     image_sections = manager.list([PIL.Image.new("RGB", (100, 100), (255, 0, 102))] * processes)
     lock = multiprocessing.Lock()
 
-    with multiprocessing.Pool(processes, initializer = initialize_pool, initargs =
-    (section_progress, dots, image_sections, lock)) as pool:
+    with multiprocessing.Pool(processes, initializer=initialize_pool,
+    initargs=(section_progress, dots, image_sections, lock)) as pool:
 
         try:
 
             # Progress Tracking
 
-            tracker_process = multiprocessing.Process(target = track_progress,
-                args = (section_progress, section_progress_total, start_time))
+            tracker_process = multiprocessing.Process(target=track_progress,
+                args=(section_progress, section_progress_total, start_time))
             tracker_process.start()
 
             # Section Generation
@@ -490,11 +491,11 @@ def main():
                     for i in range(0, len(dots), ii):
                         dot = dots[i]
                         if dot.type == "Land":
-                            dist = tree1.query((dot.x, dot.y), k = num, workers = processes)[0]
-                            dist2 = tree2.query((dot.x, dot.y), k = num, workers = processes)[0]
+                            dist = tree1.query((dot.x, dot.y), k=num, workers=processes)[0]
+                            dist2 = tree2.query((dot.x, dot.y), k=num, workers=processes)[0]
                         elif dot.type == "Water":
-                            dist = tree2.query((dot.x, dot.y), k = num, workers = processes)[0]
-                            dist2 = tree1.query((dot.x, dot.y), k = num, workers = processes)[0]
+                            dist = tree2.query((dot.x, dot.y), k=num, workers=processes)[0]
+                            dist2 = tree1.query((dot.x, dot.y), k=num, workers=processes)[0]
                         if dot.type in ("Land", "Water") and sum(dist) > sum(dist2):
                             if random.random() <= 0.00:
                                 items = ["Land", "Water"]
@@ -548,7 +549,7 @@ def main():
                 dot = dots[i]
 
                 equator_dist = abs(dot.y - height / 2) / height * 20
-                land_dist = tree.query((dot.x, dot.y), workers = processes)[0]
+                land_dist = tree.query((dot.x, dot.y), workers=processes)[0]
 
                 if (
                     (land_dist < 35 and equator_dist > 9) or
@@ -570,7 +571,7 @@ def main():
             tree = scipy.spatial.KDTree([(dot.x, dot.y) for dot in biome_origin_dots])
             for i in [index for index in range(len(dots)) if dots[index].type == "Land"]:
                 dot = dots[i]
-                dots[i] = Dot(dot.x, dot.y, biome_origin_dots[tree.query((dot.x, dot.y), workers = processes)[1]].type)
+                dots[i] = Dot(dot.x, dot.y, biome_origin_dots[tree.query((dot.x, dot.y), workers=processes)[1]].type)
 
             section_progress[2] = 5
 
