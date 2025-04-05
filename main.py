@@ -1,3 +1,17 @@
+# Copyright (C) 2025 Liam Ralph
+# https://github.com/liam-ralph
+
+# This program, including this file, is licensed under the
+# GNU General Public License v3.0 (GNU GPLv3), with one exception.
+# See LICENSE or this project's source for more information.
+# Project Source: https://github.com/liam-ralph/map-maker
+
+# result.png, the output of this program, is licensed under The Unlicense.
+# See LICENSE_PNG or this project's source for more information.
+
+# MapMaker, a terminal application for generating png maps.
+
+
 # Imports
 
 import ctypes
@@ -90,7 +104,7 @@ def track_progress(section_progress, section_progress_total, start_time):
 
     try:
 
-        section_times = [0.0, 0.0, 0.0, 0.0]
+        section_times = [0.0, 0.0, 0.0, 0.0, 0.0]
 
         while True:
 
@@ -100,9 +114,10 @@ def track_progress(section_progress, section_progress_total, start_time):
             # Section Progress
 
             section_names = [
-                "Section Generation", "Section Assignment", "Biome Generation", "Image Generation"
+                "Section Generation", "Section Assignment", "Coastline Smoothing",
+                "Biome Generation", "Image Generation"
             ]
-            section_weights = [0.05, 0.25, 0.50, 0.20]
+            section_weights = [0.05, 0.25, 0.30, 0.20, 0.20]
 
             for i in range(len(section_names)):
                 section_total = section_progress_total[i]
@@ -121,7 +136,7 @@ def track_progress(section_progress, section_progress_total, start_time):
                         section_times[i] -= sum(section_times[ii] for ii in range(i))
                 
                 print(
-                    color + "[" + str(i + 1) + "/4] " + section_names[i].ljust(20) +
+                    color + "[" + str(i + 1) + "/5] " + section_names[i].ljust(20) +
                     "{:.2f}% ".format(progress_section * 100).rjust(8) +
                     ANSI_GREEN + "█" * round(progress_section * 20) +
                     ANSI_BLUE + "█" * (20 - round(progress_section * 20)) +
@@ -217,13 +232,13 @@ def generate_sections(coords, island_abundance, width):
 def copy_piece(piece_range):
     return dots[piece_range[0] : piece_range[1]]
 
-def assign_sections(start_index, index_length, map_resolution, local_dots, origin_dots, dist_multipliers):
+def assign_sections(piece_range, map_resolution, local_dots, origin_dots, dist_multipliers):
 
     try:
 
         tree = scipy.spatial.KDTree([(dot.x, dot.y) for dot in origin_dots])
 
-        for i in range(start_index, start_index + index_length):
+        for i in range(piece_range[0], piece_range[1]):
 
             dot = local_dots[i]
             
@@ -233,7 +248,11 @@ def assign_sections(start_index, index_length, map_resolution, local_dots, origi
 
                 nearest_origin_dot = origin_dots[index]
 
-                dist = (math.sqrt((nearest_origin_dot.x - dot.x) ** 2 + (nearest_origin_dot.y - dot.y) ** 2) / math.sqrt(map_resolution))
+                dist = (
+                    math.sqrt(
+                        (nearest_origin_dot.x - dot.x) ** 2 + (nearest_origin_dot.y - dot.y) ** 2
+                    ) / math.sqrt(map_resolution)
+                )
                 
                 if dist <= dist_multipliers[index]:
                     chance = ((0.9) ** (1 / dist)) ** dist
@@ -256,6 +275,10 @@ def assign_sections(start_index, index_length, map_resolution, local_dots, origi
                 "Input \"local_dots\": (Not available)"
             )
         )
+
+def smooth_coastlines(piece_range, coastline_smoothing):
+
+
 
 def generate_image(start_height, section_height, process_num, local_dots, width):
 
@@ -314,7 +337,7 @@ def generate_image(start_height, section_height, process_num, local_dots, width)
                 pixels[x, y] = tuple(colors)
 
             with lock:
-                section_progress[3] += 1
+                section_progress[4] += 1
 
         image_sections[process_num] = image_local
 
@@ -377,26 +400,11 @@ def main():
     print(
         "\nCoastline smoothing controls how clean coastlines look.\n" +
         "Integers between 1 and 100 cause smoother coastlines, fewer islands,\n" +
-        "and fewer lakes. Decimals between 0 and 1 cause minimal smoothing.\n" +
-        "A value of 0 causes no smoothing. Larger numbers produce more smoothing\n" +
+        "and fewer lakes. A value of 0 causes no smoothing. Larger numbers\n" +
+        "produce more smoothing\n" +
         "Coastline Smoothing:"
     )
-    while True:
-
-        choice = input()
-
-        try:
-            choice = float(choice)
-        except ValueError:
-            print("Input must be a number.")
-            continue
-
-        if 0 <= choice <= 100:
-            break
-        else:
-            print("Input must be between", min, "and", max, "(both inclusive).")
-
-    coastline_smoothing = choice
+    coastline_smoothing = get_int(0, 100)
 
     print(
         "\nNow you must choose how many of your CPU's threads to use for map generation.\n" +
@@ -409,16 +417,14 @@ def main():
     )
     processes = get_int(1, 32)
 
-    num = int(input("rounds:"))
-
     start_time = time.time()
 
     clear_screen()
 
     manager = multiprocessing.Manager()
 
-    section_progress = multiprocessing.Array(ctypes.c_int, [0, 0, 0, 0])
-    section_progress_total = multiprocessing.Array(ctypes.c_int, [1, 1, 1, 1])
+    section_progress = multiprocessing.Array(ctypes.c_int, [0, 0, 0, 0, 0])
+    section_progress_total = multiprocessing.Array(ctypes.c_int, [1, 1, 1, 1, 1])
     dots = manager.list([])
     image_sections = manager.list([PIL.Image.new("RGB", (100, 100), (255, 0, 102))] * processes)
     lock = multiprocessing.Lock()
@@ -453,8 +459,6 @@ def main():
             
             section_progress_total[1] = num_dots
 
-            results = []
-
             local_dots = []
             piece_lengths = [num_dots // processes] * (processes - 1)
             piece_lengths.append(num_dots - sum(piece_lengths))
@@ -468,20 +472,34 @@ def main():
 
             results = []
 
-            start_indexes = list(range(0, num_dots, num_dots // processes))
-            index_lengths = [num_dots // processes] * (processes - 1)
-            index_lengths.append(num_dots - sum(index_lengths))
-
             origin_dots = [dot for dot in local_dots if dot.type == "Land Origin"]
-            dist_multipliers = [random.uniform(island_size / 2, island_size * 2) for i in range(len(origin_dots))]
+            dist_multipliers = [
+                random.uniform(island_size / 2, island_size * 2) for i in range(len(origin_dots))
+            ]
 
             for i in range(processes):
                 results.append(pool.apply_async(assign_sections,
-                    (start_indexes[i], index_lengths[i], map_resolution, local_dots, origin_dots, dist_multipliers)))
+                    (piece_ranges[i], map_resolution, local_dots, origin_dots, dist_multipliers)))
             [result.wait() for result in results]
 
             # Biome Generation
-            section_progress_total[2] = 5
+
+            if coastline_smoothing != 0:
+
+                section_progress_total[2] = coastline_smoothing * num_dots
+
+                for i in range(coastline_smoothing):
+
+                    results = []
+
+            else:
+
+                section_progress[2] = 1
+
+            # Old Biome Generation
+            """
+            num = coastline_smoothing
+            section_progress_total[3] = 5
             if num != 0:
                 for ii in (1, -1):
                     land_dots = [dot for dot in dots if dot.type == "Land"]
@@ -497,11 +515,10 @@ def main():
                             dist = tree2.query((dot.x, dot.y), k=num, workers=processes)[0]
                             dist2 = tree1.query((dot.x, dot.y), k=num, workers=processes)[0]
                         if dot.type in ("Land", "Water") and sum(dist) > sum(dist2):
-                            if random.random() <= 0.00:
-                                items = ["Land", "Water"]
-                                items.remove(dot.type)
-                                dots[i] = Dot(dot.x, dot.y, items[0])
-            section_progress[2] = 1
+                            items = ["Land", "Water"]
+                            items.remove(dot.type)
+                            dots[i] = Dot(dot.x, dot.y, items[0])
+            section_progress[3] = 1
 
             for i in range(len(dots)):
                 dot = dots[i]
@@ -509,12 +526,12 @@ def main():
                     dots[i] = Dot(dot.x, dot.y, "Land")
                 elif dot.type == "Water Forced":
                     dots[i] = Dot(dot.x, dot.y, "Water")
-            section_progress[2] = 2
+            section_progress[3] = 2
 
             tree = (
                 scipy.spatial.KDTree([(dot.x, dot.y) for dot in dots if dot.type == "Land"])
             )
-            section_progress[2] = 3
+            section_progress[3] = 3
             biome_origin_dot_indexes = random.sample(range(len(dots)), len(dots) // 10)
             biome_origin_dot_indexes = [index for index in biome_origin_dot_indexes if dots[index].type == "Land"]
             for i in biome_origin_dot_indexes:
@@ -565,29 +582,22 @@ def main():
                     dot_type = "Deep Water"
                 
                 dots[i] = Dot(dot.x, dot.y, dot_type)
-            section_progress[2] = 4
+            section_progress[3] = 4
 
             biome_origin_dots = [dots[i] for i in biome_origin_dot_indexes]
-            tree = scipy.spatial.KDTree([(dot.x, dot.y) for dot in biome_origin_dots])
+            tree = scipy.spatial.KDTree([(dot.x, dot.y) for dot in biome_origin_dots]) 
             for i in [index for index in range(len(dots)) if dots[index].type == "Land"]:
                 dot = dots[i]
                 dots[i] = Dot(dot.x, dot.y, biome_origin_dots[tree.query((dot.x, dot.y), workers=processes)[1]].type)
 
-            section_progress[2] = 5
+            section_progress[3] = 5
+            
+            """
 
             # Image Generation
 
-            section_progress_total[3] = height
+            section_progress_total[4] = height
 
-            results = []
-
-            local_dots = []
-            piece_lengths = [num_dots // processes] * (processes - 1)
-            piece_lengths.append(num_dots - sum(piece_lengths))
-            piece_ranges = [
-                [i * piece_lengths[0], i * piece_lengths[0] + piece_lengths[i]]
-                for i in range(processes)
-            ]
             results = pool.map(copy_piece, piece_ranges)
             for result in results:
                 local_dots.extend(result)
@@ -612,7 +622,7 @@ def main():
             for section in image_sections:
                 image.paste(section, (0, shift))
                 shift += section_heights[0]
-            image.save("result3.png")
+            image.save("result.png")
 
         except:
             raise_error("Pool Parent Process", traceback.format_exc())
