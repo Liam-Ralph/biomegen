@@ -1,3 +1,13 @@
+Input Order
+
+width
+height
+map resolution
+island abundance
+island size
+coastline smoothing
+cpu thread count
+
 Calculation Speed Test Inputs
 
 1920
@@ -40,7 +50,7 @@ Calculation Speed Test Inputs
 10
 16
 
-Testing Inputs
+Other Test Inputs
 
 200
 200
