@@ -60,7 +60,7 @@ def clear_screen():
     os.system(command)
 
 def format_time(time_seconds):
-    seconds = f"{(time_seconds % 60):.3f}".rjust(5, "0")
+    seconds = f"{(time_seconds % 60):.3f}".rjust(6, "0")
     minutes = str(int(time_seconds // 60))
     return (minutes + ":" + seconds).rjust(7)
 
@@ -234,7 +234,7 @@ def generate_sections(coords, island_abundance, width):
         )
 
 def copy_piece(piece_range):
-    return dots[piece_range[0] : piece_range[1]]
+    return dots[piece_range[0]:piece_range[1]]
 
 def assign_sections(piece_range, map_resolution, local_dots, origin_dots, dist_multipliers):
 
@@ -356,6 +356,82 @@ def clean_dots(start_index, local_dots_section):
 
     except:
         raise_error("clean_dots", traceback.format_exc())
+
+def create_biome_origin_dots(piece_range, local_dots):
+
+    try:
+
+        return [i for i in random.sample(range(piece_range[0], piece_range[1]), (piece_range[1] - piece_range[0]) // 10) if local_dots[i].type == "Land"]
+
+    except:
+        raise_error("create_biome_origin_dots", traceback.format_exc())
+
+def generate_biomes_water(piece_range, local_dots, height):
+
+    try:
+
+        tree = (
+            scipy.spatial.KDTree([(dot.x, dot.y) for dot in local_dots if dot.type == "Land"])
+        )
+
+        for i in [index for index in range(piece_range[0], piece_range[1]) if local_dots[index].type == "Water"]:
+            
+            dot = dots[i]
+
+            equator_dist = abs(dot.y - height / 2) / height * 20
+            land_dist = tree.query((dot.x, dot.y))[0]
+
+            if (
+                (land_dist < 35 and equator_dist > 9) or
+                (land_dist < 25 and equator_dist > 8) or
+                (land_dist < 15 and equator_dist > 7)
+            ):
+                dot_type = "Ice"
+            elif land_dist < 18:
+                dot_type = "Shallow Water"
+            elif land_dist < 35:
+                dot_type = "Water"
+            else:
+                dot_type = "Deep Water"
+            
+            dots[i] = Dot(dot.x, dot.y, dot_type)
+
+    except:
+        raise_error("generate_biomes_water", traceback.format_exc())
+
+def generate_biomes_land(piece_range, local_dots, height):
+
+    try:
+
+        for i in piece_range:
+            dot = local_dots[i]
+            equator_dist = abs(dot.y - height / 2) / height * 20
+
+            if equator_dist < 1:
+                probs = ["Rock"] + ["Desert"] * 3 + ["Jungle"] * 4 + ["Plains"] * 2
+            elif equator_dist < 2:
+                probs = ["Rock"] + ["Desert"] * 2 + ["Jungle"] * 4 + ["Plains"] * 3
+            elif equator_dist < 3:
+                probs = ["Rock"] + ["Jungle"] * 3 + ["Forest"] * 2 + ["Plains"] * 4
+            elif equator_dist < 4:
+                probs = ["Rock"] + ["Jungle"] * 2 + ["Forest"] * 3 + ["Plains"] * 4
+            elif equator_dist < 6:
+                probs = ["Rock"] +  ["Forest"] * 4 + ["Plains"] * 5
+            elif equator_dist < 7:
+                probs = ["Rock"] + ["Taiga"] * 2 + ["Forest"] * 3 + ["Plains"] * 4
+            elif equator_dist < 8:
+                probs = ["Rock"] +  ["Snow"] * 2 + ["Taiga"] * 4 + ["Forest"] * 3
+            elif equator_dist < 9:
+                probs = ["Snow"] * 6 + ["Taiga"] * 4
+            else:
+                probs = ["Snow"] * 10
+
+            dot_type = probs[random.randint(0, 9)]
+            
+            dots[i] = Dot(dot.x, dot.y, dot_type)
+
+    except:
+        raise_error("generate_biomes_land", traceback.format_exc())
 
 def assign_biomes(piece_range, biome_origin_dots, local_dots):
     
@@ -507,14 +583,6 @@ def main():
 
     start_time = time.time()
 
-    print(width)
-    print(height)
-    print(map_resolution)
-    print(island_abundance)
-    print(island_size)
-    print(coastline_smoothing)
-    print(processes)
-
     clear_screen()
 
     manager = multiprocessing.Manager()
@@ -615,68 +683,43 @@ def main():
 
             section_progress[3] += 1
 
+            section_progress[3] += 1
+
+            local_dots = []
+            results = pool.map(copy_piece, piece_ranges)
+            for result in results:
+                local_dots.extend(result)
+            
+            results = []
+            for i in range(processes):
+                results.append(pool.apply_async(create_biome_origin_dots, (piece_ranges[i], local_dots)))
+            [result.wait() for result in results]
+            biome_origin_dot_indexes = []
+            [biome_origin_dot_indexes.extend(result.get()) for result in results]
+
+            results = []
+            for i in range(processes):
+                results.append(pool.apply_async(generate_biomes_water, (piece_ranges[i], local_dots, height)))
+            [result.wait() for result in results]
+
+            num_origin_dots = len(biome_origin_dot_indexes)
+            origin_piece_lengths = [num_origin_dots // processes] * (processes - 1)
+            origin_piece_lengths.append(num_origin_dots - sum(origin_piece_lengths))
+            origin_piece_ranges = [
+                [i * origin_piece_lengths[0], i * origin_piece_lengths[0] + origin_piece_lengths[i]]
+                for i in range(processes)
+            ]
+
             local_dots = []
             results = pool.map(copy_piece, piece_ranges)
             for result in results:
                 local_dots.extend(result)
 
-            tree = (
-                scipy.spatial.KDTree([(dot.x, dot.y) for dot in local_dots if dot.type == "Land"])
-            )
-            section_progress[3] += 1
+            results = []
+            for i in range(processes):
+                results.append(pool.apply_async(generate_biomes_land, (biome_origin_dot_indexes[origin_piece_ranges[i][0]:origin_piece_ranges[i][1]], local_dots, height)))
+            [result.wait() for result in results]
 
-            # Old Biome Generation
-            
-            biome_origin_dot_indexes = random.sample(range(num_dots), num_dots // 10)
-            biome_origin_dot_indexes = [index for index in biome_origin_dot_indexes if dots[index].type == "Land"]
-            for i in biome_origin_dot_indexes:
-                dot = dots[i]
-                equator_dist = abs(dot.y - height / 2) / height * 20
-
-                if equator_dist < 1:
-                    probs = ["Rock"] + ["Desert"] * 3 + ["Jungle"] * 4 + ["Plains"] * 2
-                elif equator_dist < 2:
-                    probs = ["Rock"] + ["Desert"] * 2 + ["Jungle"] * 4 + ["Plains"] * 3
-                elif equator_dist < 3:
-                    probs = ["Rock"] + ["Jungle"] * 3 + ["Forest"] * 2 + ["Plains"] * 4
-                elif equator_dist < 4:
-                    probs = ["Rock"] + ["Jungle"] * 2 + ["Forest"] * 3 + ["Plains"] * 4
-                elif equator_dist < 6:
-                    probs = ["Rock"] +  ["Forest"] * 4 + ["Plains"] * 5
-                elif equator_dist < 7:
-                    probs = ["Rock"] + ["Taiga"] * 2 + ["Forest"] * 3 + ["Plains"] * 4
-                elif equator_dist < 8:
-                    probs = ["Rock"] +  ["Snow"] * 2 + ["Taiga"] * 4 + ["Forest"] * 3
-                elif equator_dist < 9:
-                    probs = ["Snow"] * 6 + ["Taiga"] * 4
-                else:
-                    probs = ["Snow"] * 10
-
-                dot_type = probs[random.randint(0, 9)]
-                
-                dots[i] = Dot(dot.x, dot.y, dot_type)
-
-            for i in [index for index in range(num_dots) if dots[index].type == "Water"]:
-                
-                dot = dots[i]
-
-                equator_dist = abs(dot.y - height / 2) / height * 20
-                land_dist = tree.query((dot.x, dot.y), workers=processes)[0]
-
-                if (
-                    (land_dist < 35 and equator_dist > 9) or
-                    (land_dist < 25 and equator_dist > 8) or
-                    (land_dist < 15 and equator_dist > 7)
-                ):
-                    dot_type = "Ice"
-                elif land_dist < 18:
-                    dot_type = "Shallow Water"
-                elif land_dist < 35:
-                    dot_type = "Water"
-                else:
-                    dot_type = "Deep Water"
-                
-                dots[i] = Dot(dot.x, dot.y, dot_type)
             section_progress[3] += 1
 
             local_dots = []

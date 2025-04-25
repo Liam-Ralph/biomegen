@@ -3,3 +3,6 @@ Biome Assignment Times
 1864 - Original
  853 - dots-->local_dots
  394 - improvement 2
+
+Total
+1309

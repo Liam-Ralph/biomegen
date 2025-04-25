@@ -8,6 +8,14 @@ Calculation Speed Test Inputs
 10
 16
 
+2560
+1440
+100
+50
+3
+10
+16
+
 3840
 2160
 100
