@@ -6,3 +6,9 @@ Biome Assignment Times
 
 Total
 1309
+
+Test Conditions
+VSCode - main.py
+VSCode - sample_inputs.txt
+Spotify
+Excel
