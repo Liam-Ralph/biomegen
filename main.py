@@ -764,7 +764,7 @@ def main():
             for section in image_sections:
                 image.paste(section, (0, shift))
                 shift += section_heights[0]
-            image.save(f"Production Files/Results/result{coastline_smoothing}.png")
+            image.save("result.png")
 
         except:
             raise_error("Pool Parent Process", traceback.format_exc())
