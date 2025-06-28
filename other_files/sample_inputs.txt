@@ -14,7 +14,7 @@ Calculation Speed Test Inputs
 1080
 100
 50
-3
+40
 10
 16
 
@@ -22,7 +22,7 @@ Calculation Speed Test Inputs
 1440
 100
 50
-3
+40
 10
 16
 
@@ -30,7 +30,7 @@ Calculation Speed Test Inputs
 2160
 100
 50
-3
+40
 10
 16
 
@@ -38,7 +38,7 @@ Calculation Speed Test Inputs
 4320
 100
 50
-3
+40
 10
 16
 
@@ -46,17 +46,17 @@ Calculation Speed Test Inputs
 10000
 100
 50
-3
+40
 10
 16
 
 Other Test Inputs
 
-200
-200
+500
+500
 100
 50
-3
+30
 5
 4
 
@@ -64,14 +64,14 @@ Other Test Inputs
 345
 51
 61
-2
+22
 17
 11
 
-100
-100
+500
+500
 500
 10
-1
+10
 0
 16

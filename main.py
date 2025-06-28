@@ -96,7 +96,7 @@ def raise_error(location, traceback_output, notes=None):
 # (Order of use)
 
 def initialize_pool(section_progress_value, dots_value, image_sections_value, lock_value):
-    
+
     global section_progress
     global dots
     global image_sections
@@ -107,11 +107,15 @@ def initialize_pool(section_progress_value, dots_value, image_sections_value, lo
     image_sections = image_sections_value
     lock = lock_value
 
-def track_progress(section_progress, section_progress_total, start_time):
+def track_progress(section_progress, section_progress_total, section_times, start_time):
 
     try:
 
-        section_times = [0.0, 0.0, 0.0, 0.0, 0.0]
+        section_names = [
+            "Setup", "Section Generation", "Section Assignment", "Coastline Smoothing",
+            "Biome Generation", "Image Generation", "Finish"
+        ]
+        section_weights = [0.05, 0.01, 0.09, 0.20, 0.30, 0.15, 0.20]
 
         while True:
 
@@ -120,34 +124,30 @@ def track_progress(section_progress, section_progress_total, start_time):
 
             # Section Progress
 
-            section_names = [
-                "Section Generation", "Section Assignment", "Coastline Smoothing",
-                "Biome Generation", "Image Generation"
-            ]
-            section_weights = [0.05, 0.25, 0.30, 0.20, 0.20]
+            time_now = time.time()
 
             for i in range(len(section_names)):
+
                 section_total = section_progress_total[i]
-                if section_total == 0:
-                    section_total = 1
                 progress_section = section_progress[i] / section_total
                 total_progress += progress_section * section_weights[i]
 
                 if section_progress[i] == section_progress_total[i]:
                     color = ANSI_GREEN
+                    section_time = section_times[i]
                 else:
                     color = ANSI_BLUE
+                    if i == 0 or section_times[i - 1] != 0:
+                        section_time = time.time() - start_time - sum(section_times)
+                    else:
+                        section_time = 0
 
-                    if i == 0 or section_progress[i - 1] == section_progress_total[i - 1]:
-                        section_times[i] = time.time() - start_time
-                        section_times[i] -= sum(section_times[ii] for ii in range(i))
-                
                 print(
-                    color + "[" + str(i + 1) + "/5] " + section_names[i].ljust(20) +
+                    color + "[" + str(i + 1) + "/7] " + section_names[i].ljust(20) +
                     "{:.2f}% ".format(progress_section * 100).rjust(8) +
                     ANSI_GREEN + "█" * round(progress_section * 20) +
                     ANSI_BLUE + "█" * (20 - round(progress_section * 20)) +
-                    ANSI_RESET + " " + format_time(section_times[i])
+                    ANSI_RESET + " " + format_time(section_time)
                 )
 
             # Total Progress
@@ -161,7 +161,7 @@ def track_progress(section_progress, section_progress_total, start_time):
                 "{:.2f}% ".format(total_progress * 100).rjust(8) +
                 ANSI_GREEN + "█" * round(total_progress * 20) +
                 ANSI_BLUE + "█" * (20 - round(total_progress * 20)) +
-                ANSI_RESET + " " + format_time(time.time() - start_time)
+                ANSI_RESET + " " + format_time(time_now - start_time)
             )
 
             if sum(section_progress) == sum(section_progress_total):
@@ -171,72 +171,13 @@ def track_progress(section_progress, section_progress_total, start_time):
 
     except:
         raise_error(
-            "track_progress", traceback.format_exc(),
-            notes = (
-                "Input \"start_time\": " + str(start_time),
-            )
-        )
-
-def calc_pieces_coords(num_dots, processes, width, height):
-    
-    try:
-
-        piece_lengths = [num_dots // processes] * (processes - 1)
-        piece_lengths.append(num_dots - sum(piece_lengths))
-
-        coords = random.sample(range(0, width * height), num_dots)
-
-        coord_sections = [
-            coords[i * piece_lengths[0] : i * piece_lengths[0] + piece_lengths[i]]
-            for i in range(processes)
-        ]
-
-        return coord_sections
-
-    except:
-        raise_error(
-            "calc_sections", traceback.format_exc(),
-            notes = (
-                "Input \"num_dots\": " + str(num_dots),
-                "Input \"processes\": " + str(processes),
-                "Input \"width\": " + str(width),
-                "Input \"height\": " + str(height)
-            )
-        )
-
-def generate_sections(coords, island_abundance, width):
-
-    try:
-
-        local_dots = []
-
-        for coord in coords:
-
-            dot_type = "Water"
-            if random.randint(1, island_abundance) == 1:
-                dot_type = "Land Origin"
-            elif random.randint(1, (island_abundance - 1)) == 1:
-                dot_type = "Water Forced"
-            local_dots.append(Dot(coord % width, coord // width, dot_type))
-
-            with lock:
-                section_progress[0] += 1
-
-        dots.extend(local_dots)
-
-    except:
-        raise_error(
-            "generate_sections", traceback.format_exc(),
-            notes = (
-                "Input \"island_abundance\": " + str(island_abundance),
-                "Input \"width\": " + str(width)
-            )
+            "track_progress", traceback.format_exc()
         )
 
 def copy_piece(piece_range):
     return dots[piece_range[0]:piece_range[1]]
 
-def assign_sections(piece_range, map_resolution, local_dots, origin_dots, dist_multipliers):
+def assign_sections(piece_range, map_resolution, local_dots, origin_dots, island_size):
 
     try:
 
@@ -245,7 +186,7 @@ def assign_sections(piece_range, map_resolution, local_dots, origin_dots, dist_m
         for i in range(piece_range[0], piece_range[1]):
 
             dot = local_dots[i]
-            
+
             if dot.type == "Water":
 
                 index = tree.query((dot.x, dot.y))[1]
@@ -257,8 +198,8 @@ def assign_sections(piece_range, map_resolution, local_dots, origin_dots, dist_m
                         (nearest_origin_dot.x - dot.x) ** 2 + (nearest_origin_dot.y - dot.y) ** 2
                     ) / math.sqrt(map_resolution)
                 )
-                
-                if dist <= dist_multipliers[index]:
+
+                if dist <= (index % 20 / 19 * 1.5 + 0.25) * island_size:
                     chance = ((0.9) ** (1 / dist)) ** dist
                 else:
                     chance = ((0.1) ** (1 / dist)) ** dist
@@ -269,7 +210,7 @@ def assign_sections(piece_range, map_resolution, local_dots, origin_dots, dist_m
                     dots[i] = Dot(dot.x, dot.y, "Land")
 
             with lock:
-                section_progress[1] += 1
+                section_progress[2] += 1
 
     except:
         raise_error(
@@ -304,7 +245,7 @@ def smooth_coastlines(piece_range, coastline_smoothing, local_dots):
 
                 if dot.type not in types:
                     with lock:
-                        section_progress[2] += 1
+                        section_progress[3] += 1
                     continue
 
                 same_dist = 0.0
@@ -328,7 +269,7 @@ def smooth_coastlines(piece_range, coastline_smoothing, local_dots):
                         dots[ii] = Dot(dot.x, dot.y, types[0])
 
                 with lock:
-                    section_progress[2] += 1
+                    section_progress[3] += 1
 
     except:
         raise_error(
@@ -357,15 +298,6 @@ def clean_dots(start_index, local_dots_section):
     except:
         raise_error("clean_dots", traceback.format_exc())
 
-def create_biome_origin_dots(piece_range, local_dots):
-
-    try:
-
-        return [i for i in random.sample(range(piece_range[0], piece_range[1]), (piece_range[1] - piece_range[0]) // 10) if local_dots[i].type == "Land"]
-
-    except:
-        raise_error("create_biome_origin_dots", traceback.format_exc())
-
 def generate_biomes_water(piece_range, local_dots, height):
 
     try:
@@ -375,7 +307,7 @@ def generate_biomes_water(piece_range, local_dots, height):
         )
 
         for i in [index for index in range(piece_range[0], piece_range[1]) if local_dots[index].type == "Water"]:
-            
+
             dot = dots[i]
 
             equator_dist = abs(dot.y - height / 2) / height * 20
@@ -393,48 +325,14 @@ def generate_biomes_water(piece_range, local_dots, height):
                 dot_type = "Water"
             else:
                 dot_type = "Deep Water"
-            
+
             dots[i] = Dot(dot.x, dot.y, dot_type)
 
     except:
         raise_error("generate_biomes_water", traceback.format_exc())
 
-def generate_biomes_land(piece_range, local_dots, height):
-
-    try:
-
-        for i in piece_range:
-            dot = local_dots[i]
-            equator_dist = abs(dot.y - height / 2) / height * 20
-
-            if equator_dist < 1:
-                probs = ["Rock"] + ["Desert"] * 3 + ["Jungle"] * 4 + ["Plains"] * 2
-            elif equator_dist < 2:
-                probs = ["Rock"] + ["Desert"] * 2 + ["Jungle"] * 4 + ["Plains"] * 3
-            elif equator_dist < 3:
-                probs = ["Rock"] + ["Jungle"] * 3 + ["Forest"] * 2 + ["Plains"] * 4
-            elif equator_dist < 4:
-                probs = ["Rock"] + ["Jungle"] * 2 + ["Forest"] * 3 + ["Plains"] * 4
-            elif equator_dist < 6:
-                probs = ["Rock"] +  ["Forest"] * 4 + ["Plains"] * 5
-            elif equator_dist < 7:
-                probs = ["Rock"] + ["Taiga"] * 2 + ["Forest"] * 3 + ["Plains"] * 4
-            elif equator_dist < 8:
-                probs = ["Rock"] +  ["Snow"] * 2 + ["Taiga"] * 4 + ["Forest"] * 3
-            elif equator_dist < 9:
-                probs = ["Snow"] * 6 + ["Taiga"] * 4
-            else:
-                probs = ["Snow"] * 10
-
-            dot_type = probs[random.randint(0, 9)]
-            
-            dots[i] = Dot(dot.x, dot.y, dot_type)
-
-    except:
-        raise_error("generate_biomes_land", traceback.format_exc())
-
 def assign_biomes(piece_range, biome_origin_dots, local_dots):
-    
+
     try:
 
         tree = scipy.spatial.KDTree([(dot.x, dot.y) for dot in biome_origin_dots])
@@ -504,7 +402,7 @@ def generate_image(start_height, section_height, process_num, local_dots, width)
                 pixels[x, y] = tuple(colors)
 
             with lock:
-                section_progress[4] += 1
+                section_progress[5] += 1
 
         image_sections[process_num] = image_local
 
@@ -530,19 +428,19 @@ def main():
     clear_screen()
 
     print(
-        "Welcome to MapMaker v1.0\n" + 
+        "Welcome to MapMaker v1.0\n" +
         "\nMap Width:"
     )
-    width = get_int(100, 10_000)
+    width = get_int(500, 10_000)
 
     print("\nMap Height:")
-    height = get_int(100, 10_000)
+    height = get_int(500, 10_000)
 
     print(
         "\nMap resolution controls the section size of the map.\n" +
         "Choose a number between 50 and 500. 100 is the default.\n" +
         "Larger numbers produce lower resolutions,\n" +
-        "while higher numbers take longer and have less variation.\n" + 
+        "while lower numbers take longer and have less variation.\n" +
         "Map Resolution:"
     )
     map_resolution = get_int(50, 500)
@@ -557,11 +455,11 @@ def main():
 
     print(
         "\nIsland size controls average island size.\n" +
-        "Choose a number between 1 and 10. 3 is the default.\n" +
+        "Choose a number between 10 and 100. 40 is the default.\n" +
         "Larger numbers produce larger islands.\n" +
         "Island Size:"
     )
-    island_size = get_int(0, 10)
+    island_size = get_int(10, 100) / 10
 
     print(
         "\nCoastline smoothing controls how clean coastlines look.\n" +
@@ -587,8 +485,9 @@ def main():
 
     manager = multiprocessing.Manager()
 
-    section_progress = multiprocessing.Array(ctypes.c_int, [0, 0, 0, 0, 0])
-    section_progress_total = multiprocessing.Array(ctypes.c_int, [1, 1, 1, 1, 1])
+    section_progress = multiprocessing.Array(ctypes.c_int, [0, 0, 0, 0, 0, 0, 0])
+    section_progress_total = multiprocessing.Array(ctypes.c_int, [1, 1, 1, 1, 1, 1, 1])
+    section_times = multiprocessing.Array(ctypes.c_double, [0, 0, 0, 0, 0, 0, 0])
     dots = manager.list([])
     image_sections = manager.list([PIL.Image.new("RGB", (100, 100), (255, 0, 102))] * processes)
     lock = multiprocessing.Lock()
@@ -601,26 +500,36 @@ def main():
             # Progress Tracking
 
             tracker_process = multiprocessing.Process(target=track_progress,
-                args=(section_progress, section_progress_total, start_time))
+                args=(section_progress, section_progress_total, section_times, start_time))
             tracker_process.start()
+
+            section_times[0] = time.time() - start_time
+            section_progress[0] = 1
 
             # Section Generation
 
             num_dots = width * height // map_resolution
 
-            section_progress_total[0] = num_dots
+            section_progress_total[1] = num_dots
 
-            coord_sections = pool.apply(calc_pieces_coords, (num_dots, processes, width, height))
-    
-            results = []
-            for i in range(processes):
-                results.append(pool.apply_async(generate_sections,
-                    (coord_sections[i], island_abundance, width)))
-            [result.wait() for result in results]
+            coords = random.sample(range(0, width * height), num_dots)
+            local_dots = []
+            num_special_dots = num_dots // island_abundance
+
+            [local_dots.append(Dot(coords[i] % width, coords[i] // width, "Land Origin")) for i in range(num_special_dots)]
+            section_progress[1] = num_special_dots
+            [local_dots.append(Dot(coords[i] % width, coords[i] // width, "Water Forced")) for i in range(num_special_dots, num_special_dots * 2)]
+            section_progress[1] += num_special_dots
+            [local_dots.append(Dot(coords[i] % width, coords[i] // width, "Water")) for i in range(num_special_dots * 2, num_dots)]
+            section_progress[1] = num_dots
+
+            dots.extend(local_dots)
+
+            section_times[1] = time.time() - start_time - sum(section_times)
 
             # Section Assignment
-            
-            section_progress_total[1] = num_dots
+
+            section_progress_total[2] = num_dots
 
             piece_lengths = [num_dots // processes] * (processes - 1)
             piece_lengths.append(num_dots - sum(piece_lengths))
@@ -629,27 +538,31 @@ def main():
                 for i in range(processes)
             ]
 
+            asdf_time = time.time()
+
             local_dots = []
             results = pool.map(copy_piece, piece_ranges)
             for result in results:
                 local_dots.extend(result)
 
+            with open("asdf2.txt", "a") as f:
+                f.write(str((time.time() - asdf_time) * 1000) + "\n")
+
             origin_dots = [dot for dot in local_dots if dot.type == "Land Origin"]
-            dist_multipliers = [
-                random.uniform(island_size / 2, island_size * 2) for _ in range(len(origin_dots))
-            ]
 
             results = []
             for i in range(processes):
                 results.append(pool.apply_async(assign_sections,
-                    (piece_ranges[i], map_resolution, local_dots, origin_dots, dist_multipliers)))
+                    (piece_ranges[i], map_resolution, local_dots, origin_dots, island_size)))
             [result.wait() for result in results]
+
+            section_times[2] = time.time() - start_time - sum(section_times)
 
             # Coastline Smoothing
 
             if coastline_smoothing != 0:
 
-                section_progress_total[2] = num_dots * 2
+                section_progress_total[3] = num_dots * 2
 
                 local_dots = []
                 results = pool.map(copy_piece, piece_ranges)
@@ -664,11 +577,13 @@ def main():
 
             else:
 
-                section_progress[2] = 1
+                section_progress[3] = 1
+
+            section_times[3] = time.time() - start_time - sum(section_times)
 
             # Biome Generation
 
-            section_progress_total[3] = 4
+            section_progress_total[4] = 4
 
             local_dots = []
             results = pool.map(copy_piece, piece_ranges)
@@ -681,52 +596,60 @@ def main():
                     (piece_ranges[i][0], local_dots[piece_ranges[i][0]:piece_ranges[i][1]])))
             [result.wait() for result in results]
 
-            section_progress[3] += 1
-
-            section_progress[3] += 1
+            section_progress[4] += 2
 
             local_dots = []
             results = pool.map(copy_piece, piece_ranges)
             for result in results:
                 local_dots.extend(result)
-            
-            results = []
-            for i in range(processes):
-                results.append(pool.apply_async(create_biome_origin_dots, (piece_ranges[i], local_dots)))
-            [result.wait() for result in results]
-            biome_origin_dot_indexes = []
-            [biome_origin_dot_indexes.extend(result.get()) for result in results]
+
+            biome_origin_dot_indexes = [i for i in random.sample(range(0, num_dots), num_dots // 10) if local_dots[i].type == "Land"]
 
             results = []
             for i in range(processes):
                 results.append(pool.apply_async(generate_biomes_water, (piece_ranges[i], local_dots, height)))
             [result.wait() for result in results]
 
-            num_origin_dots = len(biome_origin_dot_indexes)
-            origin_piece_lengths = [num_origin_dots // processes] * (processes - 1)
-            origin_piece_lengths.append(num_origin_dots - sum(origin_piece_lengths))
-            origin_piece_ranges = [
-                [i * origin_piece_lengths[0], i * origin_piece_lengths[0] + origin_piece_lengths[i]]
-                for i in range(processes)
-            ]
+            local_dots = []
+            results = pool.map(copy_piece, piece_ranges)
+            for result in results:
+                local_dots.extend(result)
+
+            for i in biome_origin_dot_indexes:
+
+                dot = local_dots[i]
+                equator_dist = abs(dot.y - height / 2) / height * 20
+
+                if equator_dist < 1:
+                    probs = ["Rock"] + ["Desert"] * 3 + ["Jungle"] * 4 + ["Plains"] * 2
+                elif equator_dist < 2:
+                    probs = ["Rock"] + ["Desert"] * 2 + ["Jungle"] * 4 + ["Plains"] * 3
+                elif equator_dist < 3:
+                    probs = ["Rock"] + ["Jungle"] * 3 + ["Forest"] * 2 + ["Plains"] * 4
+                elif equator_dist < 4:
+                    probs = ["Rock"] + ["Jungle"] * 2 + ["Forest"] * 3 + ["Plains"] * 4
+                elif equator_dist < 6:
+                    probs = ["Rock"] +  ["Forest"] * 4 + ["Plains"] * 5
+                elif equator_dist < 7:
+                    probs = ["Rock"] + ["Taiga"] * 2 + ["Forest"] * 3 + ["Plains"] * 4
+                elif equator_dist < 8:
+                    probs = ["Rock"] +  ["Snow"] * 2 + ["Taiga"] * 4 + ["Forest"] * 3
+                elif equator_dist < 9:
+                    probs = ["Snow"] * 6 + ["Taiga"] * 4
+                else:
+                    probs = ["Snow"] * 10
+
+                dot_type = probs[random.randint(0, 9)]
+
+                dots[i] = Dot(dot.x, dot.y, dot_type)
+
+            section_progress[4] += 1
 
             local_dots = []
             results = pool.map(copy_piece, piece_ranges)
             for result in results:
                 local_dots.extend(result)
 
-            results = []
-            for i in range(processes):
-                results.append(pool.apply_async(generate_biomes_land, (biome_origin_dot_indexes[origin_piece_ranges[i][0]:origin_piece_ranges[i][1]], local_dots, height)))
-            [result.wait() for result in results]
-
-            section_progress[3] += 1
-
-            local_dots = []
-            results = pool.map(copy_piece, piece_ranges)
-            for result in results:
-                local_dots.extend(result)
-            
             biome_origin_dots = [local_dots[i] for i in biome_origin_dot_indexes]
 
             results = []
@@ -734,11 +657,12 @@ def main():
                 results.append(pool.apply_async(assign_biomes, (piece_ranges[i], biome_origin_dots, local_dots)))
             [result.wait() for result in results]
 
-            section_progress[3] += 1
+            section_times[4] = time.time() - start_time - sum(section_times)
+            section_progress[4] += 1
 
             # Image Generation
 
-            section_progress_total[4] = height
+            section_progress_total[5] = height
 
             local_dots = []
             results = pool.map(copy_piece, piece_ranges)
@@ -755,7 +679,7 @@ def main():
                     (start_heights[i], section_heights[i], i, local_dots, width)))
             [result.wait() for result in results]
 
-            tracker_process.join()
+            section_times[5] = time.time() - start_time - sum(section_times)
 
             # Image Stitching
 
@@ -766,9 +690,13 @@ def main():
                 shift += section_heights[0]
             image.save("production_files/result.png")
 
+            section_times[6] = time.time() - start_time - sum(section_times)
+            section_progress[6] = 1
+
         except:
             raise_error("Pool Parent Process", traceback.format_exc())
 
+    tracker_process.join()
     print(
         ANSI_GREEN + "Generation Complete " + ANSI_RESET +
         format_time(time.time() - start_time)
