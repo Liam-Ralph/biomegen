@@ -1,0 +1,9 @@
+Error at track_progress
+
+Traceback (most recent call last):
+  File "/home/liam-ralph/Files/Projects/MapMaker/main.py", line 170, in track_progress
+    time.sleep(0.1)
+KeyboardInterrupt
+
+
+

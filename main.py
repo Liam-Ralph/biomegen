@@ -328,6 +328,8 @@ def generate_biomes_water(piece_range, local_dots, height):
 
             dots[i] = Dot(dot.x, dot.y, dot_type)
 
+            section_progress[4] += 1
+
     except:
         raise_error("generate_biomes_water", traceback.format_exc())
 
@@ -337,10 +339,13 @@ def assign_biomes(piece_range, biome_origin_dots, local_dots):
 
         tree = scipy.spatial.KDTree([(dot.x, dot.y) for dot in biome_origin_dots])
 
-        for i in range(piece_range[0], piece_range[1]):
+        for i in [index for index in range(piece_range[0], piece_range[1]) if local_dots[index].type == "Land"]:
+
             dot = local_dots[i]
-            if dot.type == "Land":
-                dots[i] = Dot(dot.x, dot.y, biome_origin_dots[tree.query((dot.x, dot.y))[1]].type)
+
+            dots[i] = Dot(dot.x, dot.y, biome_origin_dots[tree.query((dot.x, dot.y))[1]].type)
+
+            section_progress[4] += 1
 
     except:
         raise_error("clean_dots", traceback.format_exc())
@@ -538,15 +543,10 @@ def main():
                 for i in range(processes)
             ]
 
-            asdf_time = time.time()
-
             local_dots = []
             results = pool.map(copy_piece, piece_ranges)
             for result in results:
                 local_dots.extend(result)
-
-            with open("asdf2.txt", "a") as f:
-                f.write(str((time.time() - asdf_time) * 1000) + "\n")
 
             origin_dots = [dot for dot in local_dots if dot.type == "Land Origin"]
 
@@ -583,7 +583,7 @@ def main():
 
             # Biome Generation
 
-            section_progress_total[4] = 4
+            section_progress_total[4] = num_dots
 
             local_dots = []
             results = pool.map(copy_piece, piece_ranges)
@@ -595,8 +595,6 @@ def main():
                 results.append(pool.apply_async(clean_dots,
                     (piece_ranges[i][0], local_dots[piece_ranges[i][0]:piece_ranges[i][1]])))
             [result.wait() for result in results]
-
-            section_progress[4] += 2
 
             local_dots = []
             results = pool.map(copy_piece, piece_ranges)
@@ -643,7 +641,7 @@ def main():
 
                 dots[i] = Dot(dot.x, dot.y, dot_type)
 
-            section_progress[4] += 1
+                section_progress[4] += 1
 
             local_dots = []
             results = pool.map(copy_piece, piece_ranges)
@@ -657,8 +655,11 @@ def main():
                 results.append(pool.apply_async(assign_biomes, (piece_ranges[i], biome_origin_dots, local_dots)))
             [result.wait() for result in results]
 
+            with open("asdf2.txt", "w") as file:
+                file.write(str(section_progress_total[4]) + "\n")
+                file.write(str(section_progress[4]))
+
             section_times[4] = time.time() - start_time - sum(section_times)
-            section_progress[4] += 1
 
             # Image Generation
 
