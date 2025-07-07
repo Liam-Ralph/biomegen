@@ -83,13 +83,9 @@ def get_int(min, max):
 
     return choice
 
-def raise_error(location, traceback_output, notes=None):
+def raise_error(location, traceback_output):
     with open("errors.txt", "a") as file:
-        file.write("Error at " + location + "\n\n" + traceback_output + "\n")
-        if notes != None:
-            for note in notes:
-                file.write(note)
-        file.write("\n\n")
+        file.write("Error at " + location + "\n\n" + traceback_output + "\n\n\n")
 
 
 # Multiprocessing Functions
@@ -170,9 +166,7 @@ def track_progress(section_progress, section_progress_total, section_times, star
                 time.sleep(0.1)
 
     except:
-        raise_error(
-            "track_progress", traceback.format_exc()
-        )
+        raise_error("track_progress", traceback.format_exc())
 
 def copy_piece(piece_range):
     return dots[piece_range[0]:piece_range[1]]
@@ -213,12 +207,7 @@ def assign_sections(piece_range, map_resolution, local_dots, origin_dots, island
                 section_progress[2] += 1
 
     except:
-        raise_error(
-            "assign_sections", traceback.format_exc(),
-            notes = (
-                "Input \"map_resolution\": " + str(map_resolution),
-            )
-        )
+        raise_error("assign_sections", traceback.format_exc())
 
 def smooth_coastlines(piece_range, coastline_smoothing, local_dots):
 
@@ -272,12 +261,7 @@ def smooth_coastlines(piece_range, coastline_smoothing, local_dots):
                     section_progress[3] += 1
 
     except:
-        raise_error(
-            "smooth_coastlines", traceback.format_exc(),
-            notes = (
-                "Input \"coastline smoothing\": " + str(coastline_smoothing),
-            )
-        )
+        raise_error("smooth_coastlines", traceback.format_exc())
 
 def clean_dots(start_index, local_dots_section):
 
@@ -306,7 +290,8 @@ def generate_biomes_water(piece_range, local_dots, height):
             scipy.spatial.KDTree([(dot.x, dot.y) for dot in local_dots if dot.type == "Land"])
         )
 
-        for i in [index for index in range(piece_range[0], piece_range[1]) if local_dots[index].type == "Water"]:
+        for i in [index for index in range(piece_range[0], piece_range[1])
+        if local_dots[index].type == "Water"]:
 
             dot = dots[i]
 
@@ -340,7 +325,8 @@ def assign_biomes(piece_range, biome_origin_dots, local_dots):
 
         tree = scipy.spatial.KDTree([(dot.x, dot.y) for dot in biome_origin_dots])
 
-        for i in [index for index in range(piece_range[0], piece_range[1]) if local_dots[index].type == "Land"]:
+        for i in [index for index in range(piece_range[0], piece_range[1])
+        if local_dots[index].type == "Land"]:
 
             dot = local_dots[i]
 
@@ -350,7 +336,7 @@ def assign_biomes(piece_range, biome_origin_dots, local_dots):
                 section_progress[4] += 1
 
     except:
-        raise_error("clean_dots", traceback.format_exc())
+        raise_error("assign_biomes", traceback.format_exc())
 
 def generate_image(start_height, section_height, process_num, local_dots, width):
 
@@ -414,15 +400,7 @@ def generate_image(start_height, section_height, process_num, local_dots, width)
         image_sections[process_num] = image_local
 
     except:
-        raise_error(
-            "generate_image", traceback.format_exc(),
-            notes=(
-                "Input \"start_height\": " + str(start_height),
-                "Input \"section_height\": " + str(section_height),
-                "Input \"process_num\": " + str(process_num),
-                "Input \"width\": " + str(width)
-            )
-        )
+        raise_error("generate_image", traceback.format_exc())
 
 
 # Main Function
@@ -523,11 +501,14 @@ def main():
             local_dots = []
             num_special_dots = num_dots // island_abundance
 
-            [local_dots.append(Dot(coords[i] % width, coords[i] // width, "Land Origin")) for i in range(num_special_dots)]
+            [local_dots.append(Dot(coords[i] % width, coords[i] // width, "Land Origin"))
+                for i in range(num_special_dots)]
             section_progress[1] = num_special_dots
-            [local_dots.append(Dot(coords[i] % width, coords[i] // width, "Water Forced")) for i in range(num_special_dots, num_special_dots * 2)]
+            [local_dots.append(Dot(coords[i] % width, coords[i] // width, "Water Forced"))
+                for i in range(num_special_dots, num_special_dots * 2)]
             section_progress[1] += num_special_dots
-            [local_dots.append(Dot(coords[i] % width, coords[i] // width, "Water")) for i in range(num_special_dots * 2, num_dots)]
+            [local_dots.append(Dot(coords[i] % width, coords[i] // width, "Water"))
+                for i in range(num_special_dots * 2, num_dots)]
             section_progress[1] = num_dots
 
             dots.extend(local_dots)
@@ -603,11 +584,13 @@ def main():
             for result in results:
                 local_dots.extend(result)
 
-            biome_origin_dot_indexes = [i for i in random.sample(range(0, num_dots), num_dots // 10) if local_dots[i].type == "Land"]
+            biome_origin_dot_indexes = [i for i in random.sample(range(0, num_dots), num_dots // 10)
+                if local_dots[i].type == "Land"]
 
             results = []
             for i in range(processes):
-                results.append(pool.apply_async(generate_biomes_water, (piece_ranges[i], local_dots, height)))
+                results.append(pool.apply_async(
+                    generate_biomes_water, (piece_ranges[i], local_dots, height)))
             [result.wait() for result in results]
 
             local_dots = []
@@ -654,7 +637,8 @@ def main():
 
             results = []
             for i in range(processes):
-                results.append(pool.apply_async(assign_biomes, (piece_ranges[i], biome_origin_dots, local_dots)))
+                results.append(pool.apply_async(
+                    assign_biomes, (piece_ranges[i], biome_origin_dots, local_dots)))
             [result.wait() for result in results]
 
             section_times[4] = time.time() - start_time - sum(section_times)
@@ -693,7 +677,7 @@ def main():
             section_progress[6] = 1
 
         except:
-            raise_error("Pool Parent Process", traceback.format_exc())
+            raise_error("main", traceback.format_exc())
 
     tracker_process.join()
     print(
