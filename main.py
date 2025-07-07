@@ -4,12 +4,12 @@
 # This program, including this file, is licensed under the
 # GNU General Public License v3.0 (GNU GPLv3), with one exception.
 # See LICENSE or this project's source for more information.
-# Project Source: https://github.com/liam-ralph/map-maker
+# Project Source: https://github.com/liam-ralph/biomegen
 
 # result.png, the output of this program, is licensed under The Unlicense.
 # See LICENSE_PNG or this project's source for more information.
 
-# MapMaker, a terminal application for generating png maps.
+# BiomeGen, a terminal application for generating png maps.
 
 
 # Imports
@@ -59,12 +59,12 @@ def clear_screen():
         command = "cls"
     os.system(command)
 
-def format_time(time_seconds):
+def format_time(time_seconds): # E.g. 86.34521s --> 01:26.345
     seconds = f"{(time_seconds % 60):.3f}".rjust(6, "0")
     minutes = str(int(time_seconds // 60))
-    return (minutes + ":" + seconds).rjust(7)
+    return (minutes + ":" + seconds).rjust(8)
 
-def get_int(min, max):
+def get_int(min, max): # Integer input sanitization
 
     while True:
 
@@ -84,6 +84,7 @@ def get_int(min, max):
     return choice
 
 def raise_error(location, traceback_output):
+    # Errors in the terminal are often overwritten, so this saves them to error.txt
     with open("errors.txt", "a") as file:
         file.write("Error at " + location + "\n\n" + traceback_output + "\n\n\n")
 
@@ -93,10 +94,12 @@ def raise_error(location, traceback_output):
 
 def initialize_pool(section_progress_value, dots_value, image_sections_value, lock_value):
 
+    # Creates shared variables
+
     global section_progress
     global dots
-    global image_sections
-    global lock
+    global image_sections # Holder for image pieces in generate_image
+    global lock # Lock to prevent two processes from updating the same variable simultaneously
 
     section_progress = section_progress_value
     dots = dots_value
@@ -112,78 +115,81 @@ def track_progress(section_progress, section_progress_total, section_times, star
             "Biome Generation", "Image Generation", "Finish"
         ]
         section_weights = [0.05, 0.01, 0.09, 0.20, 0.30, 0.15, 0.20]
+        # Used for overall progress bar (e.g. Setup takes ~5% of total time)
 
         while True:
 
             clear_screen()
-            total_progress = 0
 
             # Section Progress
 
             time_now = time.time()
 
+            total_progress = 0
+
             for i in range(len(section_names)):
 
-                section_total = section_progress_total[i]
-                progress_section = section_progress[i] / section_total
+                progress_section = section_progress[i] / section_progress_total[i]
                 total_progress += progress_section * section_weights[i]
 
-                if section_progress[i] == section_progress_total[i]:
+                if section_progress[i] == section_progress_total[i]: # Checking if section complete
                     color = ANSI_GREEN
-                    section_time = section_times[i]
+                    section_time = section_times[i] # Section complete
                 else:
                     color = ANSI_BLUE
-                    if i == 0 or section_times[i - 1] != 0:
+                    if i == 0 or section_times[i - 1] != 0: # Section is in progress
                         section_time = time.time() - start_time - sum(section_times)
                     else:
-                        section_time = 0
+                        section_time = 0 # Section hasn't started
 
                 print(
-                    color + "[" + str(i + 1) + "/7] " + section_names[i].ljust(20) +
-                    "{:.2f}% ".format(progress_section * 100).rjust(8) +
-                    ANSI_GREEN + "█" * round(progress_section * 20) +
-                    ANSI_BLUE + "█" * (20 - round(progress_section * 20)) +
-                    ANSI_RESET + " " + format_time(section_time)
+                    color + "[" + str(i + 1) + "/7] " + section_names[i].ljust(20) + # Section name
+                    "{:.2f}% ".format(progress_section * 100).rjust(8) + # Section progress %
+                    ANSI_GREEN + "█" * round(progress_section * 20) + # Green part of progress bar
+                    ANSI_BLUE + "█" * (20 - round(progress_section * 20)) + # Blue part of progress bar
+                    ANSI_RESET + " " + format_time(section_time) # Section time
                 )
 
             # Total Progress
 
             if sum(section_progress) == sum(section_progress_total):
-                color = ANSI_GREEN
+                color = ANSI_GREEN # All sections complete
             else:
-                color = ANSI_BLUE
+                color = ANSI_BLUE # Section in progress
             print(
                 color + "      Total Progress      " +
-                "{:.2f}% ".format(total_progress * 100).rjust(8) +
-                ANSI_GREEN + "█" * round(total_progress * 20) +
-                ANSI_BLUE + "█" * (20 - round(total_progress * 20)) +
-                ANSI_RESET + " " + format_time(time_now - start_time)
+                "{:.2f}% ".format(total_progress * 100).rjust(8) + # Total progress %
+                ANSI_GREEN + "█" * round(total_progress * 20) + # Green part of bar
+                ANSI_BLUE + "█" * (20 - round(total_progress * 20)) + # Blue part
+                ANSI_RESET + " " + format_time(time_now - start_time) # Total time
             )
 
             if sum(section_progress) == sum(section_progress_total):
-                break
+                break # Tracking process ends when all section have completed
             else:
-                time.sleep(0.1)
+                time.sleep(0.1) # Delay before refreshing
 
     except:
         raise_error("track_progress", traceback.format_exc())
 
 def copy_piece(piece_range):
+    # For copying dots into local_dots, as a local variable is faster to access
     return dots[piece_range[0]:piece_range[1]]
 
-def assign_sections(piece_range, map_resolution, local_dots, origin_dots, island_size):
+def assign_sections(map_resolution, island_size, piece_range, origin_dots, local_dots):
 
     try:
 
+        # Used to find the nearest origin dot
         tree = scipy.spatial.KDTree([(dot.x, dot.y) for dot in origin_dots])
 
         for i in range(piece_range[0], piece_range[1]):
 
             dot = local_dots[i]
 
-            if dot.type == "Water":
+            if dot.type == "Water": # Ignore "Water Forced" and "Land Origin"
 
-                index = tree.query((dot.x, dot.y))[1]
+                index = tree.query((dot.x, dot.y))[1] # Find index of nearest origin dot
 
                 nearest_origin_dot = origin_dots[index]
 
@@ -191,15 +197,14 @@ def assign_sections(piece_range, map_resolution, local_dots, origin_dots, island
                     math.sqrt(
                         (nearest_origin_dot.x - dot.x) ** 2 + (nearest_origin_dot.y - dot.y) ** 2
                     ) / math.sqrt(map_resolution)
-                )
+                ) # Find distance between dot and nearest_origin_dot
 
                 if dist <= (index % 20 / 19 * 1.5 + 0.25) * island_size:
-                    chance = ((0.9) ** (1 / dist)) ** dist
+                # Random num (0.25 - 1.75) * island_size
+                    chance = 0.9
                 else:
-                    chance = ((0.1) ** (1 / dist)) ** dist
+                    chance = 0.1
 
-                if chance > 1.0:
-                    chance = 1.0
                 if random.random() < chance:
                     dots[i] = Dot(dot.x, dot.y, "Land")
 
@@ -214,12 +219,16 @@ def smooth_coastlines(piece_range, coastline_smoothing, local_dots):
     try:
 
         for i in (1, -1):
+        # Smooths starting with first and last dot
+        # (shouldn't make a difference, more of a just in case)
 
             land_dots = [dot for dot in local_dots if dot.type == "Land"]
             water_dots = [dot for dot in local_dots if dot.type == "Water"]
 
             land_tree = scipy.spatial.KDTree([(dot.x, dot.y) for dot in land_dots])
+            # Measures distance to nearest land dot
             water_tree = scipy.spatial.KDTree([(dot.x, dot.y) for dot in water_dots])
+            # Measures distance to nearest water dot
 
             list_dots = list(range(piece_range[0], piece_range[1]))
 
@@ -232,12 +241,12 @@ def smooth_coastlines(piece_range, coastline_smoothing, local_dots):
 
                 types = ["Land", "Water"]
 
-                if dot.type not in types:
+                if dot.type not in types: # "Water Forced" and "Land Origin"
                     with lock:
                         section_progress[3] += 1
                     continue
 
-                same_dist = 0.0
+                same_dist = 0.0 # Distance to nearest dot of same type
                 opp_dist = 1.0
 
                 if dot.type == "Land":
@@ -249,10 +258,11 @@ def smooth_coastlines(piece_range, coastline_smoothing, local_dots):
 
                     same_dist = water_tree.query((dot.x, dot.y), k=coastline_smoothing)[0]
                     opp_dist = land_tree.query((dot.x, dot.y), k=coastline_smoothing)[0]
+    
                 if type(same_dist) is float:
                     same_dist = [same_dist]
                     opp_dist = [opp_dist]
-                if dot.type in types and sum(same_dist) > sum(opp_dist):
+                if sum(same_dist) > sum(opp_dist):
                     types.remove(dot.type)
                     with lock:
                         dots[ii] = Dot(dot.x, dot.y, types[0])
@@ -413,9 +423,19 @@ def main():
     clear_screen()
 
     print(
-        "Welcome to MapMaker v1.0\n" +
-        "\nMap Width:"
+        "Welcome to BiomeGen v1.0\n" +
+        "Copyright (C) 2025 Liam Ralph\n" +
+        "https://github.com/liam-ralph\n" +
+        "This project is licensed under the GNU General Public License v3.0,\n" +
+        "except for result.png, this program's output, licensed under The Unlicense.\n" +
+        "\u001b[38;5;1mWARNING: In some terminals, the refreshing progress screen\n" + 
+        "may flash, which could cause problems for people with epilepsy.\n" + ANSI_RESET +
+        "Press ENTER to begin."
     )
+    input()
+    clear_screen()
+
+    print("Map Width (pixels):")
     width = get_int(500, 10_000)
 
     print("\nMap Height:")
@@ -424,14 +444,15 @@ def main():
     print(
         "\nMap resolution controls the section size of the map.\n" +
         "Choose a number between 50 and 500. 100 is the default.\n" +
-        "Larger numbers produce lower resolutions,\n" +
-        "while lower numbers take longer and have less variation.\n" +
+        "Larger numbers produce lower resolutions, with larger pieces\n" +
+        "while lower numbers take longer to generate.\n" +
         "Map Resolution:"
     )
     map_resolution = get_int(50, 500)
 
     print(
-        "\nIsland abundance controls the ratio of land to water.\n" +
+        "\nIsland abundance control how many islands there are,\n" +
+        "and the ration of land to water.\n" +
         "Choose a number between 10 and 90. 50 is the default.\n" +
         "Larger numbers produces less land.\n" +
         "Island Abundance:"
@@ -447,10 +468,10 @@ def main():
     island_size = get_int(10, 100) / 10
 
     print(
-        "\nCoastline smoothing controls how clean coastlines look.\n" +
-        "Integers between 1 and 100 cause smoother coastlines, fewer islands,\n" +
-        "and fewer lakes. A value of 0 causes no smoothing. A value of 10\n" +
-        "moderate smoothing. Larger numbers produce more smoothing.\n" +
+        "\nCoastline smoothing controls how smooth or rough coastlines look.\n" +
+        "Choose a number between 1 and 100. Larger numbers cause more smoothing.\n" +
+        "A value of 0 causes no smoothing. A value of 10 causes moderate smoothing,\n" +
+        "and is the default value.\n" +
         "Coastline Smoothing:"
     )
     coastline_smoothing = get_int(0, 100)
@@ -458,11 +479,13 @@ def main():
     print(
         "\nNow you must choose how many of your CPU's threads to use for map generation.\n" +
         "Values exceeding your CPU's number of threads will slow map generation.\n" +
+        "The most efficient number of threads to use varies by hardware, OS,\n" +
+        "and CPU load. Values less than 4 threads are usually very inefficient.\n" +
         "Ensure you monitor your CPU for overheating, and halt the program if\n" +
         "high temperatures occur. Using fewer threads may reduce temperatures.\n" +
         "Number of Threads:"
     )
-    processes = get_int(1, 32)
+    processes = get_int(1, 64)
 
     start_time = time.time()
 
@@ -536,7 +559,7 @@ def main():
             results = []
             for i in range(processes):
                 results.append(pool.apply_async(assign_sections,
-                    (piece_ranges[i], map_resolution, local_dots, origin_dots, island_size)))
+                    (map_resolution, island_size, piece_ranges[i], origin_dots, local_dots)))
             [result.wait() for result in results]
 
             section_times[2] = time.time() - start_time - sum(section_times)
@@ -671,7 +694,7 @@ def main():
             for section in image_sections:
                 image.paste(section, (0, shift))
                 shift += section_heights[0]
-            image.save("production_files/result.png")
+            image.save("result.png")
 
             section_times[6] = time.time() - start_time - sum(section_times)
             section_progress[6] = 1
