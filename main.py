@@ -328,7 +328,8 @@ def generate_biomes_water(piece_range, local_dots, height):
 
             dots[i] = Dot(dot.x, dot.y, dot_type)
 
-            section_progress[4] += 1
+            with lock:
+                section_progress[4] += 1
 
     except:
         raise_error("generate_biomes_water", traceback.format_exc())
@@ -344,8 +345,9 @@ def assign_biomes(piece_range, biome_origin_dots, local_dots):
             dot = local_dots[i]
 
             dots[i] = Dot(dot.x, dot.y, biome_origin_dots[tree.query((dot.x, dot.y))[1]].type)
-
-            section_progress[4] += 1
+            
+            with lock:
+                section_progress[4] += 1
 
     except:
         raise_error("clean_dots", traceback.format_exc())
@@ -654,10 +656,6 @@ def main():
             for i in range(processes):
                 results.append(pool.apply_async(assign_biomes, (piece_ranges[i], biome_origin_dots, local_dots)))
             [result.wait() for result in results]
-
-            with open("asdf2.txt", "w") as file:
-                file.write(str(section_progress_total[4]) + "\n")
-                file.write(str(section_progress[4]))
 
             section_times[4] = time.time() - start_time - sum(section_times)
 
