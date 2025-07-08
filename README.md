@@ -21,8 +21,8 @@ as detailed in LICENSE, with the following exception:
 <br/>
 
 ## Other Files
-Found in /other_files
  - sample_inputs.txt
-   Includes a number of inputs that can pasted into your terminal.
+   Includes a number of inputs that can pasted into your terminal
+   (Ctrl + Shift + V usually works for this).
  - generation_times.xlsx
    An Excel file with details on generation time across versions and map sizes.
