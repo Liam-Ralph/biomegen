@@ -1,7 +1,0 @@
-Shades of Pink Used in Errors
-255, 153, 194 Used
-255, 102, 163 Used
-255, 51, 133  Used
-255, 0, 102   Used
-204, 0, 82    Used
-153, 0, 61    Available

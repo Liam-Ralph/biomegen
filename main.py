@@ -146,7 +146,7 @@ def track_progress(section_progress, section_progress_total, section_times, star
                     color + "[" + str(i + 1) + "/7] " + section_names[i].ljust(20) + # Section name
                     "{:.2f}% ".format(progress_section * 100).rjust(8) + # Section progress %
                     ANSI_GREEN + "█" * round(progress_section * 20) + # Green part of progress bar
-                    ANSI_BLUE + "█" * (20 - round(progress_section * 20)) + # Blue part of progress bar
+                    ANSI_BLUE + "█" * (20 - round(progress_section * 20)) + # Blue part of bar
                     ANSI_RESET + " " + format_time(section_time) # Section time
                 )
 
@@ -214,7 +214,7 @@ def assign_sections(map_resolution, island_size, piece_range, origin_dots, local
     except:
         raise_error("assign_sections", traceback.format_exc())
 
-def smooth_coastlines(piece_range, coastline_smoothing, local_dots):
+def smooth_coastlines(coastline_smoothing, piece_range, local_dots):
 
     try:
 
@@ -252,6 +252,8 @@ def smooth_coastlines(piece_range, coastline_smoothing, local_dots):
                 if dot.type == "Land":
 
                     same_dist = land_tree.query((dot.x, dot.y), k=coastline_smoothing)[0]
+                    # Includes the nearest k dots
+                    # Larger number of dots creates more clumping and smoother coastlines
                     opp_dist = water_tree.query((dot.x, dot.y), k=coastline_smoothing)[0]
 
                 elif dot.type == "Water":
@@ -259,10 +261,12 @@ def smooth_coastlines(piece_range, coastline_smoothing, local_dots):
                     same_dist = water_tree.query((dot.x, dot.y), k=coastline_smoothing)[0]
                     opp_dist = land_tree.query((dot.x, dot.y), k=coastline_smoothing)[0]
     
-                if type(same_dist) is float:
+                if type(same_dist) is float: # If coastline_smoothing == 1
                     same_dist = [same_dist]
                     opp_dist = [opp_dist]
                 if sum(same_dist) > sum(opp_dist):
+                # If average distance to the same type of dot is greater
+                # than average distance to opposite type dot for the nearest k dots
                     types.remove(dot.type)
                     with lock:
                         dots[ii] = Dot(dot.x, dot.y, types[0])
@@ -273,9 +277,11 @@ def smooth_coastlines(piece_range, coastline_smoothing, local_dots):
     except:
         raise_error("smooth_coastlines", traceback.format_exc())
 
-def clean_dots(start_index, local_dots_section):
+def clean_dots(local_dots_section, start_index):
 
     try:
+
+        # Remove all "Land Origin" and "Water Forced", which become "Land" and "Water"
 
         for i in range(len(local_dots_section)):
 
@@ -299,27 +305,30 @@ def generate_biomes_water(piece_range, local_dots, height):
         tree = (
             scipy.spatial.KDTree([(dot.x, dot.y) for dot in local_dots if dot.type == "Land"])
         )
+        # Finds nearest land dot
 
         for i in [index for index in range(piece_range[0], piece_range[1])
-        if local_dots[index].type == "Water"]:
+        if local_dots[index].type == "Water"]: # For every "Water" dot in piece_range
 
             dot = dots[i]
 
             equator_dist = abs(dot.y - height / 2) / height * 20
+            # Distance from equator 0-10, where 0 is on equator and 10 is top or bottom of page
             land_dist = tree.query((dot.x, dot.y))[0]
+            # Distance to nearest land dot
 
             if (
                 (land_dist < 35 and equator_dist > 9) or
                 (land_dist < 25 and equator_dist > 8) or
                 (land_dist < 15 and equator_dist > 7)
             ):
-                dot_type = "Ice"
+                dot_type = "Ice" # All water near poles is ice
             elif land_dist < 18:
-                dot_type = "Shallow Water"
+                dot_type = "Shallow Water" # Near land is shallow
             elif land_dist < 35:
                 dot_type = "Water"
             else:
-                dot_type = "Deep Water"
+                dot_type = "Deep Water" # Far from land is deep
 
             dots[i] = Dot(dot.x, dot.y, dot_type)
 
@@ -334,13 +343,16 @@ def assign_biomes(piece_range, biome_origin_dots, local_dots):
     try:
 
         tree = scipy.spatial.KDTree([(dot.x, dot.y) for dot in biome_origin_dots])
+        # Finds nearest biome origin dot
+        # (a dot that sets the surrounding land to be a certain biome)
 
         for i in [index for index in range(piece_range[0], piece_range[1])
-        if local_dots[index].type == "Land"]:
+        if local_dots[index].type == "Land"]: # For every "Land" dot
 
             dot = local_dots[i]
 
             dots[i] = Dot(dot.x, dot.y, biome_origin_dots[tree.query((dot.x, dot.y))[1]].type)
+            # Dot becomes the type of the nearest biome origin dot
             
             with lock:
                 section_progress[4] += 1
@@ -354,20 +366,22 @@ def generate_image(start_height, section_height, process_num, local_dots, width)
 
         image_local = (
             PIL.Image.new("RGB", (width, section_height), (255, 153, 194))
-        )
-        pixels = image_local.load()
+        ) # Create empty image for section
+        pixels = image_local.load() # Load image into pixel array
         tree = scipy.spatial.KDTree([(dot.x, dot.y) for dot in local_dots])
+        # Find nearest dot to a point
 
         for y in range(section_height):
 
             indexes = tree.query([(x, y + start_height) for x in range(width)])[1]
+            # Finds nearest dot's index for every x value in the row y
 
             for x in range(width):
 
                 pixel_type = "Error"
-                pixel_type = local_dots[indexes[x]].type
+                pixel_type = local_dots[indexes[x]].type # Find pixel type
 
-                match (pixel_type):
+                match (pixel_type): # Assign color based on type
                     case "Ice":
                         colors = [153, 221, 255]
                     case "Snow":
@@ -397,12 +411,14 @@ def generate_image(start_height, section_height, process_num, local_dots, width)
                     case _:
                         colors = [204, 0, 82]
                 for i in range(len(colors)):
+                    # Adds slight color variation
+                    # Every pixel around the same dot has the same variation
                     colors[i] += indexes[x] % 20 - 10
                     if colors[i] > 255:
                         colors[i] = 255
                     elif colors[i] < 0:
                         colors[i] = 0
-                pixels[x, y] = tuple(colors)
+                pixels[x, y] = tuple(colors) # Update image section with pixel color
 
             with lock:
                 section_progress[5] += 1
@@ -422,6 +438,7 @@ def main():
 
     clear_screen()
 
+    # Copyright, license notice, etc.
     print(
         "Welcome to BiomeGen v1.0\n" +
         "Copyright (C) 2025 Liam Ralph\n" +
@@ -432,6 +449,8 @@ def main():
         "may flash, which could cause problems for people with epilepsy.\n" + ANSI_RESET +
         "Press ENTER to begin."
     )
+    # I do not know if the flashing lights this program sometimes makes could reasonably cause
+    # epilepsy or not, but I put this just in case
     input()
     clear_screen()
 
@@ -485,7 +504,7 @@ def main():
         "high temperatures occur. Using fewer threads may reduce temperatures.\n" +
         "Number of Threads:"
     )
-    processes = get_int(1, 64)
+    processes = get_int(1, 64) # Change this for CPUs with >64 threads
 
     start_time = time.time()
 
@@ -499,6 +518,7 @@ def main():
     dots = manager.list([])
     image_sections = manager.list([PIL.Image.new("RGB", (100, 100), (255, 0, 102))] * processes)
     lock = multiprocessing.Lock()
+    # Lock to prevent two processes from updating the same variable simultaneously
 
     with multiprocessing.Pool(processes, initializer=initialize_pool,
     initargs=(section_progress, dots, image_sections, lock)) as pool:
@@ -512,20 +532,29 @@ def main():
             tracker_process.start()
 
             section_times[0] = time.time() - start_time
+            # Everyting from "start_time = " to here is part of Setup
             section_progress[0] = 1
 
             # Section Generation
+            # Creating the initial list of dots
 
             num_dots = width * height // map_resolution
+            # The map is divided by a number of dots, which form polygons out of the nearest pixels
+            # to each dot, so only dots are used during map generation, and pixels are only assigned
+            # at the very end
 
             section_progress_total[1] = num_dots
+            # A section's progress = section_progress[x] / section_progress_total[x]
+            # For this section, the total number of "steps" taken == num_dots
 
             coords = random.sample(range(0, width * height), num_dots)
-            local_dots = []
+            # Randomly creates coords for each dot, not in any order
+            local_dots = [] # Faster to add items to local_dots than dots
             num_special_dots = num_dots // island_abundance
 
             [local_dots.append(Dot(coords[i] % width, coords[i] // width, "Land Origin"))
                 for i in range(num_special_dots)]
+            # Add x "Land Origin" dots with random coords to local_dots, where x = num_special_dots
             section_progress[1] = num_special_dots
             [local_dots.append(Dot(coords[i] % width, coords[i] // width, "Water Forced"))
                 for i in range(num_special_dots, num_special_dots * 2)]
@@ -539,6 +568,7 @@ def main():
             section_times[1] = time.time() - start_time - sum(section_times)
 
             # Section Assignment
+            # Assigning dots as "Land", "Land Origin", "Water", or "Water Forced"
 
             section_progress_total[2] = num_dots
 
@@ -548,19 +578,22 @@ def main():
                 [i * piece_lengths[0], i * piece_lengths[0] + piece_lengths[i]]
                 for i in range(processes)
             ]
+            # Used to create x pieces of around size num_dots / x, where x = num_processes
 
             local_dots = []
             results = pool.map(copy_piece, piece_ranges)
             for result in results:
                 local_dots.extend(result)
+            # Copying dots in local_dots, since local variables are faster to access
 
             origin_dots = [dot for dot in local_dots if dot.type == "Land Origin"]
 
             results = []
+            # results list needed for result.wait(), no result is actually returned in most cases
             for i in range(processes):
                 results.append(pool.apply_async(assign_sections,
                     (map_resolution, island_size, piece_ranges[i], origin_dots, local_dots)))
-            [result.wait() for result in results]
+            [result.wait() for result in results] # Wait for all process to finish assign_sections
 
             section_times[2] = time.time() - start_time - sum(section_times)
 
@@ -578,18 +611,22 @@ def main():
                 results = []
                 for i in range(processes):
                     results.append(pool.apply_async(smooth_coastlines,
-                        (piece_ranges[i], coastline_smoothing, local_dots)))
+                        (coastline_smoothing, piece_ranges[i], local_dots)))
+                    # piece_ranges is reused multiple times without being remade
                 [result.wait() for result in results]
 
-            else:
+            else: # Skip everything, no smoothing needed
 
                 section_progress[3] = 1
 
             section_times[3] = time.time() - start_time - sum(section_times)
 
             # Biome Generation
+            # Creating biomes
 
             section_progress_total[4] = num_dots
+
+            # Removing "Land Origin" and "Water Forced" dots, they aren't needed anymore
 
             local_dots = []
             results = pool.map(copy_piece, piece_ranges)
@@ -599,16 +636,15 @@ def main():
             results = []
             for i in range(processes):
                 results.append(pool.apply_async(clean_dots,
-                    (piece_ranges[i][0], local_dots[piece_ranges[i][0]:piece_ranges[i][1]])))
+                    (local_dots[piece_ranges[i][0]:piece_ranges[i][1]], piece_ranges[i][0])))
             [result.wait() for result in results]
+
+            # Creating water biomes to add depth and ice at poles
 
             local_dots = []
             results = pool.map(copy_piece, piece_ranges)
             for result in results:
                 local_dots.extend(result)
-
-            biome_origin_dot_indexes = [i for i in random.sample(range(0, num_dots), num_dots // 10)
-                if local_dots[i].type == "Land"]
 
             results = []
             for i in range(processes):
@@ -616,15 +652,21 @@ def main():
                     generate_biomes_water, (piece_ranges[i], local_dots, height)))
             [result.wait() for result in results]
 
+            # Adding "biome origin dots", which decide what biome that area of land will be
+
             local_dots = []
             results = pool.map(copy_piece, piece_ranges)
             for result in results:
                 local_dots.extend(result)
 
+            biome_origin_dot_indexes = [i for i in random.sample(range(0, num_dots), num_dots // 10)
+                if local_dots[i].type == "Land"] # 10% of all land dots become biome origin dots
+
             for i in biome_origin_dot_indexes:
 
                 dot = local_dots[i]
                 equator_dist = abs(dot.y - height / 2) / height * 20
+                # Distance from equator 0-10, where 0 is on equator and 10 is top or bottom of page
 
                 if equator_dist < 1:
                     probs = ["Rock"] + ["Desert"] * 3 + ["Jungle"] * 4 + ["Plains"] * 2
@@ -639,17 +681,36 @@ def main():
                 elif equator_dist < 7:
                     probs = ["Rock"] + ["Taiga"] * 2 + ["Forest"] * 3 + ["Plains"] * 4
                 elif equator_dist < 8:
-                    probs = ["Rock"] +  ["Snow"] * 2 + ["Taiga"] * 4 + ["Forest"] * 3
+                    probs = (
+                        ["Rock"] +  ["Snow"] * 2 + ["Taiga"] * 4 + ["Forest"] * 1 + ["Plains"] * 2
+                    )
                 elif equator_dist < 9:
                     probs = ["Snow"] * 6 + ["Taiga"] * 4
                 else:
                     probs = ["Snow"] * 10
+
+                # Probability Chart, 1 box = 10% Chance
+                # r = Rock, D = Desert, etc. Numbers represent equator distance
+                # Uppercase and lowercase are an attempt
+                # to make it easier to read, they mean nothing
+                # 0-1 | r D D D J J J J P P
+                # 1-2 | r D D J J J J P P P
+                # 2-3 | r J J J f f P P P P
+                # 3-4 | r J J f f f P P P P
+                # 4-5 | r f f f f P P P P P
+                # 5-6 | r f f f f P P P P P (identical to 4-5)
+                # 6-7 | r T T f f f P P P P
+                # 7-8 | r s s T T T T f P P
+                # 8-9 | s s s s T T T T T T
+                # 9-10| s s s s s s s s s s
 
                 dot_type = probs[random.randint(0, 9)]
 
                 dots[i] = Dot(dot.x, dot.y, dot_type)
 
                 section_progress[4] += 1
+
+            # Add land biomes, dots are assigned the biome of the nearest biome origin dot
 
             local_dots = []
             results = pool.map(copy_piece, piece_ranges)
@@ -678,23 +739,26 @@ def main():
             start_heights = list(range(0, height, height // processes))
             section_heights = [height // processes] * (processes - 1)
             section_heights.append(height - sum(section_heights))
+            # Image is generated in x sections, where x = num_processes
+            # Sections are full width, but only around height / num_processes
 
             results = []
             for i in range(processes):
                 results.append(pool.apply_async(generate_image,
                     (start_heights[i], section_heights[i], i, local_dots, width)))
+                # i tells process which section it is
             [result.wait() for result in results]
 
             section_times[5] = time.time() - start_time - sum(section_times)
 
             # Image Stitching
 
-            image = PIL.Image.new("RGB", (width, height), (255, 51, 133))
+            image = PIL.Image.new("RGB", (width, height), (255, 51, 133)) # Create blank image
             shift = 0
-            for section in image_sections:
+            for section in image_sections: # Adds image section onto image
                 image.paste(section, (0, shift))
                 shift += section_heights[0]
-            image.save("result.png")
+            image.save("result.png") # Change this to change result location
 
             section_times[6] = time.time() - start_time - sum(section_times)
             section_progress[6] = 1
@@ -702,7 +766,7 @@ def main():
         except:
             raise_error("main", traceback.format_exc())
 
-    tracker_process.join()
+    tracker_process.join() # Tracker process closes self after all sections complete
     print(
         ANSI_GREEN + "Generation Complete " + ANSI_RESET +
         format_time(time.time() - start_time)
