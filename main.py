@@ -364,6 +364,9 @@ def generate_image(start_height, section_height, process_num, local_dots, width)
 
     try:
 
+        type_counts = [0] * 11
+        # Counts pixels of each biome and water type for statistics
+
         image_local = (
             PIL.Image.new("RGB", (width, section_height), (255, 153, 194))
         ) # Create empty image for section
@@ -381,31 +384,34 @@ def generate_image(start_height, section_height, process_num, local_dots, width)
                 pixel_type = "Error"
                 pixel_type = local_dots[indexes[x]].type # Find pixel type
 
+                type_counts[(
+                    "Ice", "Shallow Water", "Water", "Deep Water",
+                    "Rock", "Desert", "Jungle", "Plains", "Forest", "Taiga", "Snow"
+                ).index(pixel_type)] += 1
+
                 match (pixel_type): # Assign color based on type
                     case "Ice":
                         colors = [153, 221, 255]
-                    case "Snow":
-                        colors = [245, 245, 245]
                     case "Shallow Water":
                         colors = [0, 0, 255]
                     case "Water":
                         colors = [0, 0, 179]
                     case "Deep Water":
                         colors = [0, 0, 128]
-                    case "Sand":
-                        colors = [255, 153, 51]
+                    case "Rock":
+                        colors = [128, 128, 128]
                     case "Desert":
                         colors = [255, 185, 109]
-                    case "Forest":
-                        colors = [0, 128, 0]
-                    case "Taiga":
-                        colors = [152, 251, 152]
                     case "Jungle":
                         colors = [0, 77, 0]
                     case "Plains":
                         colors = [0, 179, 0]
-                    case "Rock":
-                        colors = [128, 128, 128]
+                    case "Forest":
+                        colors = [0, 128, 0]
+                    case "Taiga":
+                        colors = [152, 251, 152]
+                    case "Snow":
+                        colors = [245, 245, 245]
                     case "Error":
                         colors = [255, 102, 163]
                     case _:
@@ -425,8 +431,11 @@ def generate_image(start_height, section_height, process_num, local_dots, width)
 
         image_sections[process_num] = image_local
 
+        return type_counts
+
     except:
         raise_error("generate_image", traceback.format_exc())
+        return [0] * 11
 
 
 # Main Function
@@ -691,8 +700,7 @@ def main():
 
                 # Probability Chart, 1 box = 10% Chance
                 # r = Rock, D = Desert, etc. Numbers represent equator distance
-                # Uppercase and lowercase are an attempt
-                # to make it easier to read, they mean nothing
+                # Uppercase/lowercase are an attempt to make it easier to read, they mean nothing
                 # 0-1 | r D D D J J J J P P
                 # 1-2 | r D D J J J J P P P
                 # 2-3 | r J J J f f P P P P
@@ -749,6 +757,11 @@ def main():
                 # i tells process which section it is
             [result.wait() for result in results]
 
+            type_counts = [0] * 11 # Counting total pixels of each biome and water type
+            for result in results:
+                for i in range(11):
+                    type_counts[i] += result.get()[i]
+
             section_times[5] = time.time() - start_time - sum(section_times)
 
             # Image Stitching
@@ -769,7 +782,27 @@ def main():
     tracker_process.join() # Tracker process closes self after all sections complete
     print(
         ANSI_GREEN + "Generation Complete " + ANSI_RESET +
-        format_time(time.time() - start_time)
+        format_time(time.time() - start_time) + "\n\nStatistics"
+    )
+
+    types = (
+        "Ice", "Shallow Water", "Water", "Deep Water",
+        "Rock", "Desert", "Jungle", "Plains", "Forest", "Taiga", "Snow"
+    )
+    text_colors = ("117", "21", "19", "17", "243", "229", "22", "28", "40", "48", "255")
+    # Colored text for biome labels
+
+    for i in range(11):
+        print(
+            "\u001b[48;5;" + text_colors[i] + "m" + types[i].ljust(13) + ANSI_RESET + # Label
+            "{:.2f}%".format(type_counts[i] / (height * width) * 100).rjust(7) # Percentage
+        )
+    print(
+        "Water         " +
+        "{:.2f}%".format(sum(type_counts[:4]) / (height * width) * 100).rjust(6)
+    )
+    print("Land          " +
+        "{:.2f}%".format(sum(type_counts[4:]) / (height * width) * 100).rjust(6)
     )
 
 
