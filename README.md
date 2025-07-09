@@ -24,5 +24,5 @@ as detailed in LICENSE, with the following exception:
  - sample_inputs.txt
    Includes a number of inputs that can pasted into your terminal
    (Ctrl + Shift + V usually works for this).
- - generation_times.xlsx
-   An Excel file with details on generation time across versions and map sizes.
+ - testing_times.txt
+   Results of tests to determine average speed across version, OS, hardware, etc.

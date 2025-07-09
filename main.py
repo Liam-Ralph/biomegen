@@ -114,8 +114,8 @@ def track_progress(section_progress, section_progress_total, section_times, star
             "Setup", "Section Generation", "Section Assignment", "Coastline Smoothing",
             "Biome Generation", "Image Generation", "Finish"
         ]
-        section_weights = [0.05, 0.01, 0.09, 0.20, 0.30, 0.15, 0.20]
-        # Used for overall progress bar (e.g. Setup takes ~5% of total time)
+        section_weights = [0.02, 0.01, 0.11, 0.38, 0.29, 0.17, 0.02]
+        # Used for overall progress bar (e.g. Setup takes ~2% of total time)
 
         while True:
 
