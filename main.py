@@ -481,7 +481,7 @@ def main():
     print(
         "\nIsland abundance control how many islands there are,\n" +
         "and the ration of land to water.\n" +
-        "Choose a number between 10 and 1000. 50 is the default.\n" +
+        "Choose a number between 10 and 1000. 120 is the default.\n" +
         "Larger numbers produces less land.\n" +
         "Island Abundance:"
     )
@@ -489,7 +489,7 @@ def main():
 
     print(
         "\nIsland size controls average island size.\n" +
-        "Choose a number between 10 and 100. 40 is the default.\n" +
+        "Choose a number between 10 and 100. 50 is the default.\n" +
         "Larger numbers produce larger islands.\n" +
         "Island Size:"
     )
@@ -498,7 +498,7 @@ def main():
     print(
         "\nCoastline smoothing controls how smooth or rough coastlines look.\n" +
         "Choose a number between 1 and 100. Larger numbers cause more smoothing.\n" +
-        "A value of 0 causes no smoothing. A value of 10 causes moderate smoothing,\n" +
+        "A value of 0 causes no smoothing. A value of 5 causes some smoothing,\n" +
         "and is the default value.\n" +
         "Coastline Smoothing:"
     )
