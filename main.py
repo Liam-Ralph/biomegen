@@ -386,7 +386,7 @@ def generate_image(start_height, section_height, process_num, local_dots, width)
 
                 type_counts[(
                     "Ice", "Shallow Water", "Water", "Deep Water",
-                    "Rock", "Desert", "Jungle", "Plains", "Forest", "Taiga", "Snow"
+                    "Rock", "Desert", "Jungle", "Forest", "Plains", "Taiga", "Snow"
                 ).index(pixel_type)] += 1
 
                 match (pixel_type): # Assign color based on type
@@ -404,10 +404,10 @@ def generate_image(start_height, section_height, process_num, local_dots, width)
                         colors = [255, 185, 109]
                     case "Jungle":
                         colors = [0, 77, 0]
-                    case "Plains":
-                        colors = [0, 179, 0]
                     case "Forest":
                         colors = [0, 128, 0]
+                    case "Plains":
+                        colors = [0, 179, 0]
                     case "Taiga":
                         colors = [152, 251, 152]
                     case "Snow":
@@ -481,11 +481,11 @@ def main():
     print(
         "\nIsland abundance control how many islands there are,\n" +
         "and the ration of land to water.\n" +
-        "Choose a number between 10 and 90. 50 is the default.\n" +
+        "Choose a number between 10 and 1000. 50 is the default.\n" +
         "Larger numbers produces less land.\n" +
         "Island Abundance:"
     )
-    island_abundance = get_int(10, 90)
+    island_abundance = get_int(10, 1000)
 
     print(
         "\nIsland size controls average island size.\n" +
@@ -678,38 +678,42 @@ def main():
                 # Distance from equator 0-10, where 0 is on equator and 10 is top or bottom of page
 
                 if equator_dist < 1:
-                    probs = ["Rock"] + ["Desert"] * 3 + ["Jungle"] * 4 + ["Plains"] * 2
+                    probs = ["Rock"] + ["Desert"] * 3 + ["Jungle"] * 3 + ["Forest"] * 2 + ["Plains"]
                 elif equator_dist < 2:
-                    probs = ["Rock"] + ["Desert"] * 2 + ["Jungle"] * 4 + ["Plains"] * 3
+                    probs = (
+                        ["Rock"] + ["Desert"] * 3 + ["Jungle"] * 2 + ["Forest"] * 2 + ["Plains"] * 2
+                    )
                 elif equator_dist < 3:
-                    probs = ["Rock"] + ["Jungle"] * 3 + ["Forest"] * 2 + ["Plains"] * 4
+                    probs = ["Rock"] + ["Desert"] * 2 + ["Jungle"] + ["Forest"] * 3 + ["Plains"] * 3
                 elif equator_dist < 4:
-                    probs = ["Rock"] + ["Jungle"] * 2 + ["Forest"] * 3 + ["Plains"] * 4
+                    probs = ["Rock"] + ["Desert"] + ["Jungle"] + ["Forest"] * 3 + ["Plains"] * 4
+                elif equator_dist < 5:
+                    probs = ["Rock"] + ["Desert"] + ["Forest"] * 4 + ["Plains"] * 4
                 elif equator_dist < 6:
-                    probs = ["Rock"] +  ["Forest"] * 4 + ["Plains"] * 5
+                    probs = ["Rock"] +  ["Forest"] * 5 + ["Plains"] * 4
                 elif equator_dist < 7:
-                    probs = ["Rock"] + ["Taiga"] * 2 + ["Forest"] * 3 + ["Plains"] * 4
+                    probs = ["Rock"] + ["Taiga"] + ["Forest"] * 5 + ["Plains"] * 3
                 elif equator_dist < 8:
                     probs = (
-                        ["Rock"] +  ["Snow"] * 2 + ["Taiga"] * 4 + ["Forest"] * 1 + ["Plains"] * 2
+                        ["Rock"] +  ["Snow"] * 2 + ["Taiga"] * 2 + ["Forest"] * 3 + ["Plains"] * 2
                     )
                 elif equator_dist < 9:
-                    probs = ["Snow"] * 6 + ["Taiga"] * 4
+                    probs = ["Snow"] * 4 + ["Taiga"] * 5 + ["Forest"]
                 else:
                     probs = ["Snow"] * 10
 
                 # Probability Chart, 1 box = 10% Chance
                 # r = Rock, D = Desert, etc. Numbers represent equator distance
                 # Uppercase/lowercase are an attempt to make it easier to read, they mean nothing
-                # 0-1 | r D D D J J J J P P
-                # 1-2 | r D D J J J J P P P
-                # 2-3 | r J J J f f P P P P
-                # 3-4 | r J J f f f P P P P
-                # 4-5 | r f f f f P P P P P
-                # 5-6 | r f f f f P P P P P (identical to 4-5)
-                # 6-7 | r T T f f f P P P P
-                # 7-8 | r s s T T T T f P P
-                # 8-9 | s s s s T T T T T T
+                # 0-1 | r D D D J J J f f P
+                # 1-2 | r D D D J J f f P P
+                # 2-3 | r D D J f f f P P P
+                # 3-4 | r D J f f f P P P P
+                # 4-5 | r D f f f f P P P P
+                # 5-6 | r f f f f f P P P P
+                # 6-7 | r T f f f f f P P P
+                # 7-8 | r s s T T f f f P P
+                # 8-9 | s s s s T T T T f f
                 # 9-10| s s s s s s s s s s
 
                 dot_type = probs[random.randint(0, 9)]
@@ -787,23 +791,34 @@ def main():
 
     types = (
         "Ice", "Shallow Water", "Water", "Deep Water",
-        "Rock", "Desert", "Jungle", "Plains", "Forest", "Taiga", "Snow"
+        "Rock", "Desert", "Jungle", "Forest", "Plains", "Taiga", "Snow"
     )
     text_colors = ("117", "21", "19", "17", "243", "229", "22", "28", "40", "48", "255")
     # Colored text for biome labels
 
+    count_water = sum(type_counts[:4])
+    count_land = sum(type_counts[4:])
+    print(
+        "Water " +
+        "{:.2f}%".format(count_water / (height * width) * 100).rjust(6)
+    )
+    print(
+        "Land  " +
+        "{:.2f}%".format(count_land / (height * width) * 100).rjust(6)
+    )
+
+    print("     % of Land/Water | % of Total")
     for i in range(11):
+        if i < 4:
+            count_group = count_water
+        else:
+            count_group = count_land
         print(
             "\u001b[48;5;" + text_colors[i] + "m" + types[i].ljust(13) + ANSI_RESET + # Label
-            "{:.2f}%".format(type_counts[i] / (height * width) * 100).rjust(7) # Percentage
+            "{:.2f}%".format(type_counts[i] / count_group * 100).rjust(7) + " | " +
+            # Percentage of land/water e.g. 30% of all land is forest
+            "{:.2f}%".format(type_counts[i] / (height * width) * 100).rjust(6) # Overall percentage
         )
-    print(
-        "Water         " +
-        "{:.2f}%".format(sum(type_counts[:4]) / (height * width) * 100).rjust(6)
-    )
-    print("Land          " +
-        "{:.2f}%".format(sum(type_counts[4:]) / (height * width) * 100).rjust(6)
-    )
 
 
 if __name__ == "__main__":
