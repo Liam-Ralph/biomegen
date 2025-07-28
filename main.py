@@ -449,7 +449,7 @@ def main():
 
     # Copyright, license notice, etc.
     print(
-        "Welcome to BiomeGen v1.0\n" +
+        "Welcome to BiomeGen v1.0.1\n" +
         "Copyright (C) 2025 Liam Ralph\n" +
         "https://github.com/liam-ralph\n" +
         "This project is licensed under the GNU General Public License v3.0,\n" +
