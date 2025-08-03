@@ -260,7 +260,7 @@ def smooth_coastlines(coastline_smoothing, piece_range, local_dots):
 
                     same_dist = water_tree.query((dot.x, dot.y), k=coastline_smoothing)[0]
                     opp_dist = land_tree.query((dot.x, dot.y), k=coastline_smoothing)[0]
-    
+
                 if type(same_dist) is float: # If coastline_smoothing == 1
                     same_dist = [same_dist]
                     opp_dist = [opp_dist]
@@ -353,7 +353,7 @@ def assign_biomes(piece_range, biome_origin_dots, local_dots):
 
             dots[i] = Dot(dot.x, dot.y, biome_origin_dots[tree.query((dot.x, dot.y))[1]].type)
             # Dot becomes the type of the nearest biome origin dot
-            
+
             with lock:
                 section_progress[4] += 1
 
