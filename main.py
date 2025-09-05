@@ -30,6 +30,7 @@ import ctypes
 import os
 import PIL.Image
 import random
+import sys
 import time
 import traceback
 
@@ -447,73 +448,89 @@ def main():
 
     clear_screen()
 
-    # Copyright, license notice, etc.
-    print(
-        "Welcome to BiomeGen v1.0.1\n" +
-        "Copyright (C) 2025 Liam Ralph\n" +
-        "https://github.com/liam-ralph\n" +
-        "This project is licensed under the GNU General Public License v3.0,\n" +
-        "except for result.png, this program's output, licensed under The Unlicense.\n" +
-        "\u001b[38;5;1mWARNING: In some terminals, the refreshing progress screen\n" + 
-        "may flash, which could cause problems for people with epilepsy.\n" + ANSI_RESET +
-        "Press ENTER to begin."
-    )
-    # I do not know if the flashing lights this program sometimes makes could reasonably cause
-    # epilepsy or not, but I put this just in case
-    input()
-    clear_screen()
+    if len(sys.argv) == 1:
 
-    print("Map Width (pixels):")
-    width = get_int(500, 10_000)
+        # Manual Inputs Mode
 
-    print("\nMap Height:")
-    height = get_int(500, 10_000)
+        output_file = "result.png"
+        # Change this to change result location
 
-    print(
-        "\nMap resolution controls the section size of the map.\n" +
-        "Choose a number between 50 and 500. 100 is the default.\n" +
-        "Larger numbers produce lower resolutions, with larger pieces\n" +
-        "while lower numbers take longer to generate.\n" +
-        "Map Resolution:"
-    )
-    map_resolution = get_int(50, 500)
+        # Copyright, license notice, etc.
+        print(
+            "Welcome to BiomeGen v1.0.1\n" +
+            "Copyright (C) 2025 Liam Ralph\n" +
+            "https://github.com/liam-ralph\n" +
+            "This project is licensed under the GNU General Public License v3.0,\n" +
+            "except for result.png, this program's output, licensed under The Unlicense.\n" +
+            "\u001b[38;5;1mWARNING: In some terminals, the refreshing progress screen\n" + 
+            "may flash, which could cause problems for people with epilepsy.\n" + ANSI_RESET +
+            "Press ENTER to begin."
+        )
+        # I do not know if the flashing lights this program sometimes makes could reasonably cause
+        # epilepsy or not, but I put this just in case
+        input()
+        clear_screen()
 
-    print(
-        "\nIsland abundance control how many islands there are,\n" +
-        "and the ration of land to water.\n" +
-        "Choose a number between 10 and 1000. 120 is the default.\n" +
-        "Larger numbers produces less land.\n" +
-        "Island Abundance:"
-    )
-    island_abundance = get_int(10, 1000)
+        print("Map Width (pixels):")
+        width = get_int(500, 10_000)
 
-    print(
-        "\nIsland size controls average island size.\n" +
-        "Choose a number between 10 and 100. 50 is the default.\n" +
-        "Larger numbers produce larger islands.\n" +
-        "Island Size:"
-    )
-    island_size = get_int(10, 100) / 10
+        print("\nMap Height:")
+        height = get_int(500, 10_000)
 
-    print(
-        "\nCoastline smoothing controls how smooth or rough coastlines look.\n" +
-        "Choose a number between 1 and 100. Larger numbers cause more smoothing.\n" +
-        "A value of 0 causes no smoothing. A value of 5 causes some smoothing,\n" +
-        "and is the default value.\n" +
-        "Coastline Smoothing:"
-    )
-    coastline_smoothing = get_int(0, 100)
+        print(
+            "\nMap resolution controls the section size of the map.\n" +
+            "Choose a number between 50 and 500. 100 is the default.\n" +
+            "Larger numbers produce lower resolutions, with larger pieces\n" +
+            "while lower numbers take longer to generate.\n" +
+            "Map Resolution:"
+        )
+        map_resolution = get_int(50, 500)
 
-    print(
-        "\nNow you must choose how many of your CPU's threads to use for map generation.\n" +
-        "Values exceeding your CPU's number of threads will slow map generation.\n" +
-        "The most efficient number of threads to use varies by hardware, OS,\n" +
-        "and CPU load. Values less than 4 threads are usually very inefficient.\n" +
-        "Ensure you monitor your CPU for overheating, and halt the program if\n" +
-        "high temperatures occur. Using fewer threads may reduce temperatures.\n" +
-        "Number of Threads:"
-    )
-    processes = get_int(1, 64) # Change this for CPUs with >64 threads
+        print(
+            "\nIsland abundance control how many islands there are,\n" +
+            "and the ration of land to water.\n" +
+            "Choose a number between 10 and 1000. 120 is the default.\n" +
+            "Larger numbers produces less land.\n" +
+            "Island Abundance:"
+        )
+        island_abundance = get_int(10, 1000)
+
+        print(
+            "\nIsland size controls average island size.\n" +
+            "Choose a number between 10 and 100. 50 is the default.\n" +
+            "Larger numbers produce larger islands.\n" +
+            "Island Size:"
+        )
+        island_size = get_int(10, 100) / 10
+
+        print(
+            "\nCoastline smoothing controls how smooth or rough coastlines look.\n" +
+            "Choose a number between 1 and 100. Larger numbers cause more smoothing.\n" +
+            "A value of 0 causes no smoothing. A value of 5 causes some smoothing,\n" +
+            "and is the default value.\n" +
+            "Coastline Smoothing:"
+        )
+        coastline_smoothing = get_int(0, 100)
+
+        print(
+            "\nNow you must choose how many of your CPU's threads to use for map generation.\n" +
+            "Values exceeding your CPU's number of threads will slow map generation.\n" +
+            "The most efficient number of threads to use varies by hardware, OS,\n" +
+            "and CPU load. Values less than 4 threads are usually very inefficient.\n" +
+            "Ensure you monitor your CPU for overheating, and halt the program if\n" +
+            "high temperatures occur. Using fewer threads may reduce temperatures.\n" +
+            "Number of Threads:"
+        )
+        processes = get_int(1, 64) # Change this for CPUs with >64 threads
+
+    else:
+
+        # Automated Inputs Mode
+
+        (width, height, map_resolution, island_abundance,
+            island_size, coastline_smoothing, processes) = [int(arg) for arg in sys.argv[1:8]]
+        island_size /= 10
+        output_file = sys.argv[8]
 
     start_time = time.time()
 
@@ -775,7 +792,7 @@ def main():
             for section in image_sections: # Adds image section onto image
                 image.paste(section, (0, shift))
                 shift += section_heights[0]
-            image.save("result.png") # Change this to change result location
+            image.save(output_file) # Save image
 
             section_times[6] = time.time() - start_time - sum(section_times)
             section_progress[6] = 1
