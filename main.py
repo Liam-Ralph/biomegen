@@ -452,8 +452,9 @@ def main():
 
         # Manual Inputs Mode
 
-        output_file = "result.png"
-        # Change this to change result location
+        auto_mode = False
+
+        output_file = "result.png" # Change this to change result location
 
         # Copyright, license notice, etc.
         print(
@@ -527,6 +528,8 @@ def main():
 
         # Automated Inputs Mode
 
+        auto_mode = True
+
         (width, height, map_resolution, island_abundance,
             island_size, coastline_smoothing, processes) = [int(arg) for arg in sys.argv[1:8]]
         island_size /= 10
@@ -550,12 +553,14 @@ def main():
     initargs=(section_progress, dots, image_sections, lock)) as pool:
 
         try:
+                
+            if not auto_mode:
 
-            # Progress Tracking
+                # Progress Tracking
 
-            tracker_process = multiprocessing.Process(target=track_progress,
-                args=(section_progress, section_progress_total, section_times, start_time))
-            tracker_process.start()
+                tracker_process = multiprocessing.Process(target=track_progress,
+                    args=(section_progress, section_progress_total, section_times, start_time))
+                tracker_process.start()
 
             section_times[0] = time.time() - start_time
             # Everyting from "start_time = " to here is part of Setup
@@ -800,42 +805,54 @@ def main():
         except:
             raise_error("main", traceback.format_exc())
 
-    tracker_process.join() # Tracker process closes self after all sections complete
-    print(
-        ANSI_GREEN + "Generation Complete " + ANSI_RESET +
-        format_time(time.time() - start_time) + "\n\nStatistics"
-    )
+    if not auto_mode:
+        tracker_process.join() # Tracker process closes self after all sections complete
 
-    types = (
-        "Ice", "Shallow Water", "Water", "Deep Water",
-        "Rock", "Desert", "Jungle", "Forest", "Plains", "Taiga", "Snow"
-    )
-    text_colors = ("117", "21", "19", "17", "243", "229", "22", "28", "40", "48", "255")
-    # Colored text for biome labels
+    completion_time = time.time() - start_time
 
-    count_water = sum(type_counts[:4])
-    count_land = sum(type_counts[4:])
-    print(
-        "Water " +
-        "{:.2f}%".format(count_water / (height * width) * 100).rjust(6)
-    )
-    print(
-        "Land  " +
-        "{:.2f}%".format(count_land / (height * width) * 100).rjust(6)
-    )
+    if not auto_mode:
 
-    print("     % of Land/Water | % of Total")
-    for i in range(11):
-        if i < 4:
-            count_group = count_water
-        else:
-            count_group = count_land
+        # Print Result Statistics
+
         print(
-            "\u001b[48;5;" + text_colors[i] + "m" + types[i].ljust(13) + ANSI_RESET + # Label
-            "{:.2f}%".format(type_counts[i] / count_group * 100).rjust(7) + " | " +
-            # Percentage of land/water e.g. 30% of all land is forest
-            "{:.2f}%".format(type_counts[i] / (height * width) * 100).rjust(6) # Overall percentage
+            ANSI_GREEN + "Generation Complete " + ANSI_RESET +
+            format_time(completion_time) + "\n\nStatistics"
         )
+
+        types = (
+            "Ice", "Shallow Water", "Water", "Deep Water",
+            "Rock", "Desert", "Jungle", "Forest", "Plains", "Taiga", "Snow"
+        )
+        text_colors = ("117", "21", "19", "17", "243", "229", "22", "28", "40", "48", "255")
+        # Colored text for biome labels
+
+        count_water = sum(type_counts[:4])
+        count_land = sum(type_counts[4:])
+        print(
+            "Water " +
+            "{:.2f}%".format(count_water / (height * width) * 100).rjust(6)
+        )
+        print(
+            "Land  " +
+            "{:.2f}%".format(count_land / (height * width) * 100).rjust(6)
+        )
+
+        print("     % of Land/Water | % of Total")
+        for i in range(11):
+            if i < 4:
+                count_group = count_water
+            else:
+                count_group = count_land
+            print(
+                "\u001b[48;5;" + text_colors[i] + "m" + types[i].ljust(13) + ANSI_RESET + # Label
+                "{:.2f}%".format(type_counts[i] / count_group * 100).rjust(7) + " | " +
+                # Percentage of land/water e.g. 30% of all land is forest
+                "{:.2f}%".format(type_counts[i] / (height * width) * 100).rjust(6) # Overall percentage
+            )
+
+    else:
+
+        print(completion_time)
 
 
 if __name__ == "__main__":
