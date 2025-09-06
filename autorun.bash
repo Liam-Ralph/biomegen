@@ -1,5 +1,7 @@
 #!/bin/bash
 
+echo ""
+
 # Reading Tasks File
 
 raw_file=$(cat autorun_tasks.txt)
@@ -15,11 +17,12 @@ for i in "${tasks[@]}"; do
     reps="$((task_pieces[0]))" # Repetitions
     savepng="${task_pieces[1]}" # Whether to save the png file
     inputs="${task_pieces[2]}" # Python automode inputs
+
+    echo "Running task $inputs for $reps repititions."
+
     if [ "$savepng" = "y" ]; then
         inputs="${inputs/".png"/"0.png"}" # Prep png path for saving multiple files
     fi
-
-    echo "Running task $inputs for $reps repititions."
 
     # Run reps, calculate sum
 
