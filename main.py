@@ -446,8 +446,6 @@ def main():
     with open("errors.txt", "w") as file:
         file.write("")
 
-    clear_screen()
-
     if len(sys.argv) == 1:
 
         # Manual Inputs Mode
@@ -455,6 +453,8 @@ def main():
         auto_mode = False
 
         output_file = "result.png" # Change this to change result location
+
+        clear_screen()
 
         # Copyright, license notice, etc.
         print(
@@ -524,6 +524,8 @@ def main():
         )
         processes = get_int(1, 64) # Change this for CPUs with >64 threads
 
+        clear_screen()
+
     else:
 
         # Automated Inputs Mode
@@ -536,8 +538,6 @@ def main():
         output_file = sys.argv[8]
 
     start_time = time.time()
-
-    clear_screen()
 
     manager = multiprocessing.Manager()
 
