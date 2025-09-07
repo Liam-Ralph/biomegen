@@ -30,6 +30,7 @@ import ctypes
 import os
 import PIL.Image
 import random
+import setproctitle
 import sys
 import time
 import traceback
@@ -93,7 +94,7 @@ def raise_error(location, traceback_output):
 # Multiprocessing Functions
 # (Order of use)
 
-def initialize_pool(section_progress_value, dots_value, image_sections_value, lock_value):
+def initialize_worker(section_progress_value, dots_value, image_sections_value, lock_value):
 
     # Creates shared variables
 
@@ -101,6 +102,8 @@ def initialize_pool(section_progress_value, dots_value, image_sections_value, lo
     global dots
     global image_sections # Holder for image pieces in generate_image
     global lock # Lock to prevent two processes from updating the same variable simultaneously
+
+    setproctitle.setproctitle("biomgen-worker")
 
     section_progress = section_progress_value
     dots = dots_value
@@ -110,6 +113,8 @@ def initialize_pool(section_progress_value, dots_value, image_sections_value, lo
 def track_progress(section_progress, section_progress_total, section_times, start_time):
 
     try:
+
+        setproctitle.setproctitle("biomegen-tracker")
 
         section_names = [
             "Setup", "Section Generation", "Section Assignment", "Coastline Smoothing",
@@ -443,6 +448,8 @@ def generate_image(start_height, section_height, process_num, local_dots, width)
 
 def main():
 
+    setproctitle.setproctitle("biomegen-main")
+
     with open("errors.txt", "w") as file:
         file.write("")
 
@@ -454,16 +461,23 @@ def main():
 
         output_file = "result.png" # Change this to change result location
 
+        # Get Program Version
+
+        with open("README.md", "r") as file:
+            file.readline()
+            file.readline()
+            version = file.readline().replace("### Version ", "").strip()
+
         clear_screen()
 
         # Copyright, license notice, etc.
         print(
-            "Welcome to BiomeGen v1.0.1\n" +
+            "Welcome to BiomeGen v" + version +"\n" +
             "Copyright (C) 2025 Liam Ralph\n" +
             "https://github.com/liam-ralph\n" +
             "This project is licensed under the GNU General Public License v3.0,\n" +
             "except for result.png, this program's output, licensed under The Unlicense.\n" +
-            "\u001b[38;5;1mWARNING: In some terminals, the refreshing progress screen\n" + 
+            "\u001b[38;5;1mWARNING: In some terminals, the refreshing progress screen\n" +
             "may flash, which could cause problems for people with epilepsy.\n" + ANSI_RESET +
             "Press ENTER to begin."
         )
@@ -549,11 +563,11 @@ def main():
     lock = multiprocessing.Lock()
     # Lock to prevent two processes from updating the same variable simultaneously
 
-    with multiprocessing.Pool(processes, initializer=initialize_pool,
+    with multiprocessing.Pool(processes, initializer=initialize_worker,
     initargs=(section_progress, dots, image_sections, lock)) as pool:
 
         try:
-                
+
             if not auto_mode:
 
                 # Progress Tracking
