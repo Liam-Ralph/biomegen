@@ -17,7 +17,7 @@ for i in "${tasks[@]}"; do
     reps="$((task_pieces[0]))" # Repetitions
     rep_times="${task_pieces[1]}" # Whether to list each rep's runtime
     save_png="${task_pieces[2]}" # Whether to save the png file
-    inputs="${task_pieces[3]}" # Python automode inputs
+    inputs="${task_pieces[3]}" # C automode inputs
 
     echo "Running task $inputs for $reps repetitions."
 
@@ -40,7 +40,8 @@ for i in "${tasks[@]}"; do
             # Rep 1 saved in file1.png, rep 2 in file2.png, etc.
         fi
 
-        result=$(python3 main.py $inputs) # Run Python program
+        gcc main.c -o main
+        result=$(./main $inputs) # Run C program
 
         if [ "$rep_times" = "y" ]; then
             echo "Rep $ii Time: $(printf "%.4f" "$result")" # Rep 1 Time: 1.0000

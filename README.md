@@ -1,3 +1,5 @@
+# Note: this branch is in development. It is an attempt to rewrite the project in C.
+
 # BiomeGen
 ### Released July 2025
 ### Version 2.0.2
