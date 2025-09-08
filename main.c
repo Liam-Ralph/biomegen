@@ -12,3 +12,42 @@ See LICENSE_PNG or this project's source for more information.
 
 BiomeGen, a terminal application for generating png maps.
 */
+
+
+// Includes
+
+#include <stdio.h>
+
+
+// Definitions
+
+#define ANSI_GREEN "\u001b[38;5;2m"
+#define ANSI_BLUE "\u001b[38;5;4m"
+#define ANSI_RESET "\u001b[0m"
+
+
+// Structs
+
+struct Dot {
+    int x;
+    int y;
+    char type[13];
+};
+typedef struct Dot Dot;
+
+
+// Functions
+// (Alphabetical order)
+
+
+// Multiprocessing Functins
+//(Order of use)
+
+
+// Main Function
+
+int main(int argc, char *argv[]) {
+
+    return 0;
+
+}
