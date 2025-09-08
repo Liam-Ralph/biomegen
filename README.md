@@ -1,6 +1,6 @@
 # BiomeGen
 ### Released July 2025
-### Version 2.0.1
+### Version 2.0.2
 ### Updated September 2025
 
 <br/>
@@ -42,10 +42,16 @@ to do this:
    the Python program and handles passing arguments. It gets its instructions
    from `autorun_tasks.txt`. Each line represents one task, empty lines and comments
    will cause errors. Currently, it contains the example task
-   `2:n:1920 1080 100 120 50 5 8 file_path.png`.
+   `2:y:n:1920 1080 100 120 50 5 8 file_path.png`.
 
      - `2` is the number of repititions, meaning the Python program will be run
        twice. This must be a positive integer.
+     - `n` is whether to show the times for each repetition (y/n). Yes means each
+       repetition will show the time it took to run upon completion. This can be
+       useful for measuring variation between repetitions, but can take up a lot
+       of space in your terminal for tasks with many repetitions. No will just
+       show a progress bar based on the number of tasks completed.
+       Must be "y" or "n".
      - `n` is whether to save the png outputs (y/n). Yes means each output will
        be saved in a separate file, repetition 1 in `file_path1.png`, repetition
        2 in `file_path2.png`, etc. No means each repetition will overwrite the
