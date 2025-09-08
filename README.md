@@ -44,7 +44,7 @@ to do this:
    will cause errors. Currently, it contains the example task
    `2:y:n:1920 1080 100 120 50 5 8 file_path.png`.
 
-     - `2` is the number of repititions, meaning the Python program will be run
+     - `2` is the number of repetitions, meaning the Python program will be run
        twice. This must be a positive integer.
      - `n` is whether to show the times for each repetition (y/n). Yes means each
        repetition will show the time it took to run upon completion. This can be
@@ -64,7 +64,7 @@ to do this:
     
     With this option, you can generated multiple different png files from the same
     inputs, or test the generation speed of the Python program. This option will
-    also tell you the generation times for each repitition, and the average
+    also tell you the generation times for each repetition, and the average
     generation time.
 
 

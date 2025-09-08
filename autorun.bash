@@ -19,7 +19,7 @@ for i in "${tasks[@]}"; do
     save_png="${task_pieces[2]}" # Whether to save the png file
     inputs="${task_pieces[3]}" # Python automode inputs
 
-    echo "Running task $inputs for $reps repititions."
+    echo "Running task $inputs for $reps repetitions."
 
     if [ "$save_png" = "y" ]; then
         inputs="${inputs/".png"/"0.png"}" # Prep png path for saving multiple files
