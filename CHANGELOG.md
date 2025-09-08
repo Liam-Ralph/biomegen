@@ -1,3 +1,7 @@
+## Version 2.0.2 (September 2025)
+
+ - Added progress bar option to autorun script.
+
 ## Version 2.0.1 (September 2025)
 
  - Added process naming.

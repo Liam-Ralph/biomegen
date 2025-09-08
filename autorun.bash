@@ -29,7 +29,8 @@ for i in "${tasks[@]}"; do
 
     sum=0
     if [ "$rep_times" = "n" ]; then
-        echo "1"
+        printf "       10|       20|       30|       40|       50|       60|"
+        echo "       70|       80|       90|      100|"
     fi
 
     for ii in $(seq 1 $reps); do
@@ -44,7 +45,7 @@ for i in "${tasks[@]}"; do
         if [ "$rep_times" = "y" ]; then
             echo "Rep $ii Time: $(printf "%.4f" "$result")" # Rep 1 Time: 1.0000
         elif [ "$ii" != 0 ]; then
-            num_blocks=$((20 * $ii / $reps))
+            num_blocks=$((100 * $ii / $reps))
             printf "\r\033[K\u001b[48;5;2m"
             printf " %.0s" $(seq 1 "$num_blocks")
             printf "\u001b[0m"
