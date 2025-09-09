@@ -14,7 +14,7 @@ int main() {
 
     FILE *fptr;
     fptr = fopen("autorun_tasks.txt", "r");
-    char raw_line[100]; // Max task length is 100 chars
+    char raw_line[99]; // Max task length is 99 chars
 
     while(fgets(raw_line, 100, fptr)) {
 
@@ -36,6 +36,28 @@ int main() {
         free(line_copy);
 
         printf("Running task %s for %d reps.\n", inputs, reps);
+
+        // Prepping Save Path
+
+        if (save_png) {
+            const int len_inputs = strlen(inputs);
+            char *inputs_sec[100];
+            strncpy(inputs_sec, inputs, len_inputs - 5);
+            inputs = strcat(inputs_sec, "0.png");
+        }
+        // "1920 1080 100 120 50 5 8 file.png" --> "1920 1080 100 120 50 5 8 file0.png"
+
+        // Running Repetitions
+
+        printf("       10|       20|       30|       40|       50|       60|");
+        printf("       70|       80|       90|      100|\n");
+        
+        int rep_times[reps];
+        for (int i = 0; i < reps; i++) {
+
+            
+
+        }
 
     }
 
