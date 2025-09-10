@@ -15,7 +15,7 @@ int main() {
 
     FILE *fptr;
     fptr = fopen("autorun_tasks.txt", "r");
-    char raw_line[100]; // Max task length is 100 chars (99 if save_png)
+    char raw_line[100]; // Max task length is 100 chars
 
     while (fgets(raw_line, 100, fptr)) {
 
@@ -29,27 +29,28 @@ int main() {
 
         token = strtok(NULL, ":");
         bool show_rep_times = false; // Whether to show rep times
-        if (token == "y") {
+        if (strcmp(token, "y") == 0) {
             show_rep_times = true;
         }
 
         token = strtok(NULL, ":");
         bool save_png = false; // Whether to save png outputs
-        if (token == "y") {
+        if (strcmp(token, "y") == 0) {
             save_png = true;
         }
 
         token = strtok(NULL, "");
         char *inputs = token; // Inputs for main program
 
-        printf("Running task %s for %d reps.\n", inputs, reps);
+        printf("Running task \"%s\" for %d reps.\n", inputs, reps);
 
         // Prepping Save Path
 
         if (save_png) {
             const int len_inputs = strlen(inputs);
-            strncpy(inputs, inputs, len_inputs - 5);
-            strcat(inputs, "0.png");
+            char inputs_copy[100];
+            strncpy(inputs_copy, inputs, len_inputs - 4);
+            snprintf(inputs, len_inputs + 3, "%s0.png", inputs_copy);
         }
         // "1920 1080 100 120 50 5 8 file.png" --> "1920 1080 100 120 50 5 8 file0.png"
 
@@ -61,7 +62,7 @@ int main() {
             printf("       70|       80|       90|      100|\n");
         }
 
-        int rep_times[reps];
+        float rep_times[reps];
         for (int i = 0; i < reps; i++) {
 
             if (save_png) {
@@ -69,9 +70,9 @@ int main() {
                 // Preparing Rep's Save Path
 
                 const int len_inputs = strlen(inputs);
-                strncpy(inputs, inputs, len_inputs - 6);
-                sprintf(inputs, "%d", i);
-                strcat(inputs, ".png");
+                char inputs_copy[100] = "";
+                strncpy(inputs_copy, inputs, len_inputs - 5);
+                snprintf(inputs, len_inputs + 4, "%s%d.png", inputs_copy, i + 1);
                 // Rep 1 is saved in file1.png, rep2 in file2.png, etc.
 
             }
@@ -102,21 +103,45 @@ int main() {
             rep_times[i] = time;
 
             if (show_rep_times) {
-                printf("Rep %d Time: %f\n", i, time);
+                printf("Rep %d Time: %f\n", (i + 1), time);
             } else {
-                const int bars = round((i + 1) / reps * 100);
+                const int bars = round((i + 1) * 100 / reps);
                 printf("\r\033[K\033[48;5;2m");
                 for (int ii = 0; ii < bars; ii++) {
                     printf(" ");
+                    fflush(stdout);
                 }
                 printf("\033[0m");
             }
 
         }
 
+        // Delete Png File if not Saving
+
+        if (!save_png) {
+            strtok(inputs, " ");
+            strtok(NULL, " ");
+            strtok(NULL, " ");
+            strtok(NULL, " ");
+            strtok(NULL, " ");
+            strtok(NULL, " ");
+            strtok(NULL, " ");
+            char *file_path = strtok(NULL, "");
+            remove(file_path);
+        }
+
+        // Move off of Progress Bar Line
+
         if (!show_rep_times) {
             printf("\n");
         }
+
+        float avg = 0;
+        for (int i = 0; i < reps; i++) {
+            avg += rep_times[i];
+        }
+        avg /= reps;
+        printf("Average: %f\n\n", avg);
 
     }
 
