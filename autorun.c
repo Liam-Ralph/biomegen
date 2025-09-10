@@ -1,5 +1,6 @@
 // Includes
 
+#include <math.h>
 #include <stdio.h>
 #include <stdbool.h>
 #include <stdlib.h>
@@ -54,7 +55,7 @@ int main() {
 
         // Running Repetitions
 
-        if (show_rep_times) {
+        if (!show_rep_times) {
             // Progress Bar Scale
             printf("       10|       20|       30|       40|       50|       60|");
             printf("       70|       80|       90|      100|\n");
@@ -97,8 +98,24 @@ int main() {
             }
             pclose(fp);
 
-            printf("%s", output);
+            float time = atof(output);
+            rep_times[i] = time;
 
+            if (show_rep_times) {
+                printf("Rep %d Time: %f\n", i, time);
+            } else {
+                const int bars = round((i + 1) / reps * 100);
+                printf("\r\033[K\033[48;5;2m");
+                for (int ii = 0; ii < bars; ii++) {
+                    printf(" ");
+                }
+                printf("\033[0m");
+            }
+
+        }
+
+        if (!show_rep_times) {
+            printf("\n");
         }
 
     }
