@@ -20,21 +20,26 @@ int main() {
 
         // Getting Task Parameters
 
-        char *line_copy = malloc(strlen(raw_line) + 1);
+        char line_copy[100];
         strcpy(line_copy, raw_line);
 
-        int reps = atoi(strtok(line_copy, ":")); // Repetitions
+        char *token = strtok(line_copy, ":");
+        int reps = atoi(line_copy); // Repetitions
+
+        token = strtok(NULL, ":");
         bool show_rep_times = false; // Whether to show rep times
-        bool save_png = false; // Whether to save png outputs
-        if (strtok(NULL, ":") == "y") {
+        if (token == "y") {
             show_rep_times = true;
         }
-        if (strtok(NULL, ":") == "y") {
+
+        token = strtok(NULL, ":");
+        bool save_png = false; // Whether to save png outputs
+        if (token == "y") {
             save_png = true;
         }
-        char *inputs = strtok(NULL, ":"); // Inputs for main program
 
-        free(line_copy);
+        token = strtok(NULL, "");
+        char *inputs = token; // Inputs for main program
 
         printf("Running task %s for %d reps.\n", inputs, reps);
 
@@ -63,9 +68,8 @@ int main() {
                 // Preparing Rep's Save Path
 
                 const int len_inputs = strlen(inputs);
-                char inputs_sec[100];
-                strncpy(inputs_sec, inputs, len_inputs - 6);
-                strcat(inputs, snprintf(inputs_sec, 5, "%d", i));
+                strncpy(inputs, inputs, len_inputs - 6);
+                sprintf(inputs, "%d", i);
                 strcat(inputs, ".png");
                 // Rep 1 is saved in file1.png, rep2 in file2.png, etc.
 
@@ -73,7 +77,7 @@ int main() {
 
             // Choosing Python Command
 
-            char *python_command = "python3";
+            char python_command[100] = "python3"; // Command for running python program
 
             #ifdef _WIN32
                 python_command = "py";
@@ -85,13 +89,15 @@ int main() {
             char output[50] = {0};
             char buffer[50];
 
-            fp = popen(strcat(strcat(python_command, " main.py "), inputs));
+            strcat(python_command, " main.py ");
+            strcat(python_command, inputs);
+            fp = popen(python_command, "r");
             while (fgets(buffer, sizeof(buffer), fp) != NULL) {
                 strcat(output, buffer);
             }
             pclose(fp);
 
-            printf(output);
+            printf("%s", output);
 
         }
 
