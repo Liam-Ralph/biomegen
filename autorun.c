@@ -185,7 +185,7 @@ int main() {
 
             // Percentiles
 
-            int percentiles[] = {5, 25, 50, 75, 90};
+            int percentiles[] = {5, 25, 50, 75, 95};
             for (i = 0; i < sizeof(percentiles) / sizeof(percentiles[0]); i++) {
 
                 float exact_index = percentiles[i] * (reps - 1) / 100.0; // 50th index of 8 is 3.5
