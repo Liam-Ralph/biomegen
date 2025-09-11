@@ -11,6 +11,8 @@
 
 int main() {
 
+    int i, ii;
+
     printf("\n");
 
     FILE *fptr;
@@ -39,7 +41,7 @@ int main() {
             save_png = true;
         }
 
-        token = strtok(NULL, "");
+        token = strtok(NULL, "\n");
         char *inputs = token; // Inputs for main program
 
         printf("Running task \"%s\" for %d reps.\n", inputs, reps);
@@ -56,14 +58,8 @@ int main() {
 
         // Running Repetitions
 
-        if (!show_rep_times) {
-            // Progress Bar Scale
-            printf("       10|       20|       30|       40|       50|       60|");
-            printf("       70|       80|       90|      100|\n");
-        }
-
         float rep_times[reps];
-        for (int i = 0; i < reps; i++) {
+        for (i = 0; i < reps; i++) {
 
             if (save_png) {
 
@@ -88,13 +84,13 @@ int main() {
             // Running Program and Collecting Output
 
             FILE *fp;
-            char output[50] = {0};
-            char buffer[50];
+            char output[20] = {0};
+            char buffer[20];
 
             strcat(python_command, " main.py ");
             strcat(python_command, inputs);
             fp = popen(python_command, "r");
-            while (fgets(buffer, sizeof(buffer), fp) != NULL) {
+            while (fgets(buffer, 20, fp) != NULL) {
                 strcat(output, buffer);
             }
             pclose(fp);
@@ -102,16 +98,31 @@ int main() {
             float time = atof(output);
             rep_times[i] = time;
 
+            // Print Rep Time or Progress Bar
+
             if (show_rep_times) {
-                printf("Rep %d Time: %f\n", (i + 1), time);
+                printf("Repetition ");
+                if (reps < 10) {
+                    printf("%d Time: %15lfs\n", (i + 1), time);
+                } else if (reps < 100) {
+                    printf("%2d Time: %14lfs\n", (i + 1), time);
+                } else {
+                    printf("%3d Time: %15lfs\n", (i + 1), time);
+                }
             } else {
                 const int bars = round((i + 1) * 100 / reps);
                 printf("\r\033[K\033[48;5;2m");
-                for (int ii = 0; ii < bars; ii++) {
+                for (ii = 0; ii < bars; ii++) {
                     printf(" ");
                     fflush(stdout);
                 }
-                printf("\033[0m");
+                printf("\033[48;5;1m");
+                for (ii = 0; ii < 100 - bars; ii++) {
+                    printf(" ");
+                    fflush(stdout);
+                }
+                printf("\033[0m %3d%%", bars);
+                fflush(stdout);
             }
 
         }
@@ -136,12 +147,74 @@ int main() {
             printf("\n");
         }
 
-        float avg = 0;
-        for (int i = 0; i < reps; i++) {
-            avg += rep_times[i];
+        // Calculating Mean
+
+        float mean = 0;
+        for (i = 0; i < reps; i++) {
+            mean += rep_times[i];
         }
-        avg /= reps;
-        printf("Average: %f\n\n", avg);
+        mean /= reps;
+        printf("Mean Time: %23lfs\n", mean);
+
+        // Calculating Standard Deviation
+
+        float std_deviation = 0;
+        for (i = 0; i < reps; i++) {
+            std_deviation += pow((rep_times[i] - mean), 2);
+        }
+        std_deviation /= reps;
+        std_deviation = sqrt(std_deviation);
+        printf("Standard Deviation: %14lfs\n", std_deviation);
+
+        if (reps >= 10) {
+
+            // Sorting Rep Times
+
+            bool swapped;
+            float temp;
+            for (i = 0; i < reps - 1; i++) {
+                swapped = false;
+                for (ii = 0; ii < reps - i - 1; ii++) {
+                    if (rep_times[ii] > rep_times[ii + 1]) {
+                        temp = rep_times[ii];
+                        rep_times[ii] = rep_times[ii + 1];
+                        rep_times[ii + 1] = temp;
+                        swapped = true;
+                    }
+                }
+                if (!swapped) {
+                    break;
+                }
+            }
+
+            // Percentiles
+
+            int percentiles[] = {5, 25, 50, 75, 90};
+            for (i = 0; i < sizeof(percentiles) / sizeof(percentiles[0]); i++) {
+
+                float exact_index = percentiles[i] * (reps - 1) / 100.0; // 50th index of 8 is 3.5
+                int index = (int)exact_index; // floor of exact index
+                float diff = exact_index - index; // diff between index and exact
+
+                float value = rep_times[index]; // rep time at index
+                if (diff > 0.0001) {
+                    // add diff% of next index
+                    value += (rep_times[index + 1] - rep_times[index]) * diff;
+                }
+
+                /*
+                Example for 50th percentile of list {1, 2, 3, 4}
+                exact_index = 50 * 3 / 100 = 1.5
+                value = list[1] + (list[2] - list[1]) * 0.5 = 2 + 1 * 0.5 = 2.5
+                */
+
+                printf("%2dth Percentile: %17lfs\n", percentiles[i], value);
+
+            }
+
+        }
+
+        printf("\n");
 
     }
 
