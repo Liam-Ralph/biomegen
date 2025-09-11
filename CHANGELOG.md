@@ -1,3 +1,8 @@
+## Version 2.1.0 (September 2025)
+
+ - Rewrote autorun bash script in C for compatibility.
+ - Added standard deviation and percentiles to autorun stats.
+
 ## Version 2.0.2 (September 2025)
 
  - Added progress bar option to autorun script.

@@ -1,6 +1,6 @@
 # BiomeGen
 ### Released July 2025
-### Version 2.0.2
+### Version 2.1.0
 ### Updated September 2025
 
 <br/>
@@ -10,7 +10,7 @@ BiomeGen is a Python map generation tool that provides output in a png format.
 Customization options include map dimensions, island abundance, island size, and
 island abundance relative to water. Generates water, land, and various biomes.
 Uses Python's multiprocessing library for improved efficiency. Includes automated
-runs and a bash script to create multiple images or test generation speed.
+runs and a C program to create multiple images or test generation speed.
 
 <br/>
 
@@ -38,11 +38,11 @@ to do this:
    the program (e.g. a negative map width). This option will only print the
    generation time for the Python program.
 
-2. Use the `autorun.bash` script and `autorun_tasks.txt`. The bash script runs
+2. Use the `autorun.c` program and `autorun_tasks.txt`. The C program runs
    the Python program and handles passing arguments. It gets its instructions
    from `autorun_tasks.txt`. Each line represents one task, empty lines and comments
    will cause errors. Currently, it contains the example task
-   `2:y:n:1920 1080 100 120 50 5 8 file_path.png`.
+   `2:n:n:1920 1080 100 120 50 5 8 file_path.png`.
 
      - `2` is the number of repetitions, meaning the Python program will be run
        twice. This must be a positive integer.
@@ -55,12 +55,12 @@ to do this:
      - `n` is whether to save the png outputs (y/n). Yes means each output will
        be saved in a separate file, repetition 1 in `file_path1.png`, repetition
        2 in `file_path2.png`, etc. No means each repetition will overwrite the
-       previous, and `file_path.png` will be deleted at the end of the script.
+       previous, and `file_path.png` will be deleted at the end of the program.
        Must be "y" or "n".
      - `1920 1080 100 120 50 5 8 file_path.png` is simply the arguments to be passed
-       to the Python program. The only one that may be edited by the bash script
-       is `file_path.png`, which will be edited if "y" in the second bash script
-       argument. Must follow the rules for Python arguments in 1.
+       to the Python program. The only one that may be edited by the C program
+       is `file_path.png`, which will be edited if "y" in the second C program
+       argument. Must follow the rules for Python arguments in 1. Max 100 characters.
     
     With this option, you can generated multiple different png files from the same
     inputs, or test the generation speed of the Python program. This option will
