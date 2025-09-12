@@ -1,3 +1,8 @@
+## Version 2.1.1 (September 2025)
+
+ - Added outliers to autorun stats.
+ - Added pixels generated per second to autorun stats.
+
 ## Version 2.1.0 (September 2025)
 
  - Rewrote autorun bash script in C for compatibility.

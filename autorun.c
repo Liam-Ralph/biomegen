@@ -1,8 +1,8 @@
 // Includes
 
 #include <math.h>
-#include <stdio.h>
 #include <stdbool.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -103,11 +103,11 @@ int main() {
             if (show_rep_times) {
                 printf("Repetition ");
                 if (reps < 10) {
-                    printf("%d Time: %15lfs\n", (i + 1), time);
+                    printf("%d Time %16lfs\n", (i + 1), time);
                 } else if (reps < 100) {
-                    printf("%2d Time: %14lfs\n", (i + 1), time);
+                    printf("%2d Time %15lfs\n", (i + 1), time);
                 } else {
-                    printf("%3d Time: %15lfs\n", (i + 1), time);
+                    printf("%3d Time %14lfs\n", (i + 1), time);
                 }
             } else {
                 const int bars = round((i + 1) * 100 / reps);
@@ -127,11 +127,12 @@ int main() {
 
         }
 
+        int width = atoi(strtok(inputs, " "));
+        int height = atoi(strtok(NULL, " "));
+
         // Delete Png File if not Saving
 
         if (!save_png) {
-            strtok(inputs, " ");
-            strtok(NULL, " ");
             strtok(NULL, " ");
             strtok(NULL, " ");
             strtok(NULL, " ");
@@ -154,7 +155,7 @@ int main() {
             mean += rep_times[i];
         }
         mean /= reps;
-        printf("Mean Time: %23lfs\n", mean);
+        printf("Mean Time %24lfs\n", mean);
 
         // Calculating Standard Deviation
 
@@ -164,7 +165,7 @@ int main() {
         }
         std_deviation /= reps;
         std_deviation = sqrt(std_deviation);
-        printf("Standard Deviation: %14lfs\n", std_deviation);
+        printf("Standard Deviation %15lfs\n", std_deviation);
 
         if (reps >= 10) {
 
@@ -190,6 +191,10 @@ int main() {
             // Percentiles
 
             int percentiles[] = {5, 25, 50, 75, 95};
+            float quartile1; // 25th percentile
+            float quartile3; // 75th quartile
+            float iqr; // interquartile range (q3 - q1)
+
             for (i = 0; i < sizeof(percentiles) / sizeof(percentiles[0]); i++) {
 
                 float exact_index = percentiles[i] * (reps - 1) / 100.0; // 50th index of 8 is 3.5
@@ -208,13 +213,49 @@ int main() {
                 value = list[1] + (list[2] - list[1]) * 0.5 = 2 + 1 * 0.5 = 2.5
                 */
 
-                printf("%2dth Percentile: %17lfs\n", percentiles[i], value);
+                if (i == 1) {
+                    quartile1 = value;
+                } else if (i == 3) {
+                    quartile3 = value;
+                    iqr = quartile3 - quartile1;
+                }
+
+                printf("%2dth Percentile %18lfs\n", percentiles[i], value);
 
             }
 
+            // Finding Outliers Using IQR
+
+            printf("Interquartile Range %14lfs\n", iqr);
+            int outliers = 0;
+            float *outliers_list = malloc(reps * sizeof(rep_times[0]));
+            int outliers_cap = 0;
+            for (i = 0; i < reps; i++) {
+                if (rep_times[i] < quartile1 - iqr || rep_times[i] > quartile3 + iqr) {
+                    if (outliers > outliers_cap) {
+                        outliers_cap = (outliers_cap == 0) ? 1 : outliers_cap * 2;
+                        outliers_list = realloc(outliers_list, outliers_cap * sizeof(rep_times[i]));
+                    }
+                    outliers_list[outliers] = rep_times[i];
+                    outliers++;
+                }
+            }
+            printf("Outliers: %d\n", outliers);
+            if (outliers > 0) {
+                printf("    ");
+                float new_mean = mean * reps;
+                for (i = 0; i < outliers; i++) {
+                    printf("%f ", outliers_list[i]);
+                    new_mean -= outliers_list[i];
+                }
+                new_mean /= reps - outliers;
+                printf("\nMean (Outliers Removed) %10lfs\n", new_mean);
+            }
+            free(outliers_list);
+
         }
 
-        printf("\n");
+        printf("Pixels per Second: %d\n\n", (int)round(width * height / mean));
 
     }
 
