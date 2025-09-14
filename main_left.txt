@@ -256,53 +256,6 @@ def generate_image(start_height, section_height, process_num, local_dots, width)
         raise_error("generate_image", traceback.format_exc())
         return [0] * 11
 def main():
-    setproctitle.setproctitle("biomegen-main")
-        print("Map Width (pixels):")
-        width = get_int(500, 10_000)
-        print("\nMap Height:")
-        height = get_int(500, 10_000)
-        print(
-            "\nMap resolution controls the section size of the map.\n" +
-            "Choose a number between 50 and 500. 100 is the default.\n" +
-            "Larger numbers produce lower resolutions, with larger pieces\n" +
-            "while lower numbers take longer to generate.\n" +
-            "Map Resolution:"
-        )
-        map_resolution = get_int(50, 500)
-        print(
-            "\nIsland abundance control how many islands there are,\n" +
-            "and the ration of land to water.\n" +
-            "Choose a number between 10 and 1000. 120 is the default.\n" +
-            "Larger numbers produces less land.\n" +
-            "Island Abundance:"
-        )
-        island_abundance = get_int(10, 1000)
-        print(
-            "\nIsland size controls average island size.\n" +
-            "Choose a number between 10 and 100. 50 is the default.\n" +
-            "Larger numbers produce larger islands.\n" +
-            "Island Size:"
-        )
-        island_size = get_int(10, 100) / 10
-        print(
-            "\nCoastline smoothing controls how smooth or rough coastlines look.\n" +
-            "Choose a number between 1 and 100. Larger numbers cause more smoothing.\n" +
-            "A value of 0 causes no smoothing. A value of 5 causes some smoothing,\n" +
-            "and is the default value.\n" +
-            "Coastline Smoothing:"
-        )
-        coastline_smoothing = get_int(0, 100)
-        print(
-            "\nNow you must choose how many of your CPU's threads to use for map generation.\n" +
-            "Values exceeding your CPU's number of threads will slow map generation.\n" +
-            "The most efficient number of threads to use varies by hardware, OS,\n" +
-            "and CPU load. Values less than 4 threads are usually very inefficient.\n" +
-            "Ensure you monitor your CPU for overheating, and halt the program if\n" +
-            "high temperatures occur. Using fewer threads may reduce temperatures.\n" +
-            "Number of Threads:"
-        )
-        processes = get_int(1, 64)
-        clear_screen()
         (width, height, map_resolution, island_abundance,
             island_size, coastline_smoothing, processes) = [int(arg) for arg in sys.argv[1:8]]
         island_size /= 10

@@ -24,9 +24,9 @@ BiomeGen, a terminal application for generating png maps.
 
 // Definitions
 
-#define ANSI_GREEN "\003[38;5;2m"
-#define ANSI_BLUE "\003[38;5;4m"
-#define ANSI_RESET "\003[0m"
+#define ANSI_GREEN "\033[38;5;2m"
+#define ANSI_BLUE "\033[38;5;4m"
+#define ANSI_RESET "\033[0m"
 
 
 // Structs
@@ -42,12 +42,34 @@ typedef struct Dot Dot;
 // Functions
 // (Alphabetical order)
 
-int clear_screen(){
+void clear_screen() {
     char command[] = "clear";
     #ifdef _WIN32
         command = "cls";
     #endif
     system(command);
+}
+
+int get_int(const int min, const int max) {
+
+    char raw_result[100];
+    long result;
+
+    while (true) {
+
+        fgets(raw_result, 100, stdin);
+        result = atoi(raw_result);
+
+        if (result < min || result > max || (result == 0  && strncmp("0", raw_result, 1) != 0)) {
+            printf("Input must be an integer between %d and %d (both inclusive).\n", min, max);
+        } else {
+            break;
+        }
+
+    }
+
+    return result;
+
 }
 
 
@@ -59,6 +81,28 @@ int clear_screen(){
 
 int main(int argc, char *argv[]) {
 
+    // Setting Main Process Title
+
+    #ifdef __linux__
+        #include <sys/prctl.h>
+        prctl(PR_SET_NAME, "BiomeGen Main", 0, 0, 0);
+    #endif
+
+    #ifdef __FreeBSD__
+        #include <unistd.h>
+        setproctitle("BiomeGen Main");
+    #endif
+
+    #ifdef __Apple__
+        #include <unistd.h>
+        setproctitle("BiomeGen Main");
+    #endif
+
+    #ifdef _WIN32
+        #include <windows.h>
+        SetConsoleTitleA("BiomeGen Main");
+    #endif
+
     // Clearing Errors File
 
     FILE *fptr;
@@ -67,6 +111,8 @@ int main(int argc, char *argv[]) {
 
     bool auto_mode;
     char *output_file;
+    int width, height, map_resolution, island_abundance, coastline_smoothing, processes;
+    float island_size;
 
     if (argc == 1) {
         
@@ -96,7 +142,7 @@ int main(int argc, char *argv[]) {
             "https://github.com/liam-ralph\n"
             "This project is licensed under the GNU General Public License v3.0,\n"
             "except for result.png, this program's output, licensed under The Unlicense.\n"
-            "\003[38;5;1mWARNING: In some terminals, the refreshing progress screen\n"
+            "\033[38;5;1mWARNING: In some terminals, the refreshing progress screen\n"
             "may flash, which could cause problems for people with epilepsy.%s\n"
             "Press ENTER to begin.\n", version, ANSI_RESET
         );
@@ -107,7 +153,59 @@ int main(int argc, char *argv[]) {
         getchar();
         clear_screen();
 
-        printf("Map Width (pixels):");
+        printf("Map Width (pixels):\n");
+        width = get_int(500, 10000);
+
+        printf("\nMap Height:\n");
+        height = get_int(500, 10000);
+
+        printf(
+            "\nMap resolution controls the section size of the map.\n"
+            "Choose a number between 50 and 500. 100 is the default.\n"
+            "Larger numbers produce lower resolutions, with larger pieces\n"
+            "while lower numbers take longer to generate.\n"
+            "Map Resolution:\n"
+        );
+        map_resolution = get_int(50, 500);
+
+        printf(
+            "\nIsland abundance control how many islands there are,\n"
+            "and the ration of land to water.\n"
+            "Choose a number between 10 and 1000. 120 is the default.\n"
+            "Larger numbers produces less land.\n"
+            "Island Abundance:\n"
+        );
+        island_abundance = get_int(10, 1000);
+
+        printf(
+            "\nIsland size controls average island size.\n"
+            "Choose a number between 10 and 100. 50 is the default.\n"
+            "Larger numbers produce larger islands.\n"
+            "Island Size:\n"
+        );
+        island_size = get_int(10, 100) / 10.0;
+
+        printf(
+            "\nCoastline smoothing controls how smooth or rough coastlines look.\n"
+            "Choose a number between 0 and 100. Larger numbers cause more smoothing.\n"
+            "A value of 0 causes no smoothing. A value of 5 causes some smoothing,\n"
+            "and is the default value.\n"
+            "Coastline Smoothing:\n"
+        );
+        coastline_smoothing = get_int(0, 100);
+
+        printf(
+            "\nNow you must choose how many of your CPU's threads to use for map generation.\n"
+            "Values exceeding your CPU's number of threads will slow map generation.\n"
+            "The most efficient number of threads to use varies by hardware, OS,\n"
+            "and CPU load. Values less than 4 threads are usually very inefficient.\n"
+            "Ensure you monitor your CPU for overheating, and halt the program if\n"
+            "high temperatures occur. Using fewer threads may reduce temperatures.\n"
+            "Number of Threads:\n"
+        );
+        processes = get_int(1, 64); // Change this for CPUs with >64 threads
+
+        clear_screen();
 
     } else {
         
