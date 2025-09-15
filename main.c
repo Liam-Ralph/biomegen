@@ -43,9 +43,9 @@ typedef struct Dot Dot;
 // (Alphabetical order)
 
 void clear_screen() {
-    char command[] = "clear";
-    #ifdef _WIN32
-        command = "cls";
+    char *command = "clear";
+    #ifdef _Win32
+        command = "clear";
     #endif
     system(command);
 }
@@ -84,23 +84,20 @@ int main(int argc, char *argv[]) {
     // Setting Main Process Title
 
     #ifdef __linux__
+
         #include <sys/prctl.h>
         prctl(PR_SET_NAME, "BiomeGen Main", 0, 0, 0);
-    #endif
 
-    #ifdef __FreeBSD__
+    #elif BSD
+
         #include <unistd.h>
         setproctitle("BiomeGen Main");
-    #endif
 
-    #ifdef __Apple__
+    #elif __Apple__
+
         #include <unistd.h>
         setproctitle("BiomeGen Main");
-    #endif
-
-    #ifdef _WIN32
-        #include <windows.h>
-        SetConsoleTitleA("BiomeGen Main");
+    
     #endif
 
     // Clearing Errors File
