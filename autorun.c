@@ -73,10 +73,6 @@ int main() {
 
             }
 
-            // Compiling Main Program
-
-            system("gcc main.c -o main -lm");
-
             // Running Program and Collecting Output
 
             FILE *fp;
