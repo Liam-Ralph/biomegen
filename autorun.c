@@ -79,7 +79,12 @@ int main() {
             char output[20] = {0};
             char buffer[20];
 
-            char command[107] = "./main ";
+            #ifdef _WIN32
+                char command[109] = "main.exe "
+            #else
+                char command[107] = "./main ";
+            #endif
+
             strcat(command, inputs);
             fp = popen(command, "r");
             while (fgets(buffer, 20, fp) != NULL) {
