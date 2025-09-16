@@ -22,6 +22,13 @@ BiomeGen, a terminal application for generating png maps.
 #include <string.h>
 #include <time.h>
 
+// OS Specific Includes
+
+#ifdef _WIN32
+    #include <windows.h>
+#else
+    #include <unistd.h>
+#endif
 
 // Definitions
 
@@ -112,18 +119,6 @@ void sleep_ms(int milliseconds) {
 // Main Function
 
 int main(int argc, char *argv[]) {
-
-    // OS Specific Includes
-
-    #ifdef _WIN32
-    
-        #include <windows.h>
-
-    #else
-
-        #include <unistd.h>
-
-    #endif
 
     // Setting Main Process Title
 
