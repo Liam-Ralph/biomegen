@@ -256,7 +256,6 @@ def generate_image(start_height, section_height, process_num, local_dots, width)
         raise_error("generate_image", traceback.format_exc())
         return [0] * 11
 def main():
-    start_time = time.time()
     manager = multiprocessing.Manager()
     section_progress = multiprocessing.Array(ctypes.c_int, [0, 0, 0, 0, 0, 0, 0])
     section_progress_total = multiprocessing.Array(ctypes.c_int, [1, 1, 1, 1, 1, 1, 1])
@@ -449,7 +448,5 @@ def main():
                 "{:.2f}%".format(type_counts[i] / count_group * 100).rjust(7) + " | " +
                 "{:.2f}%".format(type_counts[i] / (height * width) * 100).rjust(6)
             )
-    else:
-        print(completion_time)
 if __name__ == "__main__":
     main()
