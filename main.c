@@ -21,7 +21,6 @@ BiomeGen, a terminal application for generating png maps.
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
-#include <unistd.h>
 
 
 // Definitions
@@ -80,6 +79,31 @@ int get_int(const int min, const int max) {
 
 }
 
+void sleep_ms(int milliseconds) {
+
+    #ifdef _WIN32
+
+        Sleep(milliseconds);
+
+    #else
+
+        if (milliseconds % 1000 == 0) {
+
+            sleep(milliseconds / 1000);
+
+        } else {
+
+            struct timespec sleep_time;
+            sleep_time.tv_sec = milliseconds / 1000;
+            sleep_time.tv_nsec = (milliseconds % 1000) * 1000000;
+            nanosleep(&sleep_time, &sleep_time);
+
+        }
+
+    #endif
+
+}
+
 
 // Multiprocessing Functins
 //(Order of use)
@@ -88,6 +112,18 @@ int get_int(const int min, const int max) {
 // Main Function
 
 int main(int argc, char *argv[]) {
+
+    // OS Specific Includes
+
+    #ifdef _WIN32
+    
+        #include <windows.h>
+
+    #else
+
+        #include <unistd.h>
+
+    #endif
 
     // Setting Main Process Title
 
@@ -98,12 +134,10 @@ int main(int argc, char *argv[]) {
 
     #elif BSD
 
-        #include <unistd.h>
         setproctitle("BiomeGen Main");
 
     #elif __Apple__
 
-        #include <unistd.h>
         setproctitle("BiomeGen Main");
     
     #endif
@@ -232,7 +266,7 @@ int main(int argc, char *argv[]) {
     struct timespec start_time;
     clock_gettime(CLOCK_REALTIME, &start_time);
 
-    sleep(2);
+    sleep_ms(2500);
 
     struct timespec end_time;
     clock_gettime(CLOCK_REALTIME, &end_time);

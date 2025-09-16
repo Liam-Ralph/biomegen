@@ -80,7 +80,7 @@ int main() {
             char buffer[20];
 
             #ifdef _WIN32
-                char command[109] = "main.exe "
+                char command[109] = "main.exe ";
             #else
                 char command[107] = "./main ";
             #endif
