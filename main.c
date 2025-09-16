@@ -20,6 +20,8 @@ BiomeGen, a terminal application for generating png maps.
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
+#include <unistd.h>
 
 
 // Definitions
@@ -210,7 +212,33 @@ int main(int argc, char *argv[]) {
 
         auto_mode = true;
 
+        width = atoi(argv[1]);
+        height = atoi(argv[2]);
+        map_resolution = atoi(argv[3]);
+        island_abundance = atoi(argv[4]);
+        island_size = atoi(argv[5]) / 10.0;
+        coastline_smoothing = atoi(argv[6]);
+        processes = atoi(argv[7]);
+        output_file = argv[8];
+
     }
+
+    struct timespec start_time_ts;
+    float start_time;
+    clock_gettime(CLOCK_REALTIME, &start_time_ts);
+    start_time = (float)start_time_ts.tv_sec + ((float)start_time_ts.tv_nsec / 1000000000.0);
+    printf("%f\n", start_time);
+    sleep(2);
+    struct timespec end_time_ts;
+    float end_time, timediff;
+    clock_gettime(CLOCK_REALTIME, &end_time_ts);
+    end_time = (float)end_time_ts.tv_sec + ((float)end_time_ts.tv_nsec / 1000000000.0);
+    timediff = end_time - start_time;
+    printf("%f\n", end_time);
+    printf("%f\n", timediff);
+
+    printf("vsec\n%ld\n%ld\n", start_time_ts.tv_sec, end_time_ts.tv_sec);
+    printf("nsec\n%ld\n%ld\n", start_time_ts.tv_nsec, end_time_ts.tv_nsec);
 
     return 0;
 

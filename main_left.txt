@@ -256,10 +256,6 @@ def generate_image(start_height, section_height, process_num, local_dots, width)
         raise_error("generate_image", traceback.format_exc())
         return [0] * 11
 def main():
-        (width, height, map_resolution, island_abundance,
-            island_size, coastline_smoothing, processes) = [int(arg) for arg in sys.argv[1:8]]
-        island_size /= 10
-        output_file = sys.argv[8]
     start_time = time.time()
     manager = multiprocessing.Manager()
     section_progress = multiprocessing.Array(ctypes.c_int, [0, 0, 0, 0, 0, 0, 0])
