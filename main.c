@@ -44,6 +44,12 @@ typedef struct Dot Dot;
 // Functions
 // (Alphabetical order)
 
+float calc_time_diff(struct timespec start, struct timespec end) {
+    int diff_sec = end.tv_sec - start.tv_sec;
+    int diff_nsec = end.tv_nsec - start.tv_nsec;
+    return (float)diff_sec + diff_nsec / 1000000000.0;
+}
+
 void clear_screen() {
     char *command = "clear";
     #ifdef _Win32
@@ -223,22 +229,24 @@ int main(int argc, char *argv[]) {
 
     }
 
-    struct timespec start_time_ts;
-    float start_time;
-    clock_gettime(CLOCK_REALTIME, &start_time_ts);
-    start_time = (float)start_time_ts.tv_sec + ((float)start_time_ts.tv_nsec / 1000000000.0);
-    printf("%f\n", start_time);
-    sleep(2);
-    struct timespec end_time_ts;
-    float end_time, timediff;
-    clock_gettime(CLOCK_REALTIME, &end_time_ts);
-    end_time = (float)end_time_ts.tv_sec + ((float)end_time_ts.tv_nsec / 1000000000.0);
-    timediff = end_time - start_time;
-    printf("%f\n", end_time);
-    printf("%f\n", timediff);
+    struct timespec start_time;
+    clock_gettime(CLOCK_REALTIME, &start_time);
 
-    printf("vsec\n%ld\n%ld\n", start_time_ts.tv_sec, end_time_ts.tv_sec);
-    printf("nsec\n%ld\n%ld\n", start_time_ts.tv_nsec, end_time_ts.tv_nsec);
+    sleep(2);
+
+    struct timespec end_time;
+    clock_gettime(CLOCK_REALTIME, &end_time);
+    float completion_time = calc_time_diff(start_time, end_time);
+
+    if (!auto_mode) {
+
+        // Print Result Statistics
+
+    } else {
+
+        printf("%f\n", completion_time);
+
+    }
 
     return 0;
 
