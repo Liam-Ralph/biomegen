@@ -16,18 +16,23 @@ BiomeGen, a terminal application for generating png maps.
 
 // Includes
 
+#define _POSIX_C_SOURCE 199309L
+
+#include <math.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/mman.h>
 #include <time.h>
+#include <unistd.h>
 
 // OS Specific Includes
 
-#ifdef _WIN32
+#ifdef __linux__
+    #include <sys/prctl.h>
+#elif _WIN32
     #include <windows.h>
-#else
-    #include <unistd.h>
 #endif
 
 // Definitions
@@ -64,6 +69,18 @@ void clear_screen() {
     system(command);
 }
 
+char * format_time(float time_seconds) {
+    char *result;
+    sprintf(result, "%2d:", (int)time_seconds / 60);
+    char *result_sec;
+    sprintf(
+        result_sec, "%06.3f",
+        (float)((int)time_seconds % 60) + (time_seconds - (int)time_seconds)
+    );
+    strcat(result, result_sec);
+    return result;
+}
+
 int get_int(const int min, const int max) {
 
     char raw_result[100];
@@ -86,34 +103,147 @@ int get_int(const int min, const int max) {
 
 }
 
-void sleep_ms(int milliseconds) {
+int sum_list_int(int *list) {
+    int sum = 0;
+    for (int i = 0; i < sizeof(list) / sizeof(int); i++) {
+        sum += list[i];
+    }
+    return sum;
+}
 
-    #ifdef _WIN32
-
-        Sleep(milliseconds);
-
-    #else
-
-        if (milliseconds % 1000 == 0) {
-
-            sleep(milliseconds / 1000);
-
-        } else {
-
-            struct timespec sleep_time;
-            sleep_time.tv_sec = milliseconds / 1000;
-            sleep_time.tv_nsec = (milliseconds % 1000) * 1000000;
-            nanosleep(&sleep_time, &sleep_time);
-
-        }
-
-    #endif
-
+float sum_list_float(float *list) {
+    float sum = 0;
+    for (int i = 0; i < sizeof(list) / sizeof(float); i++) {
+        sum += list[i];
+    }
+    return sum;
 }
 
 
-// Multiprocessing Functins
+// Multiprocessing Functions
 //(Order of use)
+
+void track_progress(
+    struct timespec start_time,
+    int *section_progress, int *section_progress_total, float *section_times
+) {
+
+    // Setting Tracker Process Title
+
+    #ifdef __linux__
+
+        prctl(PR_SET_NAME, "BiomeGen Tracker", 0, 0, 0);
+
+    #elif BSD
+
+        setproctitle("BiomeGen Tracker");
+
+    #elif __Apple__
+
+        setproctitle("BiomeGen Tracker");
+    
+    #endif
+
+    char section_names[7][19] = {
+        "Setup", "Section Generation", "Section Assignment", "Coastline Smoothing",
+        "Biome Generation", "Image Generation", "Finish"
+    };
+    float section_weights[7] = {0.02, 0.01, 0.11, 0.38, 0.29, 0.17, 0.02};
+    // Used for overall progress bar (e.g. Setup takes ~2% of total time)
+
+    while (true) {
+
+        clear_screen();
+
+        // Section Progress
+
+        struct timespec time_now;
+        clock_gettime(CLOCK_REALTIME, &time_now);
+        float time_diff = calc_time_diff(start_time, time_now);
+
+        float total_progress = 0.0;
+
+        for (int i = 0; i < 7; i++) {
+
+            // Calculatin Section Progress
+
+            float progress_section = section_progress[i] / section_progress_total[i];
+            total_progress += progress_section * section_weights[i];
+
+            // Checking if Section Complete
+
+            char *color;
+            float section_time;
+            if (section_progress[i] == section_progress_total[i]) {
+                color = ANSI_GREEN;
+                section_time = section_times[i]; // Section complete
+            } else {
+                color = ANSI_BLUE;
+                if (i == 0 || section_times[i - 1] != 0.0) {
+                    section_time = time_diff - sum_list_float(section_times); // Section in progress
+                } else {
+                    section_time = 0.0; // Section hasn't started
+                }
+            }
+
+            // Printing Output for Section Progress
+
+            printf(
+                "%s[%d/7] %19s %8.2f%% %s",
+                color, i + 1, section_names[i], progress_section * 100.0, ANSI_GREEN
+                // "[1/7] Setup               12.34% "
+            );
+            int green_bars = (int)round(20 * progress_section);
+            for (int ii; ii < green_bars; ii++) {
+                printf("█");
+            }
+            printf("%s", ANSI_BLUE);
+            for (int ii; ii < 20 - green_bars; ii++) {
+                printf("█");
+            }
+            printf("%s %s\n", ANSI_RESET, format_time(section_time));
+
+        }
+
+        // Total Progress
+
+        char *color;
+        if (sum_list_int(section_progress) == sum_list_int(section_progress_total)) {
+            color = ANSI_GREEN;
+        } else {
+            color = ANSI_BLUE;
+        }
+
+        printf("%s      Total Progress      %8.2f%% %s", color, total_progress * 100.0, ANSI_GREEN);
+        int green_bars = (int)round(20 * total_progress);
+        for (int i; i < green_bars; i++) {
+            printf("█");
+        }
+        printf("%s", ANSI_BLUE);
+        for (int i; i < 20 - green_bars; i++) {
+            printf("█");
+        }
+        printf("%s %s\n", ANSI_RESET, format_time(calc_time_diff(start_time, time_now)));
+
+        // Exiting Tracking Process
+
+        if (strcmp(color, ANSI_GREEN) == 0) {
+            break; // All sections done, exit tracking process
+        } else {
+            // Sleep 0.5 seconds
+            #ifdef _WIN32
+                Sleep(500);
+            #else
+                struct timespec sleep_time;
+                sleep_time.tv_sec = 0;
+                sleep_time.tv_nsec = 500000000;
+                nanosleep(&sleep_time, &sleep_time);
+            #endif
+        }
+
+    }
+
+}
 
 
 // Main Function
@@ -124,7 +254,6 @@ int main(int argc, char *argv[]) {
 
     #ifdef __linux__
 
-        #include <sys/prctl.h>
         prctl(PR_SET_NAME, "BiomeGen Main", 0, 0, 0);
 
     #elif BSD
@@ -261,19 +390,76 @@ int main(int argc, char *argv[]) {
     struct timespec start_time;
     clock_gettime(CLOCK_REALTIME, &start_time);
 
-    sleep_ms(2500);
+    // Shared Memory
 
-    struct timespec end_time;
-    clock_gettime(CLOCK_REALTIME, &end_time);
-    float completion_time = calc_time_diff(start_time, end_time);
+    int *section_progress = mmap(
+        NULL, sizeof(int) * 7, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0
+    );
+
+    int *section_progress_total = mmap(
+        NULL, sizeof(int) * 7, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0
+    );
+
+    float *section_times = mmap(
+        NULL, sizeof(float) * 7, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0
+    );
+
+    for (int i = 0; i < 7; i++) {
+        section_progress[i] = 0;
+        section_progress_total[i] = 0;
+        section_times[i] = 0.0;
+    }
+
+    const int num_dots = width * height / map_resolution;
+
+    struct Dot *dots = mmap(
+        NULL, sizeof(struct Dot) * num_dots, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0
+    );
 
     if (!auto_mode) {
 
-        // Print Result Statistics
+        // Progress Tracking
 
-    } else {
+        int tracker_process_pid = fork();
 
-        printf("%f\n", completion_time);
+        if (getpid() == tracker_process_pid) {
+
+            track_progress(start_time, section_progress, section_progress_total, section_times);
+
+        }
+
+    }
+
+    if (getpid() == 0) {
+
+        section_progress[0] = 1;
+
+        // Section Generation
+
+        section_progress_total[1] = num_dots;
+
+        // Shared Memory Cleanup
+
+        munmap(section_progress, sizeof(int) * 7);
+        munmap(section_progress_total, sizeof(int) * 7);
+        munmap(section_times, sizeof(float) * 7);
+        munmap(dots, sizeof(struct Dot) * num_dots);
+
+        // Completion
+
+        struct timespec end_time;
+        clock_gettime(CLOCK_REALTIME, &end_time);
+        float completion_time = calc_time_diff(start_time, end_time);
+
+        if (!auto_mode) {
+
+            // Print Result Statistics
+
+        } else {
+
+            printf("%f\n", completion_time);
+
+        }
 
     }
 
