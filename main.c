@@ -24,6 +24,7 @@ BiomeGen, a terminal application for generating png maps.
 #include <stdlib.h>
 #include <string.h>
 #include <sys/mman.h>
+#include <sys/wait.h>
 #include <time.h>
 #include <unistd.h>
 
@@ -225,7 +226,7 @@ void track_progress(
         }
         printf("%s %s\n", ANSI_RESET, format_time(calc_time_diff(start_time, time_now)));
 
-        // Exiting Tracking Process
+        // Checking Exit Status
 
         if (strcmp(color, ANSI_GREEN) == 0) {
             break; // All sections done, exit tracking process
@@ -266,11 +267,7 @@ int main(int argc, char *argv[]) {
     
     #endif
 
-    // Clearing Errors File
-
-    FILE *fptr;
-    fptr = fopen("errors.txt", "w");
-    fclose(fptr);
+    // Getting Inputs
 
     bool auto_mode;
     char *output_file;
@@ -288,6 +285,7 @@ int main(int argc, char *argv[]) {
         // Getting Program Version
 
         char file_line[100];
+        FILE *fptr;
         fptr = fopen("README.md", "r");
         fgets(file_line, 100, fptr);
         fgets(file_line, 100, fptr);
@@ -416,13 +414,15 @@ int main(int argc, char *argv[]) {
         NULL, sizeof(struct Dot) * num_dots, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0
     );
 
+    int tracker_process_pid = -1;
+
     if (!auto_mode) {
 
         // Progress Tracking
 
-        int tracker_process_pid = fork();
+        tracker_process_pid = fork();
 
-        if (getpid() == tracker_process_pid) {
+        if (tracker_process_pid == 0) {
 
             track_progress(start_time, section_progress, section_progress_total, section_times);
 
@@ -430,36 +430,38 @@ int main(int argc, char *argv[]) {
 
     }
 
-    if (getpid() == 0) {
+    section_progress[0] = 1;
 
-        section_progress[0] = 1;
+    // Section Generation
 
-        // Section Generation
+    section_progress_total[1] = num_dots;
 
-        section_progress_total[1] = num_dots;
+    // Shared Memory Cleanup
 
-        // Shared Memory Cleanup
+    munmap(section_progress, sizeof(int) * 7);
+    munmap(section_progress_total, sizeof(int) * 7);
+    munmap(section_times, sizeof(float) * 7);
+    munmap(dots, sizeof(struct Dot) * num_dots);
 
-        munmap(section_progress, sizeof(int) * 7);
-        munmap(section_progress_total, sizeof(int) * 7);
-        munmap(section_times, sizeof(float) * 7);
-        munmap(dots, sizeof(struct Dot) * num_dots);
+    if (!auto_mode) {
+        // Wait for Tracker Process
+        int junk;
+        waitpid(tracker_process_pid, &junk, 0);
+    }
 
-        // Completion
+    // Completion
 
-        struct timespec end_time;
-        clock_gettime(CLOCK_REALTIME, &end_time);
-        float completion_time = calc_time_diff(start_time, end_time);
+    struct timespec end_time;
+    clock_gettime(CLOCK_REALTIME, &end_time);
+    float completion_time = calc_time_diff(start_time, end_time);
 
-        if (!auto_mode) {
+    if (!auto_mode) {
 
-            // Print Result Statistics
+        // Print Result Statistics
 
-        } else {
+    } else {
 
-            printf("%f\n", completion_time);
-
-        }
+        printf("%f\n", completion_time);
 
     }
 
