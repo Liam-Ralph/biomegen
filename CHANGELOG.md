@@ -1,3 +1,7 @@
+## Version 2.1.2 (September 2025)
+
+ - Autorun stats are now saved to a csv file.
+
 ## Version 2.1.1 (September 2025)
 
  - Added outliers to autorun stats.
