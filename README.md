@@ -1,6 +1,6 @@
 # BiomeGen
 ### Released July 2025
-### Version 2.1.1
+### Version 2.1.2
 ### Updated September 2025
 
 # Note: this branch is in development. It is an attempt to rewrite the project in C.
@@ -45,7 +45,8 @@ to do this:
    from `autorun_tasks.txt`. Each line represents one task, empty lines and comments
    will cause errors. Currently, it contains the example task
    `2:n:n:1920 1080 100 120 50 5 8 file_path.png`. The C program will also add
-   statistics, including mean generation time, percentiles, and more.
+   statistics, including mean generation time, percentiles, and more. Statistics
+   will be saved to the file `autorun_results.csv`.
 
      - `2` is the number of repetitions, meaning the Python program will be run
        twice. This must be a positive integer.
