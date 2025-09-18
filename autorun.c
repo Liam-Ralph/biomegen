@@ -126,15 +126,15 @@ int main() {
 
         int width = atoi(strtok(inputs, " "));
         int height = atoi(strtok(NULL, " "));
+        strtok(NULL, " ");
+        strtok(NULL, " ");
+        strtok(NULL, " ");
+        strtok(NULL, " ");
+        int processes = atoi(strtok(NULL, " "));
 
         // Delete Png File if not Saving
 
         if (!save_png) {
-            strtok(NULL, " ");
-            strtok(NULL, " ");
-            strtok(NULL, " ");
-            strtok(NULL, " ");
-            strtok(NULL, " ");
             char *file_path = strtok(NULL, "");
             remove(file_path);
         }
@@ -154,7 +154,7 @@ int main() {
         mean /= reps;
         printf("Mean Time %24lfs\n", mean);
 
-        // Calculating Standard Deviation
+        // Calculating Standard Deviation and Pixels Per Second
 
         float std_deviation = 0;
         for (i = 0; i < reps; i++) {
@@ -163,6 +163,18 @@ int main() {
         std_deviation /= reps;
         std_deviation = sqrt(std_deviation);
         printf("Standard Deviation %15lfs\n", std_deviation);
+
+        int pix_per_sec = (int)round(width * height / mean);
+        printf("Pixels per Second: %d\n", pix_per_sec);
+
+        // Saving Results to File
+
+        FILE *fptr_results;
+        fptr_results = fopen("autorun_results.csv", "a");
+        fprintf(
+            fptr_results, "%d, %d, %d, %d, %f, %f, %d",
+            width, height, processes, reps, mean, std_deviation, pix_per_sec
+        );
 
         if (reps >= 10) {
 
@@ -188,8 +200,7 @@ int main() {
             // Percentiles
 
             int percentiles[] = {5, 25, 50, 75, 95};
-            float quartile1; // 25th percentile
-            float quartile3; // 75th quartile
+            float pctile_times[] = {-1.0, -1.0, -1.0, -1.0, -1.0};
             float iqr; // interquartile range (q3 - q1)
 
             for (i = 0; i < sizeof(percentiles) / sizeof(percentiles[0]); i++) {
@@ -210,12 +221,7 @@ int main() {
                 value = list[1] + (list[2] - list[1]) * 0.5 = 2 + 1 * 0.5 = 2.5
                 */
 
-                if (i == 1) {
-                    quartile1 = value;
-                } else if (i == 3) {
-                    quartile3 = value;
-                    iqr = quartile3 - quartile1;
-                }
+                pctile_times[i] = value;
 
                 printf("%2dth Percentile %18lfs\n", percentiles[i], value);
 
@@ -228,7 +234,10 @@ int main() {
             float *outliers_list = malloc(reps * sizeof(rep_times[0]));
             int outliers_cap = 0;
             for (i = 0; i < reps; i++) {
-                if (rep_times[i] < quartile1 - iqr || rep_times[i] > quartile3 + iqr) {
+                if (
+                    rep_times[i] < pctile_times[1] - iqr || // Low outlier
+                    rep_times[i] > pctile_times[3] + iqr // High outlier
+                ) {
                     if (outliers > outliers_cap) {
                         outliers_cap = (outliers_cap == 0) ? 1 : outliers_cap * 2;
                         outliers_list = realloc(outliers_list, outliers_cap * sizeof(rep_times[i]));
@@ -250,9 +259,22 @@ int main() {
             }
             free(outliers_list);
 
+            // Adding Results to File
+
+            fprintf(
+                fptr_results, ", %f, %f, %f, %f, %f\n",
+                pctile_times[0], pctile_times[1], pctile_times[2], pctile_times[3], pctile_times[4]
+            );
+
+        } else {
+
+            fprintf(fptr_results, "\n");
+
         }
 
-        printf("Pixels per Second: %d\n\n", (int)round(width * height / mean));
+        printf("\n");
+
+        fclose(fptr_results);
 
     }
 
