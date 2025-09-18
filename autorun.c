@@ -232,6 +232,7 @@ int main() {
 
             // Finding Outliers Using IQR
 
+            iqr = pctile_times[3] - pctile_times[1];
             printf("Interquartile Range %14lfs\n", iqr);
             int outliers = 0;
             float *outliers_list = malloc(reps * sizeof(rep_times[0]));
