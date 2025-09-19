@@ -239,8 +239,8 @@ int main() {
             int outliers_cap = 0;
             for (i = 0; i < reps; i++) {
                 if (
-                    rep_times[i] < pctile_times[1] - iqr || // Low outlier
-                    rep_times[i] > pctile_times[3] + iqr // High outlier
+                    rep_times[i] < pctile_times[1] - iqr * 1.5 || // Low outlier
+                    rep_times[i] > pctile_times[3] + iqr * 1.5 // High outlier
                 ) {
                     if (outliers > outliers_cap) {
                         outliers_cap = (outliers_cap == 0) ? 1 : outliers_cap * 2;
