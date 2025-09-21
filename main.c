@@ -70,16 +70,13 @@ void clear_screen() {
     system(command);
 }
 
-char * format_time(float time_seconds) {
-    char *result;
-    sprintf(result, "%2d:", (int)time_seconds / 60);
-    char *result_sec;
-    sprintf(
-        result_sec, "%06.3f",
-        (float)((int)time_seconds % 60) + (time_seconds - (int)time_seconds)
-    );
-    strcat(result, result_sec);
-    return result;
+void format_time(char *buffer, size_t buffer_size, float time_seconds) {
+
+    int minutes = (int)time_seconds / 60;
+    float seconds = fmod(time_seconds, 60.0f);
+
+    snprintf(buffer, buffer_size, "%2d:%06.3f", minutes, seconds);
+
 }
 
 int get_int(const int min, const int max) {
@@ -145,7 +142,7 @@ void track_progress(
     
     #endif
 
-    char section_names[7][19] = {
+    char section_names[7][20] = {
         "Setup", "Section Generation", "Section Assignment", "Coastline Smoothing",
         "Biome Generation", "Image Generation", "Finish"
     };
@@ -168,7 +165,7 @@ void track_progress(
 
             // Calculatin Section Progress
 
-            float progress_section = section_progress[i] / section_progress_total[i];
+            float progress_section = section_progress[i] / (float)section_progress_total[i];
             total_progress += progress_section * section_weights[i];
 
             // Checking if Section Complete
@@ -190,19 +187,20 @@ void track_progress(
             // Printing Output for Section Progress
 
             printf(
-                "%s[%d/7] %19s %8.2f%% %s",
-                color, i + 1, section_names[i], progress_section * 100.0, ANSI_GREEN
-                // "[1/7] Setup               12.34% "
-            );
+                "%s[%d/7] %-20s%8.2f%% %s",
+                color, i + 1, section_names[i], progress_section * 100, ANSI_GREEN
+            ); // "[1/7] Setup               100.00% "
             int green_bars = (int)round(20 * progress_section);
-            for (int ii; ii < green_bars; ii++) {
+            for (int ii = 0; ii < green_bars; ii++) {
                 printf("█");
             }
             printf("%s", ANSI_BLUE);
-            for (int ii; ii < 20 - green_bars; ii++) {
+            for (int ii = 0; ii < 20 - green_bars; ii++) {
                 printf("█");
             }
-            printf("%s %s\n", ANSI_RESET, format_time(section_time));
+            char formatted_time[10];
+            format_time(formatted_time, sizeof(formatted_time), section_time);
+            printf("%s%s\n", ANSI_RESET, formatted_time);
 
         }
 
@@ -215,16 +213,18 @@ void track_progress(
             color = ANSI_BLUE;
         }
 
-        printf("%s      Total Progress      %8.2f%% %s", color, total_progress * 100.0, ANSI_GREEN);
+        printf("%s      TOTAL PROGRESS      %8.2f%% %s", color, total_progress * 100.0, ANSI_GREEN);
         int green_bars = (int)round(20 * total_progress);
-        for (int i; i < green_bars; i++) {
+        for (int i = 0; i < green_bars; i++) {
             printf("█");
         }
         printf("%s", ANSI_BLUE);
-        for (int i; i < 20 - green_bars; i++) {
+        for (int i = 0; i < 20 - green_bars; i++) {
             printf("█");
         }
-        printf("%s %s\n", ANSI_RESET, format_time(calc_time_diff(start_time, time_now)));
+        char formatted_time[10];
+        format_time(formatted_time, sizeof(formatted_time), calc_time_diff(start_time, time_now));
+        printf("%s%s\n", ANSI_RESET, formatted_time);
 
         // Checking Exit Status
 
@@ -404,7 +404,7 @@ int main(int argc, char *argv[]) {
 
     for (int i = 0; i < 7; i++) {
         section_progress[i] = 0;
-        section_progress_total[i] = 0;
+        section_progress_total[i] = 1;
         section_times[i] = 0.0;
     }
 
@@ -430,6 +430,9 @@ int main(int argc, char *argv[]) {
 
     }
 
+    struct timespec time_now;
+    clock_gettime(CLOCK_REALTIME, &time_now);
+    section_times[0] = calc_time_diff(start_time, time_now);
     section_progress[0] = 1;
 
     // Section Generation
