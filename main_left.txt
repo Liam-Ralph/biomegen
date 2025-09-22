@@ -333,8 +333,6 @@ def main():
                 image.paste(section, (0, shift))
                 shift += section_heights[0]
             image.save(output_file)
-            section_times[6] = time.time() - start_time - sum(section_times)
-            section_progress[6] = 1
         except:
             raise_error("main", traceback.format_exc())
     if not auto_mode:

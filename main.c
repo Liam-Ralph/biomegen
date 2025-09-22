@@ -56,12 +56,18 @@ typedef struct Dot Dot;
 // Functions
 // (Alphabetical order)
 
+/**
+ * Calculates the difference in seconds between two timespecs, start and end.
+*/
 float calc_time_diff(struct timespec start, struct timespec end) {
     int diff_sec = end.tv_sec - start.tv_sec;
     int diff_nsec = end.tv_nsec - start.tv_nsec;
     return (float)diff_sec + diff_nsec / 1000000000.0;
 }
 
+/**
+ * Clears all output from the terminal.
+ */
 void clear_screen() {
     char *command = "clear";
     #ifdef _Win32
@@ -70,6 +76,10 @@ void clear_screen() {
     system(command);
 }
 
+/**
+ * Formats a time in seconds into a string, placing the output in buffer.
+ * Output string has the format "MM:SS.SSS", e.g. 12:34.567.
+ */
 void format_time(char *buffer, size_t buffer_size, float time_seconds) {
 
     int minutes = (int)time_seconds / 60;
@@ -79,10 +89,14 @@ void format_time(char *buffer, size_t buffer_size, float time_seconds) {
 
 }
 
+/**
+ * Get a sanitized integer input from the user between min and max,
+ * both inclusive.
+ */
 int get_int(const int min, const int max) {
 
     char raw_result[100];
-    long result;
+    int result;
 
     while (true) {
 
@@ -101,6 +115,9 @@ int get_int(const int min, const int max) {
 
 }
 
+/**
+ * Return the sum of a list of integers.
+ */
 int sum_list_int(int *list) {
     int sum = 0;
     for (int i = 0; i < sizeof(list) / sizeof(int); i++) {
@@ -109,6 +126,9 @@ int sum_list_int(int *list) {
     return sum;
 }
 
+/**
+ * Return the sum of a list of floats.
+ */
 float sum_list_float(float *list) {
     float sum = 0;
     for (int i = 0; i < sizeof(list) / sizeof(float); i++) {
@@ -119,8 +139,13 @@ float sum_list_float(float *list) {
 
 
 // Multiprocessing Functions
-//(Order of use)
+// (Order of use)
 
+/**
+ * Track the progress of map generation, and show the progress in the terminal.
+ * start_time is the time at the start of map generation in main(), and the
+ * other inputs are all shared memory used to track section progress and times.
+ */
 void track_progress(
     struct timespec start_time,
     int *section_progress, int *section_progress_total, float *section_times
@@ -130,7 +155,7 @@ void track_progress(
 
     #ifdef __linux__
 
-        prctl(PR_SET_NAME, "BiomeGen Tracker", 0, 0, 0);
+        prctl(PR_SET_NAME, "BiomeGenTracker", 0, 0, 0);
 
     #elif BSD
 
@@ -249,6 +274,9 @@ void track_progress(
 
 // Main Function
 
+/**
+ * Main Function. argc and argv used for manual inputs mode.
+ */
 int main(int argc, char *argv[]) {
 
     // Setting Main Process Title
@@ -439,18 +467,24 @@ int main(int argc, char *argv[]) {
 
     section_progress_total[1] = num_dots;
 
-    // Shared Memory Cleanup
+    // Finish
 
-    munmap(section_progress, sizeof(int) * 7);
-    munmap(section_progress_total, sizeof(int) * 7);
-    munmap(section_times, sizeof(float) * 7);
-    munmap(dots, sizeof(struct Dot) * num_dots);
+    clock_gettime(CLOCK_REALTIME, &time_now);
+    section_times[6] = calc_time_diff(start_time, time_now) - sum_list_float(section_times);
+    section_progress[6] = 1;
 
     if (!auto_mode) {
         // Wait for Tracker Process
         int junk;
         waitpid(tracker_process_pid, &junk, 0);
     }
+
+    // Shared Memory Cleanup
+
+    munmap(section_progress, sizeof(int) * 7);
+    munmap(section_progress_total, sizeof(int) * 7);
+    munmap(section_times, sizeof(float) * 7);
+    munmap(dots, sizeof(struct Dot) * num_dots);
 
     // Completion
 
