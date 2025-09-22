@@ -48,13 +48,33 @@ BiomeGen, a terminal application for generating png maps.
 struct Dot {
     int x;
     int y;
-    char type[13];
+    char *type;
 };
 typedef struct Dot Dot;
 
 
 // Functions
 // (Alphabetical order)
+
+/**
+ * Check if a 2D int array[outer_size][inner_size] contains another int array of
+ * size inner_size
+ */
+bool array_contains_int_array(int outer_size, int inner_size, int array[outer_size][inner_size], int value_array[inner_size]) {
+    for (int i = 0; i < outer_size; i++) {
+        bool found_value = true;
+        for (int ii = 0; ii < inner_size; ii++) {
+            if (array[i][ii] != value_array[ii]) {
+                found_value = false;
+                break;
+            }
+        }
+        if (found_value) {
+            return true;
+        }
+    }
+    return false;
+}
 
 /**
  * Calculates the difference in seconds between two timespecs, start and end.
@@ -238,7 +258,7 @@ void track_progress(
             color = ANSI_BLUE;
         }
 
-        printf("%s      TOTAL PROGRESS      %8.2f%% %s", color, total_progress * 100.0, ANSI_GREEN);
+        printf("%s      TOTAL PROGRESS      %8.2f%% %s", color, total_progress * 100, ANSI_GREEN);
         int green_bars = (int)round(20 * total_progress);
         for (int i = 0; i < green_bars; i++) {
             printf("█");
@@ -325,6 +345,7 @@ int main(int argc, char *argv[]) {
         version[strlen(version) - 1] = '\0';
 
         // Copyright, license notice, etc.
+        clear_screen();
         printf(
             "Welcome to BiomeGen v%s\n"
             "Copyright (C) 2025 Liam Ralph\n"
@@ -433,7 +454,7 @@ int main(int argc, char *argv[]) {
     for (int i = 0; i < 7; i++) {
         section_progress[i] = 0;
         section_progress_total[i] = 1;
-        section_times[i] = 0.0;
+        section_times[i] = 0;
     }
 
     const int num_dots = width * height / map_resolution;
@@ -458,25 +479,68 @@ int main(int argc, char *argv[]) {
 
     }
 
-    struct timespec time_now;
-    clock_gettime(CLOCK_REALTIME, &time_now);
-    section_times[0] = calc_time_diff(start_time, time_now);
-    section_progress[0] = 1;
+    if (tracker_process_pid != 0) {
 
-    // Section Generation
+        struct timespec time_now;
+        clock_gettime(CLOCK_REALTIME, &time_now);
+        section_times[0] = calc_time_diff(start_time, time_now);
+        section_progress[0] = 1;
 
-    section_progress_total[1] = num_dots;
+        // Section Generation
+        // Creating the initial list of dots
 
-    // Finish
+        section_progress_total[1] = num_dots;
 
-    clock_gettime(CLOCK_REALTIME, &time_now);
-    section_times[6] = calc_time_diff(start_time, time_now) - sum_list_float(section_times);
-    section_progress[6] = 1;
+        int rand_indexes[num_dots][2];
+        srand(time(NULL));
+        int num_special_dots = num_dots / island_abundance;
 
-    if (!auto_mode) {
-        // Wait for Tracker Process
-        int junk;
-        waitpid(tracker_process_pid, &junk, 0);
+        for (int i = 0; i < num_dots; i++) {
+
+            int rand_index[2] = {0, 0};
+
+            while (true) {
+                rand_index[0] = rand() % width;
+                rand_index[1] = rand() % height;
+                if (!array_contains_int_array(i, 2, rand_indexes, rand_index)) {
+                    break; // Dot already exists here, try again
+                }
+            }
+
+            // Create dot at rand_index[x, y]
+
+            Dot new_dot;
+            new_dot.x = rand_index[0];
+            new_dot.y = rand_index[1];
+            if (i < num_special_dots) {
+                new_dot.type = "Land Origin"; // Origin points for islands
+            } else if (i < num_special_dots * 2) {
+                new_dot.type = "Water Forced"; // Forced water (good for making lakes)
+            } else {
+                new_dot.type = "Water"; // Water (default)
+            }
+
+            dots[i] = new_dot;
+
+            section_progress[1] += 1;
+
+        }
+
+        clock_gettime(CLOCK_REALTIME, &time_now);
+        section_times[1] = calc_time_diff(start_time, time_now) - sum_list_float(section_times);
+
+        // Finish
+
+        clock_gettime(CLOCK_REALTIME, &time_now);
+        section_times[6] = calc_time_diff(start_time, time_now) - sum_list_float(section_times);
+        section_progress[6] = 1;
+
+        if (!auto_mode) {
+            // Wait for Tracker Process
+            int junk;
+            waitpid(tracker_process_pid, &junk, 0);
+        }
+
     }
 
     // Shared Memory Cleanup
