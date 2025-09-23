@@ -1,6 +1,6 @@
 ## Version 2.1.3 (September 2025)
 
- - Added version to autorun results.\
+ - Added version to autorun results.
  - Added autorun results for website.
  
 ## Version 2.1.2 (September 2025)
