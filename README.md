@@ -44,7 +44,9 @@ to do this:
    will cause errors. Currently, it contains the example task
    `2:n:n:1920 1080 100 120 50 5 8 file_path.png`. The C program will also add
    statistics, including mean generation time, percentiles, and more. Statistics
-   will be saved to the file `autorun_results.csv`.
+   will be saved to the file `autorun_results.csv`. The statistics currently there
+   are for comparing versions at this project's website, and can be removed on any
+   clones or forks, but be careful to leave the first line alone.
 
      - `2` is the number of repetitions, meaning the Python program will be run
        twice. This must be a positive integer.
