@@ -14,10 +14,25 @@ int main() {
     int i, ii;
 
     printf("\n");
+    
+    // Getting Program Version
 
+    char file_line[100];
     FILE *fptr;
+    fptr = fopen("README.md", "r");
+    fgets(file_line, 100, fptr);
+    fgets(file_line, 100, fptr);
+    fgets(file_line, 100, fptr);
+    fclose(fptr);
+
+    char version[12];
+    strncpy(version, file_line + 12, 12);
+    version[strlen(version) - 2] = '\0';
+
+    // Opening Autorun Tasks
+
     fptr = fopen("autorun_tasks.txt", "r");
-    char raw_line[100]; // Max task length is 100 chars
+    char raw_line[100]; // Max task length is 99 chars
 
     while (fgets(raw_line, 100, fptr)) {
 
@@ -175,8 +190,8 @@ int main() {
         FILE *fptr_results;
         fptr_results = fopen("autorun_results.csv", "a");
         fprintf(
-            fptr_results, "%d, %d, %d, %d, %f, %f, %d",
-            width, height, processes, reps, mean, std_deviation, pix_per_sec
+            fptr_results, "%s, %d, %d, %d, %d, %f, %f, %d",
+            version, width, height, processes, reps, mean, std_deviation, pix_per_sec
         );
 
         if (reps >= 10) {
