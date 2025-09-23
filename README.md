@@ -64,7 +64,7 @@ to do this:
      - `1920 1080 100 120 50 5 8 file_path.png` is simply the arguments to be passed
        to the Python program. The only one that may be edited by the C program
        is `file_path.png`, which will be edited if "y" in the second C program
-       argument. Must follow the rules for Python arguments in 1. Max 100 characters.
+       argument. Must follow the rules for Python arguments in 1. Max 99 characters.
     
     With this option, you can generated multiple different png files from the same
     inputs, or test the generation speed of the Python program. This option will
@@ -77,4 +77,5 @@ to do this:
 ## Other Files
  - `sample_inputs.txt`
    Includes a number of inputs that can pasted into your terminal
+
    (Ctrl + Shift + V usually works for this).
