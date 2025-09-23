@@ -1,3 +1,7 @@
+## Version 2.1.3 (September 2025)
+
+ - Added version to autorun results.
+
 ## Version 2.1.2 (September 2025)
 
  - Autorun stats are now saved to a csv file.
