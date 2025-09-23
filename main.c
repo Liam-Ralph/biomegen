@@ -340,7 +340,7 @@ int main(int argc, char *argv[]) {
         fgets(file_line, 100, fptr);
         fclose(fptr);
 
-        char version[16];
+        char version[12];
         strncpy(version, file_line + 12, 12);
         version[strlen(version) - 1] = '\0';
 
