@@ -1,6 +1,6 @@
 # BiomeGen
 ### Released July 2025
-### Version 2.1.3
+### Version 2.1.4
 ### Updated September 2025
 
 # Note: this branch is in development. It is an attempt to rewrite the project in C.
@@ -66,7 +66,7 @@ to do this:
      - `1920 1080 100 120 50 5 8 file_path.png` is simply the arguments to be passed
        to the main C program. The only one that may be edited by the C program
        is `file_path.png`, which will be edited if "y" in the second C program
-       argument. Must follow the rules for C arguments in 1. Max 99 characters.
+       argument. Must follow the rules for C arguments in 1. Max 255 characters.
     
     With this option, you can generated multiple different png files from the same
     inputs, or test the generation speed of the main C program. This option will

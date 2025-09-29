@@ -9,7 +9,10 @@
 
 // OS Specific Includes
 
-#ifdef _WIN32
+#ifdef __linux__
+    #include <sys/prctl.h>
+#elif _WIN32
+    #include <windows.h>
     #include <io.h>
     #define F_OK 0
     #define access _access
@@ -20,17 +23,31 @@
 
 int main() {
 
-    int i, ii;
+    // Setting Process Title
+
+    #ifdef __linux__
+
+        prctl(PR_SET_NAME, "BiomeGenAutorun", 0, 0, 0);
+
+    #elif BSD
+
+        setproctitle("BiomeGen Autorun");
+
+    #elif __Apple__
+
+        setproctitle("BiomeGen Autorun");
+    
+    #endif
 
     printf("\n");
 
     // Getting Program Version
 
-    char file_line[100];
+    char file_line[29];
     FILE *fptr = fopen("README.md", "r");
-    fgets(file_line, 100, fptr);
-    fgets(file_line, 100, fptr);
-    fgets(file_line, 100, fptr);
+    fgets(file_line, 29, fptr);
+    fgets(file_line, 29, fptr);
+    fgets(file_line, 29, fptr);
     fclose(fptr);
 
     char version[12];
@@ -47,20 +64,18 @@ int main() {
 
     if (!access(exec, F_OK) == 0) {
         system("gcc main.c -o main -lm");
-    } else {
-        printf("NOT NULL\n");
-    }
+    } 
 
     // Opening Autorun Tasks
 
     fptr = fopen("autorun_tasks.txt", "r");
-    char raw_line[100]; // Max task length is 99 chars
+    char raw_line[256]; // Max task length is 255 chars
 
-    while (fgets(raw_line, 100, fptr)) {
+    while (fgets(raw_line, 256, fptr)) {
 
         // Getting Task Parameters
 
-        char line_copy[100];
+        char line_copy[256];
         strcpy(line_copy, raw_line);
 
         char *token = strtok(line_copy, ":");
@@ -87,7 +102,7 @@ int main() {
 
         if (save_png) {
             const int len_inputs = strlen(inputs);
-            char inputs_copy[100];
+            char inputs_copy[257];
             strncpy(inputs_copy, inputs, len_inputs - 4);
             snprintf(inputs, len_inputs + 3, "%s0.png", inputs_copy);
         }
@@ -96,14 +111,14 @@ int main() {
         // Running Repetitions
 
         float rep_times[reps];
-        for (i = 0; i < reps; i++) {
+        for (int i = 0; i < reps; i++) {
 
             if (save_png) {
 
                 // Preparing Rep's Save Path
 
                 const int len_inputs = strlen(inputs);
-                char inputs_copy[100] = "";
+                char inputs_copy[257] = "";
                 strncpy(inputs_copy, inputs, len_inputs - 5);
                 snprintf(inputs, len_inputs + 4, "%s%d.png", inputs_copy, i + 1);
                 // Rep 1 is saved in file1.png, rep2 in file2.png, etc.
@@ -113,18 +128,18 @@ int main() {
             // Running Program and Collecting Output
 
             FILE *fp;
-            char output[20] = {0};
-            char buffer[20];
+            char output[13] = {0};
+            char buffer[13]; // max time 99999.999999 seconds (> 27 hours)
 
             #ifdef _WIN32
-                char command[109] = "main.exe ";
+                char command[265] = "main.exe ";
             #else
-                char command[107] = "./main ";
+                char command[263] = "./main ";
             #endif
 
             strcat(command, inputs);
             fp = popen(command, "r");
-            while (fgets(buffer, 20, fp) != NULL) {
+            while (fgets(buffer, 13, fp) != NULL) {
                 strcat(output, buffer);
             }
             pclose(fp);
@@ -146,12 +161,12 @@ int main() {
             } else {
                 const int bars = round((i + 1) * 100 / reps);
                 printf("\r\033[K\033[48;5;2m");
-                for (ii = 0; ii < bars; ii++) {
+                for (int ii = 0; ii < bars; ii++) {
                     printf(" ");
                     fflush(stdout);
                 }
                 printf("\033[48;5;1m");
-                for (ii = 0; ii < 100 - bars; ii++) {
+                for (int ii = 0; ii < 100 - bars; ii++) {
                     printf(" ");
                     fflush(stdout);
                 }
@@ -185,7 +200,7 @@ int main() {
         // Calculating Mean
 
         float mean = 0;
-        for (i = 0; i < reps; i++) {
+        for (int i = 0; i < reps; i++) {
             mean += rep_times[i];
         }
         mean /= reps;
@@ -194,7 +209,7 @@ int main() {
         // Calculating Standard Deviation and Pixels Per Second
 
         float std_deviation = 0;
-        for (i = 0; i < reps; i++) {
+        for (int i = 0; i < reps; i++) {
             std_deviation += pow((rep_times[i] - mean), 2);
         }
         std_deviation /= reps;
@@ -218,9 +233,9 @@ int main() {
 
             bool swapped;
             float temp;
-            for (i = 0; i < reps - 1; i++) {
+            for (int i = 0; i < reps - 1; i++) {
                 swapped = false;
-                for (ii = 0; ii < reps - i - 1; ii++) {
+                for (int ii = 0; ii < reps - i - 1; ii++) {
                     if (rep_times[ii] > rep_times[ii + 1]) {
                         temp = rep_times[ii];
                         rep_times[ii] = rep_times[ii + 1];
@@ -239,7 +254,7 @@ int main() {
             float pctile_times[] = {-1.0, -1.0, -1.0, -1.0, -1.0};
             float iqr; // interquartile range (q3 - q1)
 
-            for (i = 0; i < sizeof(percentiles) / sizeof(percentiles[0]); i++) {
+            for (int i = 0; i < sizeof(percentiles) / sizeof(percentiles[0]); i++) {
 
                 float exact_index = percentiles[i] * (reps - 1) / 100.0; // 50th index of 8 is 3.5
                 int index = (int)exact_index; // floor of exact index
@@ -270,7 +285,7 @@ int main() {
             int outliers = 0;
             float *outliers_list = malloc(reps * sizeof(rep_times[0]));
             int outliers_cap = 0;
-            for (i = 0; i < reps; i++) {
+            for (int i = 0; i < reps; i++) {
                 if (
                     rep_times[i] < pctile_times[1] - iqr * 1.5 || // Low outlier
                     rep_times[i] > pctile_times[3] + iqr * 1.5 // High outlier
@@ -287,7 +302,7 @@ int main() {
             if (outliers > 0) {
                 printf("    ");
                 float new_mean = mean * reps;
-                for (i = 0; i < outliers; i++) {
+                for (int i = 0; i < outliers; i++) {
                     printf("%f ", outliers_list[i]);
                     new_mean -= outliers_list[i];
                 }

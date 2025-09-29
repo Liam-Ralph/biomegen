@@ -1,3 +1,7 @@
+## Version 2.1.4 (September 2025)
+
+ - Modify autorun program for better memory management.
+
 ## Version 2.1.3 (September 2025)
 
  - Added version to autorun results.
