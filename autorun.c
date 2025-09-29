@@ -5,6 +5,15 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
+
+// OS Specific Includes
+
+#ifdef _WIN32
+    #include <io.h>
+    #define F_OK 0
+    #define access _access
+#endif
 
 
 // Main Function
@@ -18,8 +27,7 @@ int main() {
     // Getting Program Version
 
     char file_line[100];
-    FILE *fptr;
-    fptr = fopen("README.md", "r");
+    FILE *fptr = fopen("README.md", "r");
     fgets(file_line, 100, fptr);
     fgets(file_line, 100, fptr);
     fgets(file_line, 100, fptr);
@@ -28,6 +36,20 @@ int main() {
     char version[12];
     strncpy(version, file_line + 12, 12);
     version[strlen(version) - 2] = '\0';
+
+    // Compiling Main Program
+
+    #ifdef _WIN32
+        char exec[9] = "main.exe";
+    #else
+        char exec[5] = "main";
+    #endif
+
+    if (!access(exec, F_OK) == 0) {
+        system("gcc main.c -o main -lm");
+    } else {
+        printf("NOT NULL\n");
+    }
 
     // Opening Autorun Tasks
 
@@ -184,8 +206,7 @@ int main() {
 
         // Saving Results to File
 
-        FILE *fptr_results;
-        fptr_results = fopen("autorun_results.csv", "a");
+        FILE *fptr_results = fopen("autorun_results.csv", "a");
         fprintf(
             fptr_results, "%s, %d, %d, %d, %d, %f, %f, %d",
             version, width, height, processes, reps, mean, std_deviation, pix_per_sec

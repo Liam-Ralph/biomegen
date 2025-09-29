@@ -333,8 +333,7 @@ int main(int argc, char *argv[]) {
         // Getting Program Version
 
         char file_line[100];
-        FILE *fptr;
-        fptr = fopen("README.md", "r");
+        FILE *fptr = fopen("README.md", "r");
         fgets(file_line, 100, fptr);
         fgets(file_line, 100, fptr);
         fgets(file_line, 100, fptr);
