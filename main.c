@@ -115,12 +115,12 @@ void format_time(char *buffer, size_t buffer_size, float time_seconds) {
  */
 int get_int(const int min, const int max) {
 
-    char raw_result[100];
+    char raw_result[6]; // largest possible max is 9999 (+ \n + \0)
     int result;
 
     while (true) {
 
-        fgets(raw_result, 100, stdin);
+        fgets(raw_result, 6, stdin);
         result = atoi(raw_result);
 
         if (result < min || result > max || (result == 0  && strncmp("0", raw_result, 1) != 0)) {
@@ -332,11 +332,11 @@ int main(int argc, char *argv[]) {
 
         // Getting Program Version
 
-        char file_line[100];
+        char file_line[29];
         FILE *fptr = fopen("README.md", "r");
-        fgets(file_line, 100, fptr);
-        fgets(file_line, 100, fptr);
-        fgets(file_line, 100, fptr);
+        fgets(file_line, 29, fptr);
+        fgets(file_line, 29, fptr);
+        fgets(file_line, 29, fptr);
         fclose(fptr);
 
         char version[12];
