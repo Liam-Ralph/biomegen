@@ -23,15 +23,15 @@ BiomeGen, a terminal application for generating png maps.
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/mman.h>
-#include <sys/wait.h>
 #include <time.h>
 #include <unistd.h>
 
 // OS Specific Includes
 
 #ifdef __linux__
+    #include <sys/mman.h>
     #include <sys/prctl.h>
+    #include <sys/wait.h>
 #elif _WIN32
     #include <windows.h>
 #endif
