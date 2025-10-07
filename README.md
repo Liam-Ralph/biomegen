@@ -3,16 +3,16 @@
 ### Version 2.1.4
 ### Updated September 2025
 
-# Note: this branch is in development. It is an attempt to rewrite the project in C.
+# Note: this branch is in development. It is an attempt to rewrite the project in Rust.
 
 <br/>
 
 ## Description
-BiomeGen is a C map generation tool that provides output in a png format.
+BiomeGen is a Rust map generation tool that provides output in a png format.
 Customization options include map dimensions, island abundance, island size, and
 island abundance relative to water. Generates water, land, and various biomes.
-Uses multiprocessing in C for increased efficiency. Includes automated
-runs and another C program to create multiple images or test generation speed.
+Uses multiprocessing in Rust for increased efficiency. Includes automated
+runs and a C program to create multiple images or test generation speed.
 
 <br/>
 
@@ -30,18 +30,18 @@ as detailed in LICENSE, with the following exception:
 This project includes the ability to run in an automated mode. There are two ways
 to do this:
 
-1. Add arguments when running the main C file. With a command like
+1. Add arguments when running the main Rust file. With a command like
    `./main 1920 1080 100 120 50 5 8 file_path.png`, you can pass arguments
-   that will be used by the C program, skipping over manual inputs. The arguments
+   that will be used by the Rust program, skipping over manual inputs. The arguments
    passed are: map width, map height, map resolution, island abundance, island size,
    coastline smoothing, cpu processes, and output path. Except for the output path,
    all of these inputs must be integers. These arguments are not sanitized, meaning
    they can be outside of the limits imposed for manual inputs, which can break
    the program (e.g. a negative map width). This option will only print the
-   generation time for the C program.
+   generation time for the Rust program.
 
 2. Use the `autorun.c` program and `autorun_tasks.txt`. The C program runs
-   the main C program and handles passing arguments. It gets its instructions
+   the main Rust program and handles passing arguments. It gets its instructions
    from `autorun_tasks.txt`. Each line represents one task, empty lines and comments
    will cause errors. Currently, it contains the example task
    `2:n:n:1920 1080 100 120 50 5 8 file_path.png`. The C program will also add
@@ -50,7 +50,7 @@ to do this:
    are for comparing versions at this project's website, and can be removed on any
    clones or forks, but be careful to leave the first line alone.
 
-     - `2` is the number of repetitions, meaning the main C program will be run
+     - `2` is the number of repetitions, meaning the main Rust program will be run
        twice. This must be a positive integer.
      - `n` is whether to show the times for each repetition (y/n). Yes means each
        repetition will show the time it took to run upon completion. This can be
@@ -64,12 +64,12 @@ to do this:
        previous, and `file_path.png` will be deleted at the end of the program.
        Must be "y" or "n".
      - `1920 1080 100 120 50 5 8 file_path.png` is simply the arguments to be passed
-       to the main C program. The only one that may be edited by the C program
+       to the main Rust program. The only one that may be edited by the C program
        is `file_path.png`, which will be edited if "y" in the second C program
-       argument. Must follow the rules for C arguments in 1. Max 255 characters.
+       argument. Must follow the rules for Rust arguments in 1. Max 255 characters.
     
     With this option, you can generated multiple different png files from the same
-    inputs, or test the generation speed of the main C program. This option will
+    inputs, or test the generation speed of the main Rust program. This option will
     also tell you the generation times for each repetition, and the average
     generation time.
 
