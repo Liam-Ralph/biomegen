@@ -4,3 +4,4 @@ version = "3.0.0"
 edition = "2024"
 
 [dependencies]
+proctitle = "0.1.1"

@@ -3,3 +3,4 @@ autorun
 autorun.exe
 autorun_results.csv
 target
+Cargo.lock
