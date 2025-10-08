@@ -23,18 +23,12 @@ BiomeGen, a terminal application for generating png maps.
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/mman.h>
+#include <sys/prctl.h>
+#include <sys/wait.h>
 #include <time.h>
 #include <unistd.h>
 
-// OS Specific Includes
-
-#ifdef __linux__
-    #include <sys/mman.h>
-    #include <sys/prctl.h>
-    #include <sys/wait.h>
-#elif _WIN32
-    #include <windows.h>
-#endif
 
 // Definitions
 
@@ -89,10 +83,7 @@ float calc_time_diff(struct timespec start, struct timespec end) {
  * Clears all output from the terminal.
  */
 void clear_screen() {
-    char *command = "clear";
-    #ifdef _Win32
-        command = "clear";
-    #endif
+    char command[4] = "cls";
     system(command);
 }
 
@@ -177,11 +168,7 @@ void track_progress(
 
         prctl(PR_SET_NAME, "BiomeGenTracker", 0, 0, 0);
 
-    #elif BSD
-
-        setproctitle("BiomeGen Tracker");
-
-    #elif __Apple__
+    #elif BSD || __Apple__
 
         setproctitle("BiomeGen Tracker");
     
@@ -208,7 +195,7 @@ void track_progress(
 
         for (int i = 0; i < 7; i++) {
 
-            // Calculatin Section Progress
+            // Calculating Section Progress
 
             float progress_section = section_progress[i] / (float)section_progress_total[i];
             total_progress += progress_section * section_weights[i];
@@ -277,14 +264,10 @@ void track_progress(
             break; // All sections done, exit tracking process
         } else {
             // Sleep 0.5 seconds
-            #ifdef _WIN32
-                Sleep(500);
-            #else
-                struct timespec sleep_time;
-                sleep_time.tv_sec = 0;
-                sleep_time.tv_nsec = 500000000;
-                nanosleep(&sleep_time, &sleep_time);
-            #endif
+            struct timespec sleep_time;
+            sleep_time.tv_sec = 0;
+            sleep_time.tv_nsec = 500000000;
+            nanosleep(&sleep_time, &sleep_time);
         }
 
     }
