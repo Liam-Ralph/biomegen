@@ -10,4 +10,6 @@ fn main() {
 
     // Getting Program Version
 
+    let contents = std::fs::read_to_string("README.md").expect("");
+
 }
