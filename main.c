@@ -83,7 +83,7 @@ float calc_time_diff(struct timespec start, struct timespec end) {
  * Clears all output from the terminal.
  */
 void clear_screen() {
-    char command[4] = "cls";
+    char command[6] = "clear";
     system(command);
 }
 
@@ -473,27 +473,37 @@ int main(int argc, char *argv[]) {
 
         section_progress_total[1] = num_dots;
 
-        int rand_indexes[num_dots][2];
         srand(time(NULL));
+
         int num_special_dots = num_dots / island_abundance;
+
+        bool *used_coords = calloc(width * height, sizeof(bool));
+        //struct Dot local_dots[num_dots];
 
         for (int i = 0; i < num_dots; i++) {
 
-            int rand_index[2] = {0, 0};
+            // int rand_index[2] = {0, 0};
 
-            while (true) {
-                rand_index[0] = rand() % width;
-                rand_index[1] = rand() % height;
-                if (!array_contains_int_array(i, 2, rand_indexes, rand_index)) {
-                    break; // Dot already exists here, try again
-                }
-            }
+            // while (true) {
+            //     rand_index[0] = rand() % width;
+            //     rand_index[1] = rand() % height;
+            //     if (!array_contains_int_array(i, 2, rand_indexes, rand_index)) {
+            //         break; // Dot already exists here, try again
+            //     }
+            // }
+
+            int ii;
+            do {
+                ii = rand() % (width * height);
+            } while (used_coords[ii]);
 
             // Create dot at rand_index[x, y]
 
+            used_coords[ii] = true;
+
             Dot new_dot;
-            new_dot.x = rand_index[0];
-            new_dot.y = rand_index[1];
+            new_dot.x = i % width;
+            new_dot.y = i / width;
             if (i < num_special_dots) {
                 new_dot.type = "Land Origin"; // Origin points for islands
             } else if (i < num_special_dots * 2) {
@@ -507,6 +517,8 @@ int main(int argc, char *argv[]) {
             section_progress[1] += 1;
 
         }
+
+        //memcpy(dots, local_dots, num_dots * sizeof(struct Dot));
 
         clock_gettime(CLOCK_REALTIME, &time_now);
         section_times[1] = calc_time_diff(start_time, time_now) - sum_list_float(section_times);
