@@ -273,6 +273,36 @@ void track_progress(
 
 }
 
+void assign_sections(
+    const int map_resolution, const float island_size, const int start_index, const int end_index,
+    const struct Dot *origin_dots, struct Dot *dots
+) {
+
+    for (int i = start_index; i < end_index; i++) {
+
+        struct Dot dot = dots[i];
+
+        if (strcmp(dot.type, "Water") == 0) { // Ignore "Water Forced" and "Land Origin"
+
+            int min; // min and dist are squared, sqrt is not dont until later
+            for (int ii = 0; ii < sizeof(origin_dots) / sizeof(struct Dot); ii++) {
+                const struct Dot origin_dot = origin_dots[ii];
+                const int dist = pow(origin_dot.x - dot.x, 2) + pow(origin_dot.y - dot.y, 2);
+                if (ii == 0) {
+                    min = dist;
+                } else {
+                    if (dist < min) {
+                        min = dist;
+                    }
+                }
+            }
+
+        }
+
+    }
+
+}
+
 
 // Main Function
 
@@ -523,6 +553,24 @@ int main(int argc, char *argv[]) {
         for (int ii = 0; ii < num_dots; ii++) {
             if (strcmp(dots[ii].type, "Land Origin") == 0) {
                 origin_dots[i++] = dots[i];
+            }
+        }
+
+        const int piece_length = num_dots / processes;
+        int piece_ends[processes];
+        for (int i = 0; i < processes - 1; i++) {
+            piece_ends[i] = (i + 1) * piece_length;
+        }
+        piece_ends[processes] = num_dots;
+        // used to create x pieces of size num_dots / x, where x = processes
+
+        int fork_pids[processes];
+        for (int i = 0; i < processes; i++) {
+            fork_pids[i] = fork();
+            if (fork_pids[i] == 0) {
+                assign_secionds(
+                    map_resolution, island_size, piece_length * i, piece_ends[i], origin_dots, dots
+                );
             }
         }
 
