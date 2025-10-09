@@ -42,7 +42,7 @@ BiomeGen, a terminal application for generating png maps.
 struct Dot {
     int x;
     int y;
-    char *type;
+    char type[13];
 };
 typedef struct Dot Dot;
 
@@ -54,21 +54,21 @@ typedef struct Dot Dot;
  * Check if a 2D int array[outer_size][inner_size] contains another int array of
  * size inner_size
  */
-bool array_contains_int_array(int outer_size, int inner_size, int array[outer_size][inner_size], int value_array[inner_size]) {
-    for (int i = 0; i < outer_size; i++) {
-        bool found_value = true;
-        for (int ii = 0; ii < inner_size; ii++) {
-            if (array[i][ii] != value_array[ii]) {
-                found_value = false;
-                break;
-            }
-        }
-        if (found_value) {
-            return true;
-        }
-    }
-    return false;
-}
+// bool array_contains_int_array(int outer_size, int inner_size, int array[outer_size][inner_size], int value_array[inner_size]) {
+//     for (int i = 0; i < outer_size; i++) {
+//         bool found_value = true;
+//         for (int ii = 0; ii < inner_size; ii++) {
+//             if (array[i][ii] != value_array[ii]) {
+//                 found_value = false;
+//                 break;
+//             }
+//         }
+//         if (found_value) {
+//             return true;
+//         }
+//     }
+//     return false;
+// }
 
 /**
  * Calculates the difference in seconds between two timespecs, start and end.
@@ -106,15 +106,14 @@ void format_time(char *buffer, size_t buffer_size, float time_seconds) {
  */
 int get_int(const int min, const int max) {
 
-    char raw_result[6]; // largest possible max is 9999 (+ \n + \0)
     int result;
 
     while (true) {
 
-        fgets(raw_result, 6, stdin);
-        result = atoi(raw_result);
+        int scanf_return = scanf("%d", &result);
+        while (getchar() != '\n');
 
-        if (result < min || result > max || (result == 0  && strncmp("0", raw_result, 1) != 0)) {
+        if (scanf_return != 1 || result < min || result > max) {
             printf("Input must be an integer between %d and %d (both inclusive).\n", min, max);
         } else {
             break;
@@ -478,19 +477,10 @@ int main(int argc, char *argv[]) {
         int num_special_dots = num_dots / island_abundance;
 
         bool *used_coords = calloc(width * height, sizeof(bool));
-        //struct Dot local_dots[num_dots];
 
         for (int i = 0; i < num_dots; i++) {
 
-            // int rand_index[2] = {0, 0};
-
-            // while (true) {
-            //     rand_index[0] = rand() % width;
-            //     rand_index[1] = rand() % height;
-            //     if (!array_contains_int_array(i, 2, rand_indexes, rand_index)) {
-            //         break; // Dot already exists here, try again
-            //     }
-            // }
+            // Find unused coordinate
 
             int ii;
             do {
@@ -502,26 +492,44 @@ int main(int argc, char *argv[]) {
             used_coords[ii] = true;
 
             Dot new_dot;
-            new_dot.x = i % width;
-            new_dot.y = i / width;
+            new_dot.x = ii % width;
+            new_dot.y = ii / width;
             if (i < num_special_dots) {
-                new_dot.type = "Land Origin"; // Origin points for islands
+                strcpy(new_dot.type, "Land Origin"); // Origin points for islands
             } else if (i < num_special_dots * 2) {
-                new_dot.type = "Water Forced"; // Forced water (good for making lakes)
+                strcpy(new_dot.type, "Water Forced"); // Forced water (good for making lakes)
             } else {
-                new_dot.type = "Water"; // Water (default)
+                strcpy(new_dot.type, "Water"); // Water (default)
             }
 
             dots[i] = new_dot;
 
-            section_progress[1] += 1;
+            section_progress[1]++;
 
         }
 
-        //memcpy(dots, local_dots, num_dots * sizeof(struct Dot));
+        free(used_coords);
 
         clock_gettime(CLOCK_REALTIME, &time_now);
         section_times[1] = calc_time_diff(start_time, time_now) - sum_list_float(section_times);
+
+        // Section Assignment
+        // Assigning dots as "Land", "Land Origin", "Water", or "Water Forced"
+
+        section_progress_total[2] = num_dots;
+
+        struct Dot origin_dots[num_special_dots];
+        int i = 0;
+        for (int ii = 0; ii < num_dots; ii++) {
+            if (strcmp(dots[ii].type, "Land Origin") == 0) {
+                origin_dots[i++] = dots[i];
+            }
+        }
+
+        section_progress[2] = num_dots;
+
+        clock_gettime(CLOCK_REALTIME, &time_now);
+        section_times[2] = calc_time_diff(start_time, time_now) - sum_list_float(section_times);
 
         // Finish
 
