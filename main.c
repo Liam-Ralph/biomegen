@@ -19,6 +19,7 @@ BiomeGen, a terminal application for generating png maps.
 #define _POSIX_C_SOURCE 199309L
 
 #include <math.h>
+#include <stdatomic.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -128,20 +129,32 @@ int get_int(const int min, const int max) {
 /**
  * Return the sum of a list of integers.
  */
-int sum_list_int(int *list) {
+int sum_list_int(int *list, int list_len) {
     int sum = 0;
-    for (int i = 0; i < sizeof(list) / sizeof(int); i++) {
+    for (int i = 0; i < list_len; i++) {
         sum += list[i];
     }
     return sum;
 }
 
 /**
+ * Return the sum of a list of _Atomic int.
+ * Modifies _Atomic int list to int *list_int and uses sum_list_int().
+ */
+int sum_list_int_atomic(_Atomic int *list, int list_len) {
+    int list_int[list_len];
+    for (int i = 0; i < list_len; i++) {
+        list_int[i] = (int)list[i];
+    }
+    return sum_list_int(list_int, list_len);
+}
+
+/**
  * Return the sum of a list of floats.
  */
-float sum_list_float(float *list) {
+float sum_list_float(float *list, int list_len) {
     float sum = 0;
-    for (int i = 0; i < sizeof(list) / sizeof(float); i++) {
+    for (int i = 0; i < list_len; i++) {
         sum += list[i];
     }
     return sum;
@@ -158,7 +171,7 @@ float sum_list_float(float *list) {
  */
 void track_progress(
     struct timespec start_time,
-    int *section_progress, int *section_progress_total, float *section_times
+    _Atomic int *section_progress, int *section_progress_total, float *section_times
 ) {
 
     // Setting Tracker Process Title
@@ -209,7 +222,8 @@ void track_progress(
             } else {
                 color = ANSI_BLUE;
                 if (i == 0 || section_times[i - 1] != 0.0) {
-                    section_time = time_diff - sum_list_float(section_times); // Section in progress
+                    section_time = time_diff - sum_list_float(section_times, 7);
+                    // Section in progress
                 } else {
                     section_time = 0.0; // Section hasn't started
                 }
@@ -238,7 +252,7 @@ void track_progress(
         // Total Progress
 
         char *color;
-        if (sum_list_int(section_progress) == sum_list_int(section_progress_total)) {
+        if (sum_list_int_atomic(section_progress, 7) == sum_list_int(section_progress_total, 7)) {
             color = ANSI_GREEN;
         } else {
             color = ANSI_BLUE;
@@ -275,7 +289,7 @@ void track_progress(
 
 void assign_sections(
     const int map_resolution, const float island_size, const int start_index, const int end_index,
-    const struct Dot *origin_dots, struct Dot *dots
+    const struct Dot *origin_dots, const int num_origin_dots, struct Dot *dots, _Atomic int *section_progress
 ) {
 
     for (int i = start_index; i < end_index; i++) {
@@ -284,8 +298,8 @@ void assign_sections(
 
         if (strcmp(dot.type, "Water") == 0) { // Ignore "Water Forced" and "Land Origin"
 
-            int min; // min and dist are squared, sqrt is not dont until later
-            for (int ii = 0; ii < sizeof(origin_dots) / sizeof(struct Dot); ii++) {
+            int min = -1; // min and dist are squared, sqrt is not dont until later
+            for (int ii = 0; ii < num_origin_dots; ii++) {
                 const struct Dot origin_dot = origin_dots[ii];
                 const int dist = pow(origin_dot.x - dot.x, 2) + pow(origin_dot.y - dot.y, 2);
                 if (ii == 0) {
@@ -297,7 +311,22 @@ void assign_sections(
                 }
             }
 
+            srand(time(NULL));
+
+            int chance;
+            if (sqrt(min) <= ((float)(rand() % 20) / 19 * 1.5 + 0.25) * island_size) {
+                chance = 9;
+            } else {
+                chance = 1;
+            }
+
+            if (rand() % 10 < chance) {
+                strcpy(dot.type, "Land");
+            }
+
         }
+
+        atomic_fetch_add(&section_progress[2], 1);
 
     }
 
@@ -450,7 +479,7 @@ int main(int argc, char *argv[]) {
 
     // Shared Memory
 
-    int *section_progress = mmap(
+    _Atomic int *section_progress = mmap(
         NULL, sizeof(int) * 7, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0
     );
 
@@ -463,7 +492,7 @@ int main(int argc, char *argv[]) {
     );
 
     for (int i = 0; i < 7; i++) {
-        section_progress[i] = 0;
+        atomic_init(&section_progress[i], 0);
         section_progress_total[i] = 1;
         section_times[i] = 0;
     }
@@ -541,7 +570,7 @@ int main(int argc, char *argv[]) {
         free(used_coords);
 
         clock_gettime(CLOCK_REALTIME, &time_now);
-        section_times[1] = calc_time_diff(start_time, time_now) - sum_list_float(section_times);
+        section_times[1] = calc_time_diff(start_time, time_now) - sum_list_float(section_times, 7);
 
         // Section Assignment
         // Assigning dots as "Land", "Land Origin", "Water", or "Water Forced"
@@ -552,7 +581,8 @@ int main(int argc, char *argv[]) {
         int i = 0;
         for (int ii = 0; ii < num_dots; ii++) {
             if (strcmp(dots[ii].type, "Land Origin") == 0) {
-                origin_dots[i++] = dots[i];
+                origin_dots[i + 1] = dots[i];
+                i++;
             }
         }
 
@@ -568,21 +598,20 @@ int main(int argc, char *argv[]) {
         for (int i = 0; i < processes; i++) {
             fork_pids[i] = fork();
             if (fork_pids[i] == 0) {
-                assign_secionds(
-                    map_resolution, island_size, piece_length * i, piece_ends[i], origin_dots, dots
+                assign_sections(
+                    map_resolution, island_size, piece_length * i, piece_ends[i],
+                    origin_dots, num_special_dots, dots, section_progress
                 );
             }
         }
 
-        section_progress[2] = num_dots;
-
         clock_gettime(CLOCK_REALTIME, &time_now);
-        section_times[2] = calc_time_diff(start_time, time_now) - sum_list_float(section_times);
+        section_times[2] = calc_time_diff(start_time, time_now) - sum_list_float(section_times, 7);
 
         // Finish
 
         clock_gettime(CLOCK_REALTIME, &time_now);
-        section_times[6] = calc_time_diff(start_time, time_now) - sum_list_float(section_times);
+        section_times[6] = calc_time_diff(start_time, time_now) - sum_list_float(section_times, 7);
         section_progress[6] = 1;
 
         if (!auto_mode) {
