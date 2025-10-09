@@ -197,20 +197,6 @@ def main():
     with multiprocessing.Pool(processes, initializer=initialize_worker,
     initargs=(section_progress, dots, image_sections, lock)) as pool:
         try:
-            coords = random.sample(range(0, width * height), num_dots)
-            local_dots = []
-            num_special_dots = num_dots // island_abundance
-            [local_dots.append(Dot(coords[i] % width, coords[i] // width, "Land Origin"))
-                for i in range(num_special_dots)]
-            section_progress[1] = num_special_dots
-            [local_dots.append(Dot(coords[i] % width, coords[i] // width, "Water Forced"))
-                for i in range(num_special_dots, num_special_dots * 2)]
-            section_progress[1] += num_special_dots
-            [local_dots.append(Dot(coords[i] % width, coords[i] // width, "Water"))
-                for i in range(num_special_dots * 2, num_dots)]
-            section_progress[1] = num_dots
-            dots.extend(local_dots)
-            section_times[1] = time.time() - start_time - sum(section_times)
             section_progress_total[2] = num_dots
             piece_lengths = [num_dots // processes] * (processes - 1)
             piece_lengths.append(num_dots - sum(piece_lengths))
