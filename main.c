@@ -139,14 +139,13 @@ int sum_list_int(int *list, int list_len) {
 
 /**
  * Return the sum of a list of _Atomic int.
- * Modifies _Atomic int list to int *list_int and uses sum_list_int().
  */
 int sum_list_int_atomic(_Atomic int *list, int list_len) {
-    int list_int[list_len];
+    int sum = 0;
     for (int i = 0; i < list_len; i++) {
-        list_int[i] = (int)list[i];
+        sum += atomic_load(&list[i]);
     }
-    return sum_list_int(list_int, list_len);
+    return sum;
 }
 
 /**
@@ -209,14 +208,15 @@ void track_progress(
 
             // Calculating Section Progress
 
-            float progress_section = section_progress[i] / (float)section_progress_total[i];
+            float progress_section =
+                atomic_load(&section_progress[i]) / (float)section_progress_total[i];
             total_progress += progress_section * section_weights[i];
 
             // Checking if Section Complete
 
             char *color;
             float section_time;
-            if (section_progress[i] == section_progress_total[i]) {
+            if (atomic_load(&section_progress[i]) == section_progress_total[i]) {
                 color = ANSI_GREEN;
                 section_time = section_times[i]; // Section complete
             } else {
@@ -512,114 +512,113 @@ int main(int argc, char *argv[]) {
         tracker_process_pid = fork();
 
         if (tracker_process_pid == 0) {
-
             track_progress(start_time, section_progress, section_progress_total, section_times);
-
+            exit(0);
         }
 
     }
 
-    if (tracker_process_pid != 0) {
+    struct timespec time_now;
+    clock_gettime(CLOCK_REALTIME, &time_now);
+    section_times[0] = calc_time_diff(start_time, time_now);
+    atomic_store(&section_progress[0], 1);
 
-        struct timespec time_now;
-        clock_gettime(CLOCK_REALTIME, &time_now);
-        section_times[0] = calc_time_diff(start_time, time_now);
-        section_progress[0] = 1;
+    // Section Generation
+    // Creating the initial list of dots
 
-        // Section Generation
-        // Creating the initial list of dots
+    section_progress_total[1] = num_dots;
 
-        section_progress_total[1] = num_dots;
+    srand(time(NULL));
 
-        srand(time(NULL));
+    int num_special_dots = num_dots / island_abundance;
 
-        int num_special_dots = num_dots / island_abundance;
+    bool *used_coords = calloc(width * height, sizeof(bool));
 
-        bool *used_coords = calloc(width * height, sizeof(bool));
+    for (int i = 0; i < num_dots; i++) {
 
-        for (int i = 0; i < num_dots; i++) {
+        // Find unused coordinate
 
-            // Find unused coordinate
+        int ii;
+        do {
+            ii = rand() % (width * height);
+        } while (used_coords[ii]);
 
-            int ii;
-            do {
-                ii = rand() % (width * height);
-            } while (used_coords[ii]);
+        // Create dot at rand_index[x, y]
 
-            // Create dot at rand_index[x, y]
+        used_coords[ii] = true;
 
-            used_coords[ii] = true;
-
-            Dot new_dot;
-            new_dot.x = ii % width;
-            new_dot.y = ii / width;
-            if (i < num_special_dots) {
-                strcpy(new_dot.type, "Land Origin"); // Origin points for islands
-            } else if (i < num_special_dots * 2) {
-                strcpy(new_dot.type, "Water Forced"); // Forced water (good for making lakes)
-            } else {
-                strcpy(new_dot.type, "Water"); // Water (default)
-            }
-
-            dots[i] = new_dot;
-
-            section_progress[1]++;
-
+        Dot new_dot;
+        new_dot.x = ii % width;
+        new_dot.y = ii / width;
+        if (i < num_special_dots) {
+            strcpy(new_dot.type, "Land Origin"); // Origin points for islands
+        } else if (i < num_special_dots * 2) {
+            strcpy(new_dot.type, "Water Forced"); // Forced water (good for making lakes)
+        } else {
+            strcpy(new_dot.type, "Water"); // Water (default)
         }
 
-        free(used_coords);
+        dots[i] = new_dot;
 
-        clock_gettime(CLOCK_REALTIME, &time_now);
-        section_times[1] = calc_time_diff(start_time, time_now) - sum_list_float(section_times, 7);
+        atomic_fetch_add(&section_progress[1], 1);
 
-        // Section Assignment
-        // Assigning dots as "Land", "Land Origin", "Water", or "Water Forced"
+    }
 
-        section_progress_total[2] = num_dots;
+    free(used_coords);
 
-        struct Dot origin_dots[num_special_dots];
-        int i = 0;
-        for (int ii = 0; ii < num_dots; ii++) {
-            if (strcmp(dots[ii].type, "Land Origin") == 0) {
-                origin_dots[i + 1] = dots[i];
-                i++;
-            }
+    clock_gettime(CLOCK_REALTIME, &time_now);
+    section_times[1] = calc_time_diff(start_time, time_now) - sum_list_float(section_times, 7);
+
+    // Section Assignment
+    // Assigning dots as "Land", "Land Origin", "Water", or "Water Forced"
+
+    section_progress_total[2] = num_dots;
+
+    struct Dot origin_dots[num_special_dots];
+    int i = 0;
+    for (int ii = 0; ii < num_dots; ii++) {
+        if (strcmp(dots[ii].type, "Land Origin") == 0) {
+            origin_dots[i + 1] = dots[i];
+            i++;
         }
+    }
 
-        const int piece_length = num_dots / processes;
-        int piece_ends[processes];
-        for (int i = 0; i < processes - 1; i++) {
-            piece_ends[i] = (i + 1) * piece_length;
+    const int piece_length = num_dots / processes;
+    int piece_ends[processes];
+    for (int i = 0; i < processes - 1; i++) {
+        piece_ends[i] = (i + 1) * piece_length;
+    }
+    piece_ends[processes - 1] = num_dots;
+    // used to create x pieces of size num_dots / x, where x = processes
+    // last piece may be larger if num_dots / x != (float)num_dots / x
+
+    int fork_pids[processes];
+    for (int i = 0; i < processes; i++) {
+        fork_pids[i] = fork();
+        if (fork_pids[i] == 0) {
+            assign_sections(
+                map_resolution, island_size, piece_length * i, piece_ends[i],
+                origin_dots, num_special_dots, dots, section_progress
+            );
+            exit(0);
         }
-        piece_ends[processes] = num_dots;
-        // used to create x pieces of size num_dots / x, where x = processes
+    }
+    for (int i = 0; i < processes; i++) {
+        waitpid(fork_pids[i], NULL, 0);
+    }
 
-        int fork_pids[processes];
-        for (int i = 0; i < processes; i++) {
-            fork_pids[i] = fork();
-            if (fork_pids[i] == 0) {
-                assign_sections(
-                    map_resolution, island_size, piece_length * i, piece_ends[i],
-                    origin_dots, num_special_dots, dots, section_progress
-                );
-            }
-        }
+    clock_gettime(CLOCK_REALTIME, &time_now);
+    section_times[2] = calc_time_diff(start_time, time_now) - sum_list_float(section_times, 7);
 
-        clock_gettime(CLOCK_REALTIME, &time_now);
-        section_times[2] = calc_time_diff(start_time, time_now) - sum_list_float(section_times, 7);
+    // Finish
 
-        // Finish
+    clock_gettime(CLOCK_REALTIME, &time_now);
+    section_times[6] = calc_time_diff(start_time, time_now) - sum_list_float(section_times, 7);
+    atomic_store(&section_progress[6], 1);
 
-        clock_gettime(CLOCK_REALTIME, &time_now);
-        section_times[6] = calc_time_diff(start_time, time_now) - sum_list_float(section_times, 7);
-        section_progress[6] = 1;
-
-        if (!auto_mode) {
-            // Wait for Tracker Process
-            int junk;
-            waitpid(tracker_process_pid, &junk, 0);
-        }
-
+    if (!auto_mode) {
+        // Wait for Tracker Process
+        waitpid(tracker_process_pid, NULL, 0);
     }
 
     // Shared Memory Cleanup
