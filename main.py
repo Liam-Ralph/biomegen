@@ -56,17 +56,28 @@ ANSI_RESET = "\u001b[0m"
 # (Alphabetical order)
 
 def clear_screen():
+    """
+    Clear all output from the terminal.
+    """
     command = "clear"
     if os.name in ("nt", "dos"):
         command = "cls"
     os.system(command)
 
-def format_time(time_seconds): # E.g. 86.34521s --> 01:26.345
+def format_time(time_seconds):
+    """
+    Format time_seconds to a string of format HH:MM:SS.SSS. E.g. 86.34521s -->
+    01:26.345
+    """
     seconds = f"{(time_seconds % 60):.3f}".rjust(6, "0")
     minutes = str(int(time_seconds // 60))
     return (minutes + ":" + seconds).rjust(8)
 
-def get_int(min, max): # Integer input sanitization
+def get_int(min, max):
+    """
+    Get a sanitized integer input from the user between min and max, both
+    inclusive. Will continue to prompt user until a valid input is given.
+    """
 
     while True:
 
@@ -86,7 +97,11 @@ def get_int(min, max): # Integer input sanitization
     return choice
 
 def raise_error(location, traceback_output):
-    # Errors in the terminal are often overwritten, so this saves them to error.txt
+    """
+    Save the error descriped by traceback_output originating from location to
+    the file errors.txt. Error printed to the terminal would usually be cleared
+    by the tracker process during generation progress.
+    """
     with open("errors.txt", "a") as file:
         file.write("Error at " + location + "\n\n" + traceback_output + "\n\n\n")
 
@@ -95,6 +110,9 @@ def raise_error(location, traceback_output):
 # (Order of use)
 
 def initialize_worker(section_progress_value, dots_value, image_sections_value, lock_value):
+    """
+    Initialize a worker process. Access shared variables and set process title.
+    """
 
     # Creates shared variables
 
@@ -111,6 +129,10 @@ def initialize_worker(section_progress_value, dots_value, image_sections_value, 
     lock = lock_value
 
 def track_progress(section_progress, section_progress_total, section_times, start_time):
+    """
+    Track progress of map generation, and show progress in the terminal. Not
+    used in automated inputs mode.
+    """
 
     try:
 
@@ -179,10 +201,17 @@ def track_progress(section_progress, section_progress_total, section_times, star
         raise_error("track_progress", traceback.format_exc())
 
 def copy_piece(piece_range):
-    # For copying dots into local_dots, as a local variable is faster to access
+    """
+    Copy and return dots[piece_range[0]:piece_range[1]]. Used because copying
+    dots with multiple threads is faster for creating a local copy of dots.
+    """
     return dots[piece_range[0]:piece_range[1]]
 
 def assign_sections(map_resolution, island_size, piece_range, origin_dots, local_dots):
+    """
+    Assign sections of the map. Land and water are randomly assigned based on a
+    dot's distance from the nearest land origin dot.
+    """
 
     try:
 
@@ -221,6 +250,12 @@ def assign_sections(map_resolution, island_size, piece_range, origin_dots, local
         raise_error("assign_sections", traceback.format_exc())
 
 def smooth_coastlines(coastline_smoothing, piece_range, local_dots):
+    """
+    Smooth map coastlines for a more realistic, aesthetically pleasing map.
+    Randomly reassigns land and water dots based on the average distance of the
+    nearest k dots of the same and opposite types, where k =
+    coastline_smoothing.
+    """
 
     try:
 
@@ -284,6 +319,10 @@ def smooth_coastlines(coastline_smoothing, piece_range, local_dots):
         raise_error("smooth_coastlines", traceback.format_exc())
 
 def clean_dots(local_dots_section, start_index):
+    """
+    Remove all Land Origin and Water Forced dots in dots at the same indexes as
+    the dots in local_dots_section.
+    """
 
     try:
 
@@ -305,6 +344,11 @@ def clean_dots(local_dots_section, start_index):
         raise_error("clean_dots", traceback.format_exc())
 
 def generate_biomes_water(piece_range, local_dots, height):
+    """
+    Generate water biomes for dots[piece_rangep[0], piece_range[1]]. Water
+    biomes include Ice, Shallow Water, Water, and Deep Water, and are based on
+    the distance from land and the latitude.
+    """
 
     try:
 
@@ -345,6 +389,10 @@ def generate_biomes_water(piece_range, local_dots, height):
         raise_error("generate_biomes_water", traceback.format_exc())
 
 def assign_biomes(piece_range, biome_origin_dots, local_dots):
+    """
+    Assign land biomes based on the nearest biome origin dot. I.e. every dot
+    nearst to a Forest dot will become Forest.
+    """
 
     try:
 
@@ -367,6 +415,11 @@ def assign_biomes(piece_range, biome_origin_dots, local_dots):
         raise_error("assign_biomes", traceback.format_exc())
 
 def generate_image(start_height, section_height, process_num, local_dots, width):
+    """
+    Generate a piece of the output image from start_height to (start_height +
+    section_height). Place image piece in image_sections. Return a count of the
+    number of pixels of each type for generation statistics.
+    """
 
     try:
 
@@ -447,6 +500,9 @@ def generate_image(start_height, section_height, process_num, local_dots, width)
 # Main Function
 
 def main():
+    """
+    Main Function. Control setup, genertion, and output image saving.
+    """
 
     setproctitle.setproctitle("biomegen-main")
 
