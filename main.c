@@ -52,26 +52,6 @@ typedef struct Dot Dot;
 // (Alphabetical order)
 
 /**
- * Check if a 2D int array[outer_size][inner_size] contains another int array of
- * size inner_size
- */
-// bool array_contains_int_array(int outer_size, int inner_size, int array[outer_size][inner_size], int value_array[inner_size]) {
-//     for (int i = 0; i < outer_size; i++) {
-//         bool found_value = true;
-//         for (int ii = 0; ii < inner_size; ii++) {
-//             if (array[i][ii] != value_array[ii]) {
-//                 found_value = false;
-//                 break;
-//             }
-//         }
-//         if (found_value) {
-//             return true;
-//         }
-//     }
-//     return false;
-// }
-
-/**
  * Calculates the difference in seconds between two timespecs, start and end.
 */
 float calc_time_diff(struct timespec start, struct timespec end) {
@@ -177,11 +157,11 @@ void track_progress(
 
     #ifdef __linux__
 
-        prctl(PR_SET_NAME, "BiomeGenTracker", 0, 0, 0);
+        prctl(PR_SET_NAME, "biomegentracker", 0, 0, 0);
 
     #elif BSD || __Apple__
 
-        setproctitle("BiomeGen Tracker");
+        setproctitle("biomegen-tracker");
     
     #endif
 
@@ -289,9 +269,24 @@ void track_progress(
 
 void assign_sections(
     const int map_resolution, const float island_size, const int start_index, const int end_index,
-    const struct Dot *origin_dots, const int num_origin_dots, struct Dot *dots, _Atomic int *section_progress
+    const struct Dot *origin_dots, const int num_origin_dots,
+    struct Dot *dots, _Atomic int *section_progress
 ) {
 
+    // Setting Worker Process Title
+
+    #ifdef __linux__
+
+        prctl(PR_SET_NAME, "biomegen-worker", 0, 0, 0);
+
+    #elif BSD || __Apple__
+
+        setproctitle("biomegen-worker");
+    
+    #endif
+
+    srand(time(NULL));
+    
     for (int i = start_index; i < end_index; i++) {
 
         struct Dot dot = dots[i];
@@ -309,9 +304,11 @@ void assign_sections(
                         min = dist;
                     }
                 }
+                if (origin_dot.x == dot.x && origin_dot.y == dot.y) {
+                    break;
+                }
             }
 
-            srand(time(NULL));
 
             int chance;
             if (sqrt(min) <= ((float)(rand() % 20) / 19 * 1.5 + 0.25) * island_size) {
@@ -321,7 +318,7 @@ void assign_sections(
             }
 
             if (rand() % 10 < chance) {
-                strcpy(dot.type, "Land");
+                strcpy(dots[i].type, "Land");
             }
 
         }
@@ -344,15 +341,11 @@ int main(int argc, char *argv[]) {
 
     #ifdef __linux__
 
-        prctl(PR_SET_NAME, "BiomeGen Main", 0, 0, 0);
+        prctl(PR_SET_NAME, "biomegen-main", 0, 0, 0);
 
-    #elif BSD
+    #elif BSD || __Apple__
 
-        setproctitle("BiomeGen Main");
-
-    #elif __Apple__
-
-        setproctitle("BiomeGen Main");
+        setproctitle("biomegen-main");
     
     #endif
 
@@ -609,6 +602,20 @@ int main(int argc, char *argv[]) {
 
     clock_gettime(CLOCK_REALTIME, &time_now);
     section_times[2] = calc_time_diff(start_time, time_now) - sum_list_float(section_times, 7);
+
+    // Coastline Smoothing
+
+    if (coastline_smoothing != 0) {
+
+        section_progress_total[3] = num_dots * 2;
+
+        atomic_store(&section_progress[3], num_dots * 2);
+
+    } else {
+        
+        atomic_store(&section_progress[3], 1);
+
+    }
 
     // Finish
 
