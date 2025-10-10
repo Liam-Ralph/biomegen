@@ -267,6 +267,9 @@ void track_progress(
 
 }
 
+/**
+ * Assign land sections based on the positions of land origin sections.
+ */
 void assign_sections(
     const int map_resolution, const float island_size, const int start_index, const int end_index,
     const struct Dot *origin_dots, const int num_origin_dots,
@@ -304,11 +307,7 @@ void assign_sections(
                         min = dist;
                     }
                 }
-                if (origin_dot.x == dot.x && origin_dot.y == dot.y) {
-                    break;
-                }
             }
-
 
             int chance;
             if (sqrt(min) <= ((float)(rand() % 20) / 19 * 1.5 + 0.25) * island_size) {
