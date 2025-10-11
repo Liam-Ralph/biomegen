@@ -29,6 +29,7 @@ BiomeGen, a terminal application for generating png maps.
 #include <sys/wait.h>
 #include <time.h>
 #include <unistd.h>
+#include <limits.h>
 
 
 // Definitions
@@ -147,6 +148,7 @@ float sum_list_float(float *list, int list_len) {
  * Track the progress of map generation, and show the progress in the terminal.
  * start_time is the time at the start of map generation in main(), and the
  * other inputs are all shared memory used to track section progress and times.
+ * Not used in automated inputs mode.
  */
 void track_progress(
     struct timespec start_time,
@@ -268,7 +270,8 @@ void track_progress(
 }
 
 /**
- * Assign land sections based on the positions of land origin sections.
+ * Assign sections of the map. Land and water are randomly assigned based on a
+ * dot's distance from the nearest land origin dot.
  */
 void assign_sections(
     const int map_resolution, const float island_size, const int start_index, const int end_index,
@@ -290,40 +293,75 @@ void assign_sections(
 
     srand(time(NULL));
     
+    // for (int i = start_index; i < end_index; i++) {
+
+    //     struct Dot dot = dots[i];
+
+    //     if (strcmp(dot.type, "Water") == 0) { // Ignore "Water Forced" and "Land Origin"
+
+    //         int min = -1; // min and dist are squared, sqrt is not done until later
+    //         for (int ii = 0; ii < num_origin_dots; ii++) {
+    //             const struct Dot origin_dot = origin_dots[ii];
+    //             const int dist = pow(origin_dot.x - dot.x, 2) + pow(origin_dot.y - dot.y, 2);
+    //             if (ii == 0 || dist < min) {
+    //                 min = dist;
+    //             }
+    //         }
+
+    //         int chance;
+    //         if (sqrt(min) <= ((float)(rand() % 20) / 19 * 1.5 + 0.25) * island_size) {
+    //             chance = 9;
+    //         } else {
+    //             chance = 1;
+    //         }
+
+    //         if (rand() % 10 < chance) {
+    //             strcpy(dots[i].type, "Land");
+    //         }
+
+    //     }
+
+    //     atomic_fetch_add(&section_progress[2], 1);
+
+    // }
+
+    // Pre-compute squared distances to avoid sqrt until necessary
     for (int i = start_index; i < end_index; i++) {
-
-        struct Dot dot = dots[i];
-
-        if (strcmp(dot.type, "Water") == 0) { // Ignore "Water Forced" and "Land Origin"
-
-            int min = -1; // min and dist are squared, sqrt is not dont until later
-            for (int ii = 0; ii < num_origin_dots; ii++) {
-                const struct Dot origin_dot = origin_dots[ii];
-                const int dist = pow(origin_dot.x - dot.x, 2) + pow(origin_dot.y - dot.y, 2);
-                if (ii == 0) {
-                    min = dist;
-                } else {
-                    if (dist < min) {
-                        min = dist;
-                    }
-                }
-            }
-
-            int chance;
-            if (sqrt(min) <= ((float)(rand() % 20) / 19 * 1.5 + 0.25) * island_size) {
-                chance = 9;
-            } else {
-                chance = 1;
-            }
-
-            if (rand() % 10 < chance) {
-                strcpy(dots[i].type, "Land");
-            }
-
+        struct Dot *dot = &dots[i];  // Use pointer to avoid copying struct
+        
+        // strcmp is slow - compare first char first as quick filter
+        if (dot->type[0] != 'W' || strcmp(dot->type, "Water") != 0) {
+            atomic_fetch_add(&section_progress[2], 1);
+            continue;
         }
-
+        
+        int min_dist_sq = INT_MAX;  // Use INT_MAX instead of -1
+        
+        // Find nearest origin dot
+        for (int ii = 0; ii < num_origin_dots; ii++) {
+            const struct Dot *origin_dot = &origin_dots[ii];  // Use pointer
+            
+            // Avoid pow() - it's very slow for integers
+            int dx = origin_dot->x - dot->x;
+            int dy = origin_dot->y - dot->y;
+            int dist_sq = dx * dx + dy * dy;
+            
+            if (dist_sq < min_dist_sq) {
+                min_dist_sq = dist_sq;
+            }
+        }
+        
+        // Pre-compute threshold squared to avoid sqrt
+        float random_factor = ((float)(rand() % 20) / 19.0f * 1.5f + 0.25f) * island_size;
+        int threshold_sq = (int)(random_factor * random_factor);
+        
+        int chance = (min_dist_sq <= threshold_sq) ? 9 : 1;
+        
+        if (rand() % 10 < chance) {
+            strcpy(dot->type, "Land");
+        }
+        
         atomic_fetch_add(&section_progress[2], 1);
-
     }
 
 }
