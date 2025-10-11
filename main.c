@@ -325,40 +325,38 @@ void assign_sections(
 
     // }
 
-    // Pre-compute squared distances to avoid sqrt until necessary
     for (int i = start_index; i < end_index; i++) {
-        struct Dot *dot = &dots[i];  // Use pointer to avoid copying struct
-        
-        // strcmp is slow - compare first char first as quick filter
-        if (dot->type[0] != 'W' || strcmp(dot->type, "Water") != 0) {
-            atomic_fetch_add(&section_progress[2], 1);
-            continue;
-        }
-        
-        int min_dist_sq = INT_MAX;  // Use INT_MAX instead of -1
-        
-        // Find nearest origin dot
-        for (int ii = 0; ii < num_origin_dots; ii++) {
-            const struct Dot *origin_dot = &origin_dots[ii];  // Use pointer
+
+        struct Dot *dot = &dots[i];
+
+        if (dot->type[5] == '\0') {
+
+            int min_dist_sq = INT_MAX;  // Use INT_MAX instead of -1
             
-            // Avoid pow() - it's very slow for integers
-            int dx = origin_dot->x - dot->x;
-            int dy = origin_dot->y - dot->y;
-            int dist_sq = dx * dx + dy * dy;
-            
-            if (dist_sq < min_dist_sq) {
-                min_dist_sq = dist_sq;
+            // Find nearest origin dot
+            for (int ii = 0; ii < num_origin_dots; ii++) {
+                const struct Dot *origin_dot = &origin_dots[ii];  // Use pointer
+                
+                // Avoid pow() - it's very slow for integers
+                int dx = origin_dot->x - dot->x;
+                int dy = origin_dot->y - dot->y;
+                int dist_sq = dx * dx + dy * dy;
+                
+                if (dist_sq < min_dist_sq) {
+                    min_dist_sq = dist_sq;
+                }
             }
-        }
-        
-        // Pre-compute threshold squared to avoid sqrt
-        float random_factor = ((float)(rand() % 20) / 19.0f * 1.5f + 0.25f) * island_size;
-        int threshold_sq = (int)(random_factor * random_factor);
-        
-        int chance = (min_dist_sq <= threshold_sq) ? 9 : 1;
-        
-        if (rand() % 10 < chance) {
-            strcpy(dot->type, "Land");
+            
+            // Pre-compute threshold squared to avoid sqrt
+            float random_factor = ((float)(rand() % 20) / 19.0f * 1.5f + 0.25f) * island_size;
+            int threshold_sq = (int)(random_factor * random_factor);
+            
+            int chance = (min_dist_sq <= threshold_sq) ? 9 : 1;
+            
+            if (rand() % 10 < chance) {
+                strcpy(dot->type, "Land");
+            }
+
         }
         
         atomic_fetch_add(&section_progress[2], 1);
