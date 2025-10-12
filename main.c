@@ -29,7 +29,6 @@ BiomeGen, a terminal application for generating png maps.
 #include <sys/wait.h>
 #include <time.h>
 #include <unistd.h>
-#include <limits.h>
 
 
 // Definitions
@@ -58,7 +57,7 @@ typedef struct Dot Dot;
 float calc_time_diff(struct timespec start, struct timespec end) {
     int diff_sec = end.tv_sec - start.tv_sec;
     int diff_nsec = end.tv_nsec - start.tv_nsec;
-    return (float)diff_sec + diff_nsec / 1000000000.0;
+    return (float)diff_sec + diff_nsec / 1000000000.0f;
 }
 
 /**
@@ -164,14 +163,14 @@ void track_progress(
     #elif BSD || __Apple__
 
         setproctitle("biomegen-tracker");
-    
+
     #endif
 
     char section_names[7][20] = {
         "Setup", "Section Generation", "Section Assignment", "Coastline Smoothing",
         "Biome Generation", "Image Generation", "Finish"
     };
-    float section_weights[7] = {0.02, 0.01, 0.11, 0.38, 0.29, 0.17, 0.02};
+    float section_weights[7] = {0.02f, 0.01f, 0.11f, 0.38f, 0.29f, 0.17f, 0.02f};
     // Used for overall progress bar (e.g. Setup takes ~2% of total time)
 
     while (true) {
@@ -184,7 +183,7 @@ void track_progress(
         clock_gettime(CLOCK_REALTIME, &time_now);
         float time_diff = calc_time_diff(start_time, time_now);
 
-        float total_progress = 0.0;
+        float total_progress = 0.0f;
 
         for (int i = 0; i < 7; i++) {
 
@@ -288,77 +287,44 @@ void assign_sections(
     #elif BSD || __Apple__
 
         setproctitle("biomegen-worker");
-    
+
     #endif
 
     srand(time(NULL));
-    
-    // for (int i = start_index; i < end_index; i++) {
-
-    //     struct Dot dot = dots[i];
-
-    //     if (strcmp(dot.type, "Water") == 0) { // Ignore "Water Forced" and "Land Origin"
-
-    //         int min = -1; // min and dist are squared, sqrt is not done until later
-    //         for (int ii = 0; ii < num_origin_dots; ii++) {
-    //             const struct Dot origin_dot = origin_dots[ii];
-    //             const int dist = pow(origin_dot.x - dot.x, 2) + pow(origin_dot.y - dot.y, 2);
-    //             if (ii == 0 || dist < min) {
-    //                 min = dist;
-    //             }
-    //         }
-
-    //         int chance;
-    //         if (sqrt(min) <= ((float)(rand() % 20) / 19 * 1.5 + 0.25) * island_size) {
-    //             chance = 9;
-    //         } else {
-    //             chance = 1;
-    //         }
-
-    //         if (rand() % 10 < chance) {
-    //             strcpy(dots[i].type, "Land");
-    //         }
-
-    //     }
-
-    //     atomic_fetch_add(&section_progress[2], 1);
-
-    // }
 
     for (int i = start_index; i < end_index; i++) {
 
         struct Dot *dot = &dots[i];
 
         if (dot->type[5] == '\0') {
+        // Ignore "Water Forced" and "Land Origin", which are not 6 characters
 
-            int min_dist_sq = INT_MAX;  // Use INT_MAX instead of -1
-            
-            // Find nearest origin dot
+            int min; // min and dist are squared, sqrt is not done until later
             for (int ii = 0; ii < num_origin_dots; ii++) {
-                const struct Dot *origin_dot = &origin_dots[ii];  // Use pointer
-                
-                // Avoid pow() - it's very slow for integers
-                int dx = origin_dot->x - dot->x;
-                int dy = origin_dot->y - dot->y;
-                int dist_sq = dx * dx + dy * dy;
-                
-                if (dist_sq < min_dist_sq) {
-                    min_dist_sq = dist_sq;
+
+                const struct Dot *origin_dot = &origin_dots[ii];
+
+                const int diff_x = origin_dot->x - dot->x;
+                const int diff_y = origin_dot->y - dot->y;
+                const int dist = diff_x * diff_x + diff_y * diff_y;
+
+                if (ii == 0 || dist < min) {
+                    min = dist;
                 }
+
             }
-            
-            // Pre-compute threshold squared to avoid sqrt
-            float random_factor = ((float)(rand() % 20) / 19.0f * 1.5f + 0.25f) * island_size;
-            int threshold_sq = (int)(random_factor * random_factor);
-            
-            int chance = (min_dist_sq <= threshold_sq) ? 9 : 1;
-            
+
+            float threshold = ((float)(rand() % 20) / 19.0f * 1.5f + 0.25f) * island_size;
+            int threshold_sq = (int)(threshold * threshold);
+
+            int chance = (min <= threshold_sq) ? 9 : 1;
+
             if (rand() % 10 < chance) {
                 strcpy(dot->type, "Land");
             }
 
         }
-        
+
         atomic_fetch_add(&section_progress[2], 1);
     }
 
@@ -368,7 +334,7 @@ void assign_sections(
 // Main Function
 
 /**
- * Main Function. argc and argv used for manual inputs mode.
+ * Main Function. argc and argv used for automated inputs mode.
  */
 int main(int argc, char *argv[]) {
 
@@ -381,7 +347,7 @@ int main(int argc, char *argv[]) {
     #elif BSD || __Apple__
 
         setproctitle("biomegen-main");
-    
+
     #endif
 
     // Getting Inputs
@@ -392,7 +358,7 @@ int main(int argc, char *argv[]) {
     float island_size;
 
     if (argc == 1) {
-        
+
         // Manual Inputs Mode
 
         auto_mode = false;
@@ -486,7 +452,7 @@ int main(int argc, char *argv[]) {
         clear_screen();
 
     } else {
-        
+
         // Automated Inputs Mode
 
         auto_mode = true;
@@ -590,7 +556,7 @@ int main(int argc, char *argv[]) {
 
         atomic_fetch_add(&section_progress[1], 1);
 
-    }
+    } 
 
     free(used_coords);
 
@@ -647,7 +613,7 @@ int main(int argc, char *argv[]) {
         atomic_store(&section_progress[3], num_dots * 2);
 
     } else {
-        
+
         atomic_store(&section_progress[3], 1);
 
     }
