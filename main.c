@@ -18,6 +18,7 @@ BiomeGen, a terminal application for generating png maps.
 
 #define _POSIX_C_SOURCE 199309L
 
+#include <limits.h>
 #include <math.h>
 #include <stdatomic.h>
 #include <stdbool.h>
@@ -270,9 +271,10 @@ void track_progress(
 
 /**
  * Assign sections of the map. Land and water are randomly assigned based on a
- * dot's distance from the nearest land origin dot.
+ * dot's distance from the nearest land origin dot. Returns the number of land
+ * dots assigned for use in later sections.
  */
-void assign_sections(
+int assign_sections(
     const int map_resolution, const float island_size, const int start_index, const int end_index,
     const struct Dot *origin_dots, const int num_origin_dots,
     struct Dot *dots, _Atomic int *section_progress
@@ -289,6 +291,8 @@ void assign_sections(
         setproctitle("biomegen-worker");
 
     #endif
+
+    int land_dots = 0;
 
     srand(time(NULL));
 
@@ -321,11 +325,143 @@ void assign_sections(
 
             if (rand() % 10 < chance) {
                 strcpy(dot->type, "Land");
+                land_dots++;
             }
 
         }
 
         atomic_fetch_add(&section_progress[2], 1);
+    }
+
+    return land_dots;
+
+}
+
+/**
+ * Return the sum of distances of the nearest n dots to dot in type_dots.
+ */
+int sum_dists(
+    const struct Dot *dot, const int n,
+    const int num_type_dots, struct Dot *type_dots[num_type_dots]
+) {
+
+    int dists[n];
+    for (int i = 0; i < n; i++) {
+        dists[i] = INT_MAX;
+    }
+
+    for (int i = 0; i < num_type_dots; i++) {
+        
+        const struct Dot *type_dot = type_dots[i];
+
+        const int diff_x = type_dot->x - dot->x;
+        const int diff_y = type_dot->y - dot->y;
+        const int dist = diff_x * diff_x + diff_y * diff_y;
+
+        int left = 0;
+        int right = n - 1;
+
+        if (dist > dists[right]) {
+            continue;
+        }
+
+        while (left <= right) {
+
+            int mid = left + (right - left) / 2;
+
+            if (dists[mid] == dist) {
+                left = mid;
+                break;
+            } else if (dists[mid] < dist) {
+                left = mid + 1;
+            } else {
+                right = mid - 1;
+            }
+
+        }
+
+        for (int ii = n - 1; ii > left; ii--) {
+            dists[ii] = dists[ii - 1];  
+        }
+        dists[left] = dist;
+
+    }
+
+    return sum_list_int(dists, n);
+
+}
+
+/**
+ * Smooth map coastlines for a more realistic, aesthetically pleasing map.
+ * Randomly reassigns land and water dots based on the average distance of the
+ * nearest k dots of the same and opposite types, where k =
+ * coastline_smoothing.
+ */
+void smooth_coastlines(
+    const int coastline_smoothing, const int start_index, const int end_index,
+    const int num_land_dots, const int num_water_dots, const int num_dots,
+    struct Dot *dots, _Atomic int *section_progress
+) {
+
+    // Setting Worker Process Title
+
+    #ifdef __linux__
+
+        prctl(PR_SET_NAME, "biomegen-worker", 0, 0, 0);
+
+    #elif BSD || __Apple__
+
+        setproctitle("biomegen-worker");
+
+    #endif
+
+    for (int _ = 0; _ < 1; _++) {
+
+        struct Dot *land_dots[num_land_dots]; // list of land dot pointers
+        struct Dot *water_dots[num_water_dots];
+        int li = 0;
+        int wi = 0;
+
+        for (int i = 0; i < num_dots; i++) {
+            if (dots[i].type[4] == '\0') {
+                land_dots[li] = &dots[i];
+                li++;
+            } else if (dots[i].type[5] == '\0') {
+                water_dots[wi] = &dots[i];
+                wi++;
+            }
+        }
+
+        for (int i = start_index; i < end_index; i++) {
+
+            struct Dot *dot = &dots[i];
+
+            const bool land_dot = (dot->type[4] == '\0');
+
+            if (land_dot || dot->type[5] == '\0') { // dot.type == "Land" || "Water"
+
+                if (land_dot) {
+                    if (
+                        sum_dists(dot, coastline_smoothing, num_land_dots, land_dots) > 
+                        sum_dists(dot, coastline_smoothing, num_water_dots, water_dots)
+                    ) {
+                        strcpy(dot->type, "Water");
+                    }
+                } else {
+                    if (
+                        sum_dists(dot, coastline_smoothing, num_water_dots, water_dots) >
+                        sum_dists(dot, coastline_smoothing, num_land_dots, land_dots)
+                    ) {
+                        strcpy(dot->type, "Land");
+                    }
+                }
+
+            }
+
+            atomic_fetch_add(&section_progress[3], 1);
+
+        }
+
     }
 
 }
@@ -586,11 +722,12 @@ int main(int argc, char *argv[]) {
     // used to create x pieces of size num_dots / x, where x = processes
     // last piece may be larger if num_dots / x != (float)num_dots / x
 
+    int land_dots = 0;
     int fork_pids[processes];
     for (int i = 0; i < processes; i++) {
         fork_pids[i] = fork();
         if (fork_pids[i] == 0) {
-            assign_sections(
+            land_dots += assign_sections(
                 map_resolution, island_size, piece_length * i, piece_ends[i],
                 origin_dots, num_special_dots, dots, section_progress
             );
@@ -610,13 +747,29 @@ int main(int argc, char *argv[]) {
 
         section_progress_total[3] = num_dots * 2;
 
-        atomic_store(&section_progress[3], num_dots * 2);
+        for (int i = 0; i < processes; i++) {
+            fork_pids[i] = fork();
+            if (fork_pids[i] == 0) {
+                smooth_coastlines(
+                    coastline_smoothing, piece_length * i, piece_ends[i],
+                    land_dots, (num_dots - num_special_dots * 2 - land_dots), num_dots,
+                    dots, section_progress
+                );
+                exit(0);
+            }
+        }
+        for (int i = 0; i < processes; i++) {
+            waitpid(fork_pids[i], NULL, 0);
+        }
 
     } else {
 
         atomic_store(&section_progress[3], 1);
 
     }
+
+    clock_gettime(CLOCK_REALTIME, &time_now);
+    section_times[3] = calc_time_diff(start_time, time_now) - sum_list_float(section_times, 7);
 
     // Finish
 
