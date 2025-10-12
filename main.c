@@ -292,7 +292,7 @@ int assign_sections(
 
     #endif
 
-    int land_dots = 0;
+    int num_land_dots = 0;
 
     srand(time(NULL));
 
@@ -325,7 +325,7 @@ int assign_sections(
 
             if (rand() % 10 < chance) {
                 strcpy(dot->type, "Land");
-                land_dots++;
+                num_land_dots++;
             }
 
         }
@@ -333,14 +333,14 @@ int assign_sections(
         atomic_fetch_add(&section_progress[2], 1);
     }
 
-    return land_dots;
+    return num_land_dots;
 
 }
 
 /**
  * Return the sum of distances of the nearest n dots to dot in type_dots.
  */
-int sum_dists(
+long sum_dists(
     const struct Dot *dot, const int n,
     const int num_type_dots, struct Dot *type_dots[num_type_dots]
 ) {
@@ -387,15 +387,18 @@ int sum_dists(
 
     }
 
-    return sum_list_int(dists, n);
+    long sum = 0l;
+    for (int i = 0; i < n; i++) {
+        sum += (long)dists[i];
+    }
+    return sum;
 
 }
 
 /**
  * Smooth map coastlines for a more realistic, aesthetically pleasing map.
  * Randomly reassigns land and water dots based on the average distance of the
- * nearest k dots of the same and opposite types, where k =
- * coastline_smoothing.
+ * nearest coastline_smoothing dots of the same and opposite types.
  */
 void smooth_coastlines(
     const int coastline_smoothing, const int start_index, const int end_index,
@@ -415,7 +418,7 @@ void smooth_coastlines(
 
     #endif
 
-    for (int _ = 0; _ < 1; _++) {
+    for (int _ = 0; _ < 2; _++) {
 
         struct Dot *land_dots[num_land_dots]; // list of land dot pointers
         struct Dot *water_dots[num_water_dots];
@@ -440,18 +443,15 @@ void smooth_coastlines(
 
             if (land_dot || dot->type[5] == '\0') { // dot.type == "Land" || "Water"
 
+                long sum_land = sum_dists(dot, coastline_smoothing, num_land_dots, land_dots);
+                long sum_water = sum_dists(dot, coastline_smoothing, num_water_dots, water_dots);
+
                 if (land_dot) {
-                    if (
-                        sum_dists(dot, coastline_smoothing, num_land_dots, land_dots) > 
-                        sum_dists(dot, coastline_smoothing, num_water_dots, water_dots)
-                    ) {
+                    if (sum_land > sum_water) {
                         strcpy(dot->type, "Water");
                     }
                 } else {
-                    if (
-                        sum_dists(dot, coastline_smoothing, num_water_dots, water_dots) >
-                        sum_dists(dot, coastline_smoothing, num_land_dots, land_dots)
-                    ) {
+                    if (sum_water > sum_land) {
                         strcpy(dot->type, "Land");
                     }
                 }
@@ -722,12 +722,12 @@ int main(int argc, char *argv[]) {
     // used to create x pieces of size num_dots / x, where x = processes
     // last piece may be larger if num_dots / x != (float)num_dots / x
 
-    int land_dots = 0;
+    int num_land_dots = 0;
     int fork_pids[processes];
     for (int i = 0; i < processes; i++) {
         fork_pids[i] = fork();
         if (fork_pids[i] == 0) {
-            land_dots += assign_sections(
+            num_land_dots += assign_sections(
                 map_resolution, island_size, piece_length * i, piece_ends[i],
                 origin_dots, num_special_dots, dots, section_progress
             );
@@ -752,7 +752,7 @@ int main(int argc, char *argv[]) {
             if (fork_pids[i] == 0) {
                 smooth_coastlines(
                     coastline_smoothing, piece_length * i, piece_ends[i],
-                    land_dots, (num_dots - num_special_dots * 2 - land_dots), num_dots,
+                    num_land_dots, (num_dots - num_special_dots * 2 - num_land_dots), num_dots,
                     dots, section_progress
                 );
                 exit(0);
