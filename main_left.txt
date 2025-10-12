@@ -13,41 +13,8 @@ import traceback
 def raise_error(location, traceback_output):
     with open("errors.txt", "a") as file:
         file.write("Error at " + location + "\n\n" + traceback_output + "\n\n\n")
-def initialize_worker(section_progress_value, dots_value, image_sections_value, lock_value):
-    global section_progress
-    global dots
-    global image_sections
-    global lock
-    setproctitle.setproctitle("biomgen-worker")
-    section_progress = section_progress_value
-    dots = dots_value
-    image_sections = image_sections_value
-    lock = lock_value
 def copy_piece(piece_range):
     return dots[piece_range[0]:piece_range[1]]
-def assign_sections(map_resolution, island_size, piece_range, origin_dots, local_dots):
-    try:
-        tree = scipy.spatial.KDTree([(dot.x, dot.y) for dot in origin_dots])
-        for i in range(piece_range[0], piece_range[1]):
-            dot = local_dots[i]
-            if dot.type == "Water":
-                index = tree.query((dot.x, dot.y))[1]
-                nearest_origin_dot = origin_dots[index]
-                dist = (
-                    math.sqrt(
-                        (nearest_origin_dot.x - dot.x) ** 2 + (nearest_origin_dot.y - dot.y) ** 2
-                    ) / math.sqrt(map_resolution)
-                )
-                if dist <= (index % 20 / 19 * 1.5 + 0.25) * island_size:
-                    chance = 0.9
-                else:
-                    chance = 0.1
-                if random.random() < chance:
-                    dots[i] = Dot(dot.x, dot.y, "Land")
-            with lock:
-                section_progress[2] += 1
-    except:
-        raise_error("assign_sections", traceback.format_exc())
 def smooth_coastlines(coastline_smoothing, piece_range, local_dots):
     try:
         for i in (1, -1):
@@ -197,24 +164,6 @@ def main():
     with multiprocessing.Pool(processes, initializer=initialize_worker,
     initargs=(section_progress, dots, image_sections, lock)) as pool:
         try:
-            section_progress_total[2] = num_dots
-            piece_lengths = [num_dots // processes] * (processes - 1)
-            piece_lengths.append(num_dots - sum(piece_lengths))
-            piece_ranges = [
-                [i * piece_lengths[0], i * piece_lengths[0] + piece_lengths[i]]
-                for i in range(processes)
-            ]
-            local_dots = []
-            results = pool.map(copy_piece, piece_ranges)
-            for result in results:
-                local_dots.extend(result)
-            origin_dots = [dot for dot in local_dots if dot.type == "Land Origin"]
-            results = []
-            for i in range(processes):
-                results.append(pool.apply_async(assign_sections,
-                    (map_resolution, island_size, piece_ranges[i], origin_dots, local_dots)))
-            [result.wait() for result in results]
-            section_times[2] = time.time() - start_time - sum(section_times)
             if coastline_smoothing != 0:
                 section_progress_total[3] = num_dots * 2
                 local_dots = []
