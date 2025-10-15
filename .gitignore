@@ -1,9 +1,11 @@
 .vscode
+autorun_results.csv
+result.png
+
 main
 autorun
 main.exe
 autorun.exe
-autorun_results.csv
 a.exe
 a.out
-result.png
+record.txt
