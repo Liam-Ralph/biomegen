@@ -49,6 +49,28 @@ struct Dot {
 typedef struct Dot Dot;
 
 
+// Debugging Function
+
+void record_val(const long value, const char *name) {
+    if (strcmp(name, "clear") == 0) {
+        FILE *fptr = fopen("record.txt", "w");
+        fprintf(fptr, "\n");
+        fclose(fptr);
+    } else {
+        FILE *fptr = fopen("record.txt", "a");
+        fprintf(fptr, "%s | %ld\n", name, value);
+        fclose(fptr);
+    }
+}
+
+void record_str(const char *str, const char *name) {
+
+        FILE *fptr = fopen("record.txt", "a");
+        fprintf(fptr, "%s | %s\n", name, str);
+        fclose(fptr);
+}
+
+
 // Functions
 // (Alphabetical order)
 
@@ -274,10 +296,10 @@ void track_progress(
  * dot's distance from the nearest land origin dot. Returns the number of land
  * dots assigned for use in later sections.
  */
-int assign_sections(
+void assign_sections(
     const int map_resolution, const float island_size, const int start_index, const int end_index,
     const struct Dot *origin_dots, const int num_origin_dots,
-    struct Dot *dots, _Atomic int *section_progress
+    struct Dot *dots, _Atomic int *section_progress, int return_pipe[2]
 ) {
 
     // Setting Worker Process Title
@@ -329,69 +351,16 @@ int assign_sections(
             }
 
         }
+        if (dots[i].x < 0 || dots[i].y < 0 || dots[i].x > 10000 || dots[i].y > 10000) {
+            record_val(dots[i].x, "dots i x");
+            record_val(dots[i].y, "dots i y");
+            record_str(dots[i].type, "dots i type");
+        }
 
         atomic_fetch_add(&section_progress[2], 1);
     }
 
-    return num_land_dots;
-
-}
-
-/**
- * Return the sum of distances of the nearest n dots to dot in type_dots.
- */
-long sum_dists(
-    const struct Dot *dot, const int n,
-    const int num_type_dots, struct Dot *type_dots[num_type_dots]
-) {
-
-    int dists[n];
-    for (int i = 0; i < n; i++) {
-        dists[i] = INT_MAX;
-    }
-
-    for (int i = 0; i < num_type_dots; i++) {
-        
-        const struct Dot *type_dot = type_dots[i];
-
-        const int diff_x = type_dot->x - dot->x;
-        const int diff_y = type_dot->y - dot->y;
-        const int dist = diff_x * diff_x + diff_y * diff_y;
-
-        int left = 0;
-        int right = n - 1;
-
-        if (dist > dists[right]) {
-            continue;
-        }
-
-        while (left <= right) {
-
-            int mid = left + (right - left) / 2;
-
-            if (dists[mid] == dist) {
-                left = mid;
-                break;
-            } else if (dists[mid] < dist) {
-                left = mid + 1;
-            } else {
-                right = mid - 1;
-            }
-
-        }
-
-        for (int ii = n - 1; ii > left; ii--) {
-            dists[ii] = dists[ii - 1];  
-        }
-        dists[left] = dist;
-
-    }
-
-    long sum = 0l;
-    for (int i = 0; i < n; i++) {
-        sum += (long)dists[i];
-    }
-    return sum;
+    write(return_pipe[1], &num_land_dots, sizeof(int));
 
 }
 
@@ -420,20 +389,22 @@ void smooth_coastlines(
 
     for (int _ = 0; _ < 2; _++) {
 
-        struct Dot *land_dots[num_land_dots]; // list of land dot pointers
-        struct Dot *water_dots[num_water_dots];
+        int land_dots[num_land_dots]; // list of land dot indexes in dots
+        int water_dots[num_water_dots];
         int li = 0;
         int wi = 0;
 
         for (int i = 0; i < num_dots; i++) {
             if (dots[i].type[4] == '\0') {
-                land_dots[li] = &dots[i];
+                land_dots[li] = i;
                 li++;
             } else if (dots[i].type[5] == '\0') {
-                water_dots[wi] = &dots[i];
+                water_dots[wi] = i;
                 wi++;
             }
         }
+
+        record_str("", "check 1");
 
         for (int i = start_index; i < end_index; i++) {
 
@@ -443,8 +414,91 @@ void smooth_coastlines(
 
             if (land_dot || dot->type[5] == '\0') { // dot.type == "Land" || "Water"
 
-                long sum_land = sum_dists(dot, coastline_smoothing, num_land_dots, land_dots);
-                long sum_water = sum_dists(dot, coastline_smoothing, num_water_dots, water_dots);
+                long sum_land;
+                long sum_water;
+
+                int dists[coastline_smoothing];
+                for (int ii = 0; ii < coastline_smoothing; ii++) {
+                    dists[ii] = INT_MAX;
+                }
+
+                for (int ii = 0; ii < 2; ii++) {
+
+                    int num_comp_dots;
+                    if (ii == 0) {
+                        num_comp_dots = num_land_dots;
+                    } else {
+                        num_comp_dots = num_water_dots;
+                    }
+
+                    for (int iii = 0; iii < num_comp_dots; iii++) {
+
+                        int index;
+                        if (ii == 0) {
+                            index = land_dots[iii];
+                        } else {
+                            index = water_dots[iii];
+                        }
+
+                        const struct Dot *comp_dot = &dots[index];
+
+                        if (comp_dot->x < 0 || comp_dot->y < 0 || comp_dot->x > 10000 || comp_dot->y > 10000) {
+                            record_val(dots[index].x, "dots index x");
+                            record_val(dots[index].y, "dots index y");
+                            record_str(dots[index].type, "dots index type");
+                        }
+
+                        const int diff_x = comp_dot->x - dot->x;
+                        const int diff_y = comp_dot->y - dot->y;
+                        const int dist = diff_x * diff_x + diff_y * diff_y;
+
+                        int left = 0;
+                        int right = coastline_smoothing - 1;
+
+                        if (dist < dists[right]) {
+
+                            while (left <= right) {
+
+                                int mid = left + (right - left) / 2;
+
+                                if (dists[mid] == dist) {
+                                    left = mid;
+                                    break;
+                                } else if (dists[mid] < dist) {
+                                    left = mid + 1;
+                                } else {
+                                    right = mid - 1;
+                                }
+
+                            }
+
+                            for (int iv = coastline_smoothing - 1; iv > left; iv--) {
+                                dists[iv] = dists[iv - 1];
+                            }
+                            dists[left] = dist;
+
+                        }
+
+                    }
+
+                    long sum = 0l;
+                    for (int iii = 0; iii < coastline_smoothing; iii++) {
+                        sum += dists[iii];
+                    }
+                    if (ii == 0) {
+                        sum_land = sum;
+                    } else {
+                        sum_water = sum;
+                    }
+
+                }
+
+                if (sum_land < 0) {
+                    record_val(sum_land, "sum land low");
+                }
+                if (sum_water < 0) {
+                    record_val(sum_water, "sum water low");
+                }
 
                 if (land_dot) {
                     if (sum_land > sum_water) {
@@ -462,6 +516,8 @@ void smooth_coastlines(
 
         }
 
+        record_str("", "check 1sadf");
+
     }
 
 }
@@ -473,6 +529,8 @@ void smooth_coastlines(
  * Main Function. argc and argv used for automated inputs mode.
  */
 int main(int argc, char *argv[]) {
+
+    record_val(0, "clear");
 
     // Setting Main Process Title
 
@@ -692,7 +750,7 @@ int main(int argc, char *argv[]) {
 
         atomic_fetch_add(&section_progress[1], 1);
 
-    } 
+    }
 
     free(used_coords);
 
@@ -723,19 +781,24 @@ int main(int argc, char *argv[]) {
     // last piece may be larger if num_dots / x != (float)num_dots / x
 
     int num_land_dots = 0;
+    int return_pipe[2];
+    pipe(return_pipe);
     int fork_pids[processes];
     for (int i = 0; i < processes; i++) {
         fork_pids[i] = fork();
         if (fork_pids[i] == 0) {
-            num_land_dots += assign_sections(
+            assign_sections(
                 map_resolution, island_size, piece_length * i, piece_ends[i],
-                origin_dots, num_special_dots, dots, section_progress
+                origin_dots, num_special_dots, dots, section_progress, return_pipe
             );
             exit(0);
         }
     }
     for (int i = 0; i < processes; i++) {
         waitpid(fork_pids[i], NULL, 0);
+        int return_val;
+        read(return_pipe[0], &return_val, sizeof(int));
+        num_land_dots += return_val;
     }
 
     clock_gettime(CLOCK_REALTIME, &time_now);
