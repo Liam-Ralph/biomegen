@@ -351,11 +351,6 @@ void assign_sections(
             }
 
         }
-        if (dots[i].x < 0 || dots[i].y < 0 || dots[i].x > 10000 || dots[i].y > 10000) {
-            record_val(dots[i].x, "dots i x");
-            record_val(dots[i].y, "dots i y");
-            record_str(dots[i].type, "dots i type");
-        }
 
         atomic_fetch_add(&section_progress[2], 1);
     }
@@ -366,8 +361,8 @@ void assign_sections(
 
 /**
  * Smooth map coastlines for a more realistic, aesthetically pleasing map.
- * Randomly reassigns land and water dots based on the average distance of the
- * nearest coastline_smoothing dots of the same and opposite types.
+ * Reassigns land and water dots based on the average distance of the nearest
+ * coastline_smoothing dots of the same and opposite types.
  */
 void smooth_coastlines(
     const int coastline_smoothing, const int start_index, const int end_index,
@@ -409,6 +404,12 @@ void smooth_coastlines(
         for (int i = start_index; i < end_index; i++) {
 
             struct Dot *dot = &dots[i];
+            if (dots[i].x < 0 || dots[i].y < 0 || dots[i].x > 10000 || dots[i].y > 10000) {
+                record_val(i, "dots i");
+                record_val(dots[i].x, "dots i x");
+                record_val(dots[i].y, "dots i y");
+                record_str(dots[i].type, "dots i type");
+            }
 
             const bool land_dot = (dot->type[4] == '\0');
 
@@ -443,6 +444,7 @@ void smooth_coastlines(
                         const struct Dot *comp_dot = &dots[index];
 
                         if (comp_dot->x < 0 || comp_dot->y < 0 || comp_dot->x > 10000 || comp_dot->y > 10000) {
+                            record_val(index, "dots index");
                             record_val(dots[index].x, "dots index x");
                             record_val(dots[index].y, "dots index y");
                             record_str(dots[index].type, "dots index type");
