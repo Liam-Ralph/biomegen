@@ -366,8 +366,7 @@ void assign_sections(
  */
 void smooth_coastlines(
     const int coastline_smoothing, const int start_index, const int end_index,
-    const int num_land_dots, const int num_water_dots, const int num_dots,
-    struct Dot *dots, _Atomic int *section_progress
+    const int num_dots, struct Dot *dots, _Atomic int *section_progress
 ) {
 
     // Setting Worker Process Title
@@ -384,21 +383,20 @@ void smooth_coastlines(
 
     for (int _ = 0; _ < 2; _++) {
 
-        int land_dots[num_land_dots]; // list of land dot indexes in dots
-        int water_dots[num_water_dots];
-        int li = 0;
-        int wi = 0;
+        int land_dots[num_dots]; // list of land dot indexes in dots
+        int water_dots[num_dots];
+        int num_land_dots = 0;
+        int num_water_dots = 0;
 
         for (int i = 0; i < num_dots; i++) {
             if (dots[i].type[4] == '\0') {
-                land_dots[li] = i;
-                li++;
+                land_dots[num_land_dots] = i;
+                num_land_dots++;
             } else if (dots[i].type[5] == '\0') {
-                water_dots[wi] = i;
-                wi++;
+                water_dots[num_water_dots] = i;
+                num_water_dots++;
             }
         }
-
         record_str("", "check 1");
 
         for (int i = start_index; i < end_index; i++) {
@@ -817,8 +815,7 @@ int main(int argc, char *argv[]) {
             if (fork_pids[i] == 0) {
                 smooth_coastlines(
                     coastline_smoothing, piece_length * i, piece_ends[i],
-                    num_land_dots, (num_dots - num_special_dots * 2 - num_land_dots), num_dots,
-                    dots, section_progress
+                    num_dots, dots, section_progress
                 );
                 exit(0);
             }
