@@ -397,17 +397,10 @@ void smooth_coastlines(
                 num_water_dots++;
             }
         }
-        record_str("", "check 1");
 
         for (int i = start_index; i < end_index; i++) {
 
             struct Dot *dot = &dots[i];
-            if (dots[i].x < 0 || dots[i].y < 0 || dots[i].x > 10000 || dots[i].y > 10000) {
-                record_val(i, "dots i");
-                record_val(dots[i].x, "dots i x");
-                record_val(dots[i].y, "dots i y");
-                record_str(dots[i].type, "dots i type");
-            }
 
             const bool land_dot = (dot->type[4] == '\0');
 
@@ -440,13 +433,6 @@ void smooth_coastlines(
                         }
 
                         const struct Dot *comp_dot = &dots[index];
-
-                        if (comp_dot->x < 0 || comp_dot->y < 0 || comp_dot->x > 10000 || comp_dot->y > 10000) {
-                            record_val(index, "dots index");
-                            record_val(dots[index].x, "dots index x");
-                            record_val(dots[index].y, "dots index y");
-                            record_str(dots[index].type, "dots index type");
-                        }
 
                         const int diff_x = comp_dot->x - dot->x;
                         const int diff_y = comp_dot->y - dot->y;
@@ -493,13 +479,6 @@ void smooth_coastlines(
 
                 }
 
-                if (sum_land < 0) {
-                    record_val(sum_land, "sum land low");
-                }
-                if (sum_water < 0) {
-                    record_val(sum_water, "sum water low");
-                }
-
                 if (land_dot) {
                     if (sum_land > sum_water) {
                         strcpy(dot->type, "Water");
@@ -516,8 +495,6 @@ void smooth_coastlines(
 
         }
 
-        record_str("", "check 1sadf");
-
     }
 
 }
@@ -529,8 +506,6 @@ void smooth_coastlines(
  * Main Function. argc and argv used for automated inputs mode.
  */
 int main(int argc, char *argv[]) {
-
-    record_val(0, "clear");
 
     // Setting Main Process Title
 
