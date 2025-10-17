@@ -383,17 +383,21 @@ void smooth_coastlines(
 
     for (int _ = 0; _ < 2; _++) {
 
-        int land_dots[num_dots]; // list of land dot indexes in dots
-        int water_dots[num_dots];
+        int *land_dots = malloc(num_dots * 2 * sizeof(int)); // list of land dot coords
+        int *water_dots = malloc(num_dots * 2 * sizeof(int));
         int num_land_dots = 0;
         int num_water_dots = 0;
 
         for (int i = 0; i < num_dots; i++) {
             if (dots[i].type[4] == '\0') {
-                land_dots[num_land_dots] = i;
+                struct Dot *dot = &dots[i];
+                land_dots[num_land_dots * 2] = dot->x;
+                land_dots[num_land_dots * 2 + 1] = dot->y;
                 num_land_dots++;
             } else if (dots[i].type[5] == '\0') {
-                water_dots[num_water_dots] = i;
+                struct Dot *dot = &dots[i];
+                water_dots[num_water_dots * 2] = dot->x;
+                water_dots[num_water_dots * 2 + 1] = dot->y;
                 num_water_dots++;
             }
         }
@@ -409,12 +413,13 @@ void smooth_coastlines(
                 long sum_land;
                 long sum_water;
 
-                int dists[coastline_smoothing];
-                for (int ii = 0; ii < coastline_smoothing; ii++) {
-                    dists[ii] = INT_MAX;
-                }
-
                 for (int ii = 0; ii < 2; ii++) {
+
+                    int dists[coastline_smoothing];
+                    for (int ii = 0; ii < coastline_smoothing; ii++) {
+                        dists[ii] = INT_MAX;
+                    }
+                    int max_dist = INT_MAX;
 
                     int num_comp_dots;
                     if (ii == 0) {
@@ -425,45 +430,59 @@ void smooth_coastlines(
 
                     for (int iii = 0; iii < num_comp_dots; iii++) {
 
-                        int index;
+                        int x, y;
                         if (ii == 0) {
-                            index = land_dots[iii];
+                            x = land_dots[iii * 2];
+                            y = land_dots[iii * 2 + 1];
                         } else {
-                            index = water_dots[iii];
+                            x = water_dots[iii * 2];
+                            y = water_dots[iii * 2 + 1];
                         }
 
-                        const struct Dot *comp_dot = &dots[index];
-
-                        const int diff_x = comp_dot->x - dot->x;
-                        const int diff_y = comp_dot->y - dot->y;
+                        const int diff_x = x - dot->x;
+                        const int diff_y = y - dot->y;
                         const int dist = diff_x * diff_x + diff_y * diff_y;
 
-                        int left = 0;
-                        int right = coastline_smoothing - 1;
+                        if (dist < max_dist) {
 
-                        if (dist < dists[right]) {
-
-                            while (left <= right) {
-
-                                int mid = left + (right - left) / 2;
-
-                                if (dists[mid] == dist) {
-                                    left = mid;
-                                    break;
-                                } else if (dists[mid] < dist) {
-                                    left = mid + 1;
-                                } else {
-                                    right = mid - 1;
+                            int pos_max = 0;
+                            for (int iv = 1; iv < coastline_smoothing; iv++) {
+                                if (dists[iv] > dists[pos_max]) {
+                                    pos_max = iv;
                                 }
-
                             }
 
-                            for (int iv = coastline_smoothing - 1; iv > left; iv--) {
-                                dists[iv] = dists[iv - 1];
-                            }
-                            dists[left] = dist;
+                            dists[pos_max] = dist;
+                            max_dist = dist;
 
                         }
+
+                        // int left = 0;
+                        // int right = coastline_smoothing - 1;
+
+                        // if (dist < dists[right]) {
+
+                        //     while (left <= right) {
+
+                        //         int mid = left + (right - left) / 2;
+
+                        //         if (dists[mid] == dist) {
+                        //             left = mid;
+                        //             break;
+                        //         } else if (dists[mid] < dist) {
+                        //             left = mid + 1;
+                        //         } else {
+                        //             right = mid - 1;
+                        //         }
+
+                        //     }
+
+                        //     for (int iv = coastline_smoothing - 1; iv > left; iv--) {
+                        //         dists[iv] = dists[iv - 1];
+                        //     }
+                        //     dists[left] = dist;
+
+                        // }
 
                     }
 
@@ -494,6 +513,9 @@ void smooth_coastlines(
             atomic_fetch_add(&section_progress[3], 1);
 
         }
+
+        free(land_dots);
+        free(water_dots);
 
     }
 
