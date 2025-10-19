@@ -41,23 +41,22 @@ BiomeGen, a terminal application for generating png maps.
 
 // Structs
 
-struct Dot {
+typedef struct {
     int x;
     int y;
     char type[13];
-};
-typedef struct Dot Dot;
+} Dot;
 
 
 // Debugging Function
 
 void record_val(const long value, const char *name) {
     if (strcmp(name, "clear") == 0) {
-        FILE *fptr = fopen("record.txt", "w");
+        FILE *fptr = fopen("production-files/record.txt", "w");
         fprintf(fptr, "\n");
         fclose(fptr);
     } else {
-        FILE *fptr = fopen("record.txt", "a");
+        FILE *fptr = fopen("production-files/record.txt", "a");
         fprintf(fptr, "%s | %ld\n", name, value);
         fclose(fptr);
     }
@@ -65,9 +64,20 @@ void record_val(const long value, const char *name) {
 
 void record_str(const char *str, const char *name) {
 
-        FILE *fptr = fopen("record.txt", "a");
+        FILE *fptr = fopen("production-files/record.txt", "a");
         fprintf(fptr, "%s | %s\n", name, str);
         fclose(fptr);
+}
+
+void record_times(const float times[4], const int num) {
+    char fname[100] = "production-files/record";
+    char numname[50];
+    sprintf(numname, "%d", num);
+    strcat(fname, numname);
+    strcat(fname, ".txt");
+    FILE *fptr = fopen(fname, "w");
+    fprintf(fptr, "%f\n%f\n%f\n%f\n", times[0], times[1], times[2], times[3]);
+    fclose(fptr);
 }
 
 
@@ -280,10 +290,10 @@ void track_progress(
         if (strcmp(color, ANSI_GREEN) == 0) {
             break; // All sections done, exit tracking process
         } else {
-            // Sleep 0.5 seconds
+            // Sleep 0.1 seconds
             struct timespec sleep_time;
             sleep_time.tv_sec = 0;
-            sleep_time.tv_nsec = 500000000;
+            sleep_time.tv_nsec = 100000000;
             nanosleep(&sleep_time, &sleep_time);
         }
 
@@ -298,8 +308,8 @@ void track_progress(
  */
 void assign_sections(
     const int map_resolution, const float island_size, const int start_index, const int end_index,
-    const struct Dot *origin_dots, const int num_origin_dots,
-    struct Dot *dots, _Atomic int *section_progress, int return_pipe[2]
+    const int num_origin_dots, const int origin_dots[num_origin_dots][2],
+    Dot *dots, _Atomic int *section_progress, int return_pipe[2]
 ) {
 
     // Setting Worker Process Title
@@ -320,7 +330,7 @@ void assign_sections(
 
     for (int i = start_index; i < end_index; i++) {
 
-        struct Dot *dot = &dots[i];
+        Dot *dot = &dots[i];
 
         if (dot->type[5] == '\0') {
         // Ignore "Water Forced" and "Land Origin", which are not 6 characters
@@ -328,10 +338,8 @@ void assign_sections(
             int min; // min and dist are squared, sqrt is not done until later
             for (int ii = 0; ii < num_origin_dots; ii++) {
 
-                const struct Dot *origin_dot = &origin_dots[ii];
-
-                const int diff_x = origin_dot->x - dot->x;
-                const int diff_y = origin_dot->y - dot->y;
+                const int diff_x = origin_dots[ii][0] - dot->x;
+                const int diff_y = origin_dots[ii][1] - dot->y;
                 const int dist = diff_x * diff_x + diff_y * diff_y;
 
                 if (ii == 0 || dist < min) {
@@ -353,6 +361,7 @@ void assign_sections(
         }
 
         atomic_fetch_add(&section_progress[2], 1);
+
     }
 
     write(return_pipe[1], &num_land_dots, sizeof(int));
@@ -366,7 +375,8 @@ void assign_sections(
  */
 void smooth_coastlines(
     const int coastline_smoothing, const int start_index, const int end_index,
-    const int num_dots, struct Dot *dots, _Atomic int *section_progress
+    const int num_dots, const int num_special_dots, const int num_reg_dots,
+    Dot *dots, _Atomic int *section_progress
 ) {
 
     // Setting Worker Process Title
@@ -381,21 +391,22 @@ void smooth_coastlines(
 
     #endif
 
+    int *land_dots = malloc(num_reg_dots * 2 * sizeof(int)); // list of land dot coords
+    int *water_dots = malloc(num_reg_dots * 2 * sizeof(int));
+
     for (int _ = 0; _ < 2; _++) {
 
-        int *land_dots = malloc(num_dots * 2 * sizeof(int)); // list of land dot coords
-        int *water_dots = malloc(num_dots * 2 * sizeof(int));
         int num_land_dots = 0;
         int num_water_dots = 0;
 
-        for (int i = 0; i < num_dots; i++) {
+        for (int i = num_special_dots; i < num_dots; i++) {
             if (dots[i].type[4] == '\0') {
-                struct Dot *dot = &dots[i];
+                Dot *dot = &dots[i];
                 land_dots[num_land_dots * 2] = dot->x;
                 land_dots[num_land_dots * 2 + 1] = dot->y;
                 num_land_dots++;
             } else if (dots[i].type[5] == '\0') {
-                struct Dot *dot = &dots[i];
+                Dot *dot = &dots[i];
                 water_dots[num_water_dots * 2] = dot->x;
                 water_dots[num_water_dots * 2 + 1] = dot->y;
                 num_water_dots++;
@@ -404,7 +415,9 @@ void smooth_coastlines(
 
         for (int i = start_index; i < end_index; i++) {
 
-            struct Dot *dot = &dots[i];
+            Dot *dot = &dots[i];
+            int dotx = dot->x;
+            int doty = dot->y;
 
             const bool land_dot = (dot->type[4] == '\0');
 
@@ -430,17 +443,18 @@ void smooth_coastlines(
 
                     for (int iii = 0; iii < num_comp_dots; iii++) {
 
-                        int x, y;
+                        int *x;
+                        int *y;
                         if (ii == 0) {
-                            x = land_dots[iii * 2];
-                            y = land_dots[iii * 2 + 1];
+                            x = &land_dots[iii * 2];
+                            y = &land_dots[iii * 2 + 1];
                         } else {
-                            x = water_dots[iii * 2];
-                            y = water_dots[iii * 2 + 1];
+                            x = &water_dots[iii * 2];
+                            y = &water_dots[iii * 2 + 1];
                         }
 
-                        const int diff_x = x - dot->x;
-                        const int diff_y = y - dot->y;
+                        const int diff_x = *x - dotx;
+                        const int diff_y = *y - doty;
                         const int dist = diff_x * diff_x + diff_y * diff_y;
 
                         if (dist < max_dist) {
@@ -456,33 +470,6 @@ void smooth_coastlines(
                             max_dist = dist;
 
                         }
-
-                        // int left = 0;
-                        // int right = coastline_smoothing - 1;
-
-                        // if (dist < dists[right]) {
-
-                        //     while (left <= right) {
-
-                        //         int mid = left + (right - left) / 2;
-
-                        //         if (dists[mid] == dist) {
-                        //             left = mid;
-                        //             break;
-                        //         } else if (dists[mid] < dist) {
-                        //             left = mid + 1;
-                        //         } else {
-                        //             right = mid - 1;
-                        //         }
-
-                        //     }
-
-                        //     for (int iv = coastline_smoothing - 1; iv > left; iv--) {
-                        //         dists[iv] = dists[iv - 1];
-                        //     }
-                        //     dists[left] = dist;
-
-                        // }
 
                     }
 
@@ -514,10 +501,10 @@ void smooth_coastlines(
 
         }
 
-        free(land_dots);
-        free(water_dots);
-
     }
+
+    free(land_dots);
+    free(water_dots);
 
 }
 
@@ -684,8 +671,8 @@ int main(int argc, char *argv[]) {
 
     const int num_dots = width * height / map_resolution;
 
-    struct Dot *dots = mmap(
-        NULL, sizeof(struct Dot) * num_dots, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0
+    Dot *dots = mmap(
+        NULL, sizeof(Dot) * num_dots, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0
     );
 
     int tracker_process_pid = -1;
@@ -715,7 +702,8 @@ int main(int argc, char *argv[]) {
 
     srand(time(NULL));
 
-    int num_special_dots = num_dots / island_abundance;
+    const int num_special_dots = num_dots / island_abundance * 2;
+    const int num_reg_dots = num_dots - num_special_dots;
 
     bool *used_coords = calloc(width * height, sizeof(bool));
 
@@ -735,9 +723,9 @@ int main(int argc, char *argv[]) {
         Dot new_dot;
         new_dot.x = ii % width;
         new_dot.y = ii / width;
-        if (i < num_special_dots) {
+        if (i < num_special_dots / 2) {
             strcpy(new_dot.type, "Land Origin"); // Origin points for islands
-        } else if (i < num_special_dots * 2) {
+        } else if (i < num_special_dots) {
             strcpy(new_dot.type, "Water Forced"); // Forced water (good for making lakes)
         } else {
             strcpy(new_dot.type, "Water"); // Water (default)
@@ -757,25 +745,27 @@ int main(int argc, char *argv[]) {
     // Section Assignment
     // Assigning dots as "Land", "Land Origin", "Water", or "Water Forced"
 
-    section_progress_total[2] = num_dots;
+    section_progress_total[2] = num_reg_dots;
 
-    struct Dot origin_dots[num_special_dots];
-    int i = 0;
-    for (int ii = 0; ii < num_dots; ii++) {
-        if (strcmp(dots[ii].type, "Land Origin") == 0) {
-            origin_dots[i + 1] = dots[i];
-            i++;
-        }
+    int origin_dots[num_special_dots / 2][2];
+    for (int ii = 0; ii < num_special_dots / 2; ii++) {
+        Dot *dot = &dots[ii];
+        origin_dots[ii][0] = dot->x;
+        origin_dots[ii][1] = dot->y;
     }
 
-    const int piece_length = num_dots / processes;
-    int piece_ends[processes];
-    for (int i = 0; i < processes - 1; i++) {
-        piece_ends[i] = (i + 1) * piece_length;
+    const int piece_length = num_reg_dots / processes;
+
+    int piece_starts[processes + 1];
+    for (int i = 0; i < processes; i++) {
+        piece_starts[i] = i * piece_length + num_special_dots;
     }
-    piece_ends[processes - 1] = num_dots;
-    // used to create x pieces of size num_dots / x, where x = processes
-    // last piece may be larger if num_dots / x != (float)num_dots / x
+    piece_starts[processes - 1] = num_dots - piece_length;
+    piece_starts[processes] = num_dots;
+    /*
+    used to create x pieces of size num_reg_dots / x, where x = processes
+    last piece may be larger, special dots are skipped
+    */
 
     int num_land_dots = 0;
     int return_pipe[2];
@@ -785,8 +775,8 @@ int main(int argc, char *argv[]) {
         fork_pids[i] = fork();
         if (fork_pids[i] == 0) {
             assign_sections(
-                map_resolution, island_size, piece_length * i, piece_ends[i],
-                origin_dots, num_special_dots, dots, section_progress, return_pipe
+                map_resolution, island_size, piece_starts[i], piece_starts[i + 1],
+                num_special_dots / 2, origin_dots, dots, section_progress, return_pipe
             );
             exit(0);
         }
@@ -805,14 +795,14 @@ int main(int argc, char *argv[]) {
 
     if (coastline_smoothing != 0) {
 
-        section_progress_total[3] = num_dots * 2;
+        section_progress_total[3] = num_reg_dots * 2;
 
         for (int i = 0; i < processes; i++) {
             fork_pids[i] = fork();
             if (fork_pids[i] == 0) {
                 smooth_coastlines(
-                    coastline_smoothing, piece_length * i, piece_ends[i],
-                    num_dots, dots, section_progress
+                    coastline_smoothing, piece_starts[i], piece_starts[i + 1],
+                    num_dots, num_special_dots, num_reg_dots, dots, section_progress
                 );
                 exit(0);
             }
@@ -846,7 +836,7 @@ int main(int argc, char *argv[]) {
     munmap(section_progress, sizeof(int) * 7);
     munmap(section_progress_total, sizeof(int) * 7);
     munmap(section_times, sizeof(float) * 7);
-    munmap(dots, sizeof(struct Dot) * num_dots);
+    munmap(dots, sizeof(Dot) * num_dots);
 
     // Completion
 
