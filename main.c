@@ -374,7 +374,7 @@ void assign_sections(
  * coastline_smoothing dots of the same and opposite types.
  */
 void smooth_coastlines(
-    const int coastline_smoothing, const int start_index, const int end_index,
+    const int coastline_smoothing, const int width, const int start_index, const int end_index,
     const int num_dots, const int num_special_dots, const int num_reg_dots,
     Dot *dots, _Atomic int *section_progress
 ) {
@@ -416,8 +416,8 @@ void smooth_coastlines(
         for (int i = start_index; i < end_index; i++) {
 
             Dot *dot = &dots[i];
-            int dotx = dot->x;
-            int doty = dot->y;
+            int dot_x = dot->x;
+            int dot_y = dot->y;
 
             const bool land_dot = (dot->type[4] == '\0');
 
@@ -433,6 +433,10 @@ void smooth_coastlines(
                         dists[ii] = INT_MAX;
                     }
                     int max_dist = INT_MAX;
+                    // int min_x = 0;
+                    // int min_y = 0;
+                    // int max_x = INT_MAX;
+                    // int max_y = INT_MAX;
 
                     int num_comp_dots;
                     if (ii == 0) {
@@ -443,18 +447,15 @@ void smooth_coastlines(
 
                     for (int iii = 0; iii < num_comp_dots; iii++) {
 
-                        int *x;
-                        int *y;
+                        int diff_x;
+                        int diff_y;
                         if (ii == 0) {
-                            x = &land_dots[iii * 2];
-                            y = &land_dots[iii * 2 + 1];
+                            diff_x = land_dots[iii * 2] - dot_x;
+                            diff_y = land_dots[iii * 2 + 1] - dot_y;
                         } else {
-                            x = &water_dots[iii * 2];
-                            y = &water_dots[iii * 2 + 1];
+                            diff_x = water_dots[iii * 2] - dot_x;
+                            diff_y = water_dots[iii * 2 + 1] - dot_y;
                         }
-
-                        const int diff_x = *x - dotx;
-                        const int diff_y = *y - doty;
                         const int dist = diff_x * diff_x + diff_y * diff_y;
 
                         if (dist < max_dist) {
@@ -801,7 +802,7 @@ int main(int argc, char *argv[]) {
             fork_pids[i] = fork();
             if (fork_pids[i] == 0) {
                 smooth_coastlines(
-                    coastline_smoothing, piece_starts[i], piece_starts[i + 1],
+                    coastline_smoothing, width, piece_starts[i], piece_starts[i + 1],
                     num_dots, num_special_dots, num_reg_dots, dots, section_progress
                 );
                 exit(0);
