@@ -429,14 +429,10 @@ void smooth_coastlines(
                 for (int ii = 0; ii < 2; ii++) {
 
                     int dists[coastline_smoothing];
-                    for (int ii = 0; ii < coastline_smoothing; ii++) {
-                        dists[ii] = INT_MAX;
+                    for (int iii = 0; iii < coastline_smoothing; iii++) {
+                        dists[iii] = INT_MAX;
                     }
                     int max_dist = INT_MAX;
-                    // int min_x = 0;
-                    // int min_y = 0;
-                    // int max_x = INT_MAX;
-                    // int max_y = INT_MAX;
 
                     int num_comp_dots;
                     if (ii == 0) {
