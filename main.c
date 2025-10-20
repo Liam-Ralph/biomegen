@@ -48,7 +48,7 @@ typedef struct {
 } Dot;
 
 typedef struct Node {
-    int data;
+    int coord[2];
     struct Node *left;
     struct Node *right;
 } Node;
@@ -179,194 +179,48 @@ float sum_list_float(float *list, int list_len) {
 }
 
 
-// Binary Tree Functions
+// 2-Dimensional KDTree Functions
 
-void insert_node(Node **root, int data) {
+Node *insert_recursive(Node *node, const int coord[2], int depth) {
 
-    Node *new_node = (Node *)malloc(sizeof(Node));
-    new_node->data = data;
-    new_node->left = NULL;
-    new_node->right = NULL;
-
-    if (*root == NULL) {
-        *root = new_node;
-        return;
+    if (node == NULL) {
+        Node *new_node;
+        new_node->coord[0] = coord[0];
+        new_node->coord[1] = coord[1];
+        new_node->left = NULL;
+        new_node->right = NULL;
+        return new_node;
     }
 
-    Node *temp;
-    Node *queue[100];
-    int front = -1;
-    int rear = -1;
-    queue[++rear] = *root;
+    int axis = depth % 2;
 
-    while (front != rear) {
-
-        temp = queue[++front];
-
-        if (temp->left == NULL) {
-            temp->left = new_node;
-            return;
-        } else {
-            queue[++rear] = temp->left;
-        }
-
-        if (temp->right == NULL) {
-            temp->right = new_node;
-            return;
-        } else {
-            queue[++rear] = temp->right;
-        }
-
+    if (coord[axis] < node->coord[axis]) {
+        node->left = insert_recursive(node->left, coord, depth + 1);
+    } else {
+        node->right = insert_recursize(node->right, coord, depth + 1);
     }
+
+    return node;
 
 }
 
-Node *get_deepest_node(Node *root) {
+bool search_recursive(Node *node, const int coord[2], int depth) {
 
-    Node *temp;
-    Node *queue[100];
-    int front = -1;
-    int rear = -1;
-    queue[++rear] = root;
-
-    while (front != rear) {
-
-        temp = queue[++front];
-
-        if (temp->left != NULL) {
-            queue[++rear] = temp->left;
-        }
-
-        if (temp->right != NULL) {
-            queue[++rear] = temp->right;
-        }
-
+    if (node == NULL) {
+        return false;
     }
 
-    return temp;
-
-}
-
-void delete_deepest_node(Node *root, Node *d_node)
-{
-    Node *temp;
-    Node *queue[100];
-    int front = -1;
-    int rear = -1;
-    queue[++rear] = root;
-
-    while (front != rear) {
-
-        temp = queue[++front];
-
-        if (temp == d_node) {
-            temp = NULL;
-            free(d_node);
-            return;
-        }
-
-        if (temp->right != NULL) {
-            if (temp->right == d_node) {
-                temp->right = NULL;
-                free(d_node);
-                return;
-            }
-            else {
-                queue[++rear] = temp->right;
-            }
-        }
-
-        if (temp->left != NULL) {
-            if (temp->left == d_node) {
-                temp->left = NULL;
-                free(d_node);
-                return;
-            }
-            else {
-                queue[++rear] = temp->left;
-            }
-        }
-
+    if (node->coord[0] == coord[0] && node->coord[1] == coord[1]) {
+        return true;
     }
 
-}
+    int axis = depth % 2;
 
-void delete(Node **root, int data) {
-
-    if (*root == NULL) {
-        return;
+    if (coord[axis] < node->coord[axis]) {
+        return search_recursive(node->left, coord, depth + 1);
+    } else {
+        return search_recursive(node->right, coord, depth + 1);
     }
-
-    if ((*root)->left == NULL && (*root)->right == NULL) {
-        if ((*root)->data == data) {
-            free(*root);
-            *root = NULL;
-            return;
-        }
-    }
-
-    Node *temp;
-    Node *queue[100];
-    int front = -1;
-    int rear = -1;
-    queue[++rear] = *root;
-    Node *key_node = NULL;
-
-    while (front != rear) {
-
-        temp = queue[++front];
-
-        if (temp->data == data) {
-            key_node = temp;
-        }
-
-        if (temp->left != NULL) {
-            queue[++rear] = temp->left;
-        }
-
-        if (temp->right != NULL) {
-            queue[++rear] = temp->right;
-        }
-
-    }
-
-    if (key_node != NULL) {
-        Node *deepest_node = get_deepest_node(*root);
-        key_node->data = deepest_node->data;
-        delete_deepest_node(*root, deepest_node);
-    }
-}
-
-Node *search(Node *root, int data) {
-
-    if (root == NULL) {
-        return NULL;
-    }
-
-    Node *temp;
-    Node *queue[100];
-    int front = -1, rear = -1;
-    queue[++rear] = root;
-
-    while (front != rear) {
-
-        temp = queue[++front];
-
-        if (temp->data == data) {
-            return temp;
-        }
-
-        if (temp->left != NULL) {
-            queue[++rear] = temp->left;
-        }
-
-        if (temp->right != NULL) {
-            queue[++rear] = temp->right;
-        }
-
-    }
-
-    return NULL;
 
 }
 
