@@ -221,6 +221,155 @@ void insert_node(Node **root, int data) {
 
 }
 
+Node *get_deepest_node(Node *root) {
+
+    Node *temp;
+    Node *queue[100];
+    int front = -1;
+    int rear = -1;
+    queue[++rear] = root;
+
+    while (front != rear) {
+    
+        temp = queue[++front];
+
+        if (temp->left != NULL) {
+            queue[++rear] = temp->left;
+        }
+
+        if (temp->right != NULL) {
+            queue[++rear] = temp->right;
+        }
+
+    }
+
+    return temp;
+
+}
+
+void delete_deepest_node(Node *root, Node *d_node)
+{
+    Node *temp;
+    Node *queue[100];
+    int front = -1;
+    int rear = -1;
+    queue[++rear] = root;
+
+    while (front != rear) {
+
+        temp = queue[++front];
+
+        if (temp == d_node) {
+            temp = NULL;
+            free(d_node);
+            return;
+        }
+
+        if (temp->right != NULL) {
+            if (temp->right == d_node) {
+                temp->right = NULL;
+                free(d_node);
+                return;
+            }
+            else {
+                queue[++rear] = temp->right;
+            }
+        }
+
+        if (temp->left != NULL) {
+            if (temp->left == d_node) {
+                temp->left = NULL;
+                free(d_node);
+                return;
+            }
+            else {
+                queue[++rear] = temp->left;
+            }
+        }
+
+    }
+
+}
+
+void delete(Node **root, int data) {
+
+    if (*root == NULL) {
+        return;
+    }
+
+    if ((*root)->left == NULL && (*root)->right == NULL) {
+        if ((*root)->data == data) {
+            free(*root);
+            *root = NULL;
+            return;
+        }
+    }
+
+    Node *temp;
+    Node *queue[100];
+    int front = -1;
+    int rear = -1;
+    queue[++rear] = *root;
+    Node *key_node = NULL;
+
+    while (front != rear) {
+
+        temp = queue[++front];
+
+        if (temp->data == data) {
+            key_node = temp;
+        }
+
+        if (temp->left != NULL) {
+            queue[++rear] = temp->left;
+        }
+
+        if (temp->right != NULL) {
+            queue[++rear] = temp->right;
+        }
+
+    }
+
+    if (key_node != NULL) {
+        Node *deepest_node = get_deepest_node(*root);
+        key_node->data = deepest_node->data;
+        delete_deepest_node(*root, deepest_node);
+    }
+}
+
+Node *search(Node *root, int data) {
+
+    if (root == NULL) {
+        return NULL;
+    }
+
+    Node *temp;
+    Node *queue[100];
+    int front = -1, rear = -1;
+    queue[++rear] = root;
+
+    while (front != rear) {
+
+        temp = queue[++front];
+
+        if (temp->data == data) {
+            return temp;
+        }
+
+        if (temp->left != NULL) {
+            queue[++rear] = temp->left;
+        }
+
+        if (temp->right != NULL) {
+            queue[++rear] = temp->right;
+        }
+
+    }
+
+    return NULL;
+
+}
+
 
 // Multiprocessing Functions
 // (Order of use)
