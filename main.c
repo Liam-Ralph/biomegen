@@ -230,7 +230,7 @@ Node *get_deepest_node(Node *root) {
     queue[++rear] = root;
 
     while (front != rear) {
-    
+
         temp = queue[++front];
 
         if (temp->left != NULL) {
