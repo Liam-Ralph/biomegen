@@ -47,8 +47,14 @@ typedef struct {
     char type[13];
 } Dot;
 
+typedef struct Node {
+    int data;
+    struct Node *left;
+    struct Node *right;
+} Node;
 
-// Debugging Function
+
+// Debugging Functions
 
 void record_val(const long value, const char *name) {
     if (strcmp(name, "clear") == 0) {
@@ -170,6 +176,49 @@ float sum_list_float(float *list, int list_len) {
         sum += list[i];
     }
     return sum;
+}
+
+
+// Binary Tree Functions
+
+void insert_node(Node **root, int data) {
+
+    Node *new_node = (Node *)malloc(sizeof(Node));
+    new_node->data = data;
+    new_node->left = NULL;
+    new_node->right = NULL;
+
+    if (*root == NULL) {
+        *root = new_node;
+        return;
+    }
+
+    Node *temp;
+    Node *queue[100];
+    int front = -1;
+    int rear = -1;
+    queue[++rear] = *root;
+
+    while (front != rear) {
+
+        temp = queue[++front];
+
+        if (temp->left == NULL) {
+            temp->left = new_node;
+            return;
+        } else {
+            queue[++rear] = temp->left;
+        }
+
+        if (temp->right == NULL) {
+            temp->right = new_node;
+            return;
+        } else {
+            queue[++rear] = temp->right;
+        }
+
+    }
+
 }
 
 
@@ -332,32 +381,33 @@ void assign_sections(
 
         Dot *dot = &dots[i];
 
-        if (dot->type[5] == '\0') {
+        if (dot->type[5] != '\0') {
         // Ignore "Water Forced" and "Land Origin", which are not 6 characters
+            atomic_fetch_add(&section_progress[2], 1);
+            continue;
+        }
 
-            int min; // min and dist are squared, sqrt is not done until later
-            for (int ii = 0; ii < num_origin_dots; ii++) {
+        int min; // min and dist are squared, sqrt is not done until later
+        for (int ii = 0; ii < num_origin_dots; ii++) {
 
-                const int diff_x = origin_dots[ii][0] - dot->x;
-                const int diff_y = origin_dots[ii][1] - dot->y;
-                const int dist = diff_x * diff_x + diff_y * diff_y;
+            const int diff_x = origin_dots[ii][0] - dot->x;
+            const int diff_y = origin_dots[ii][1] - dot->y;
+            const int dist = diff_x * diff_x + diff_y * diff_y;
 
-                if (ii == 0 || dist < min) {
-                    min = dist;
-                }
-
+            if (ii == 0 || dist < min) {
+                min = dist;
             }
 
-            float threshold = ((float)(rand() % 20) / 19.0f * 1.5f + 0.25f) * island_size;
-            int threshold_sq = (int)(threshold * threshold);
+        }
 
-            int chance = (min <= threshold_sq) ? 9 : 1;
+        float threshold = ((float)(rand() % 20) / 19.0f * 1.5f + 0.25f) * island_size;
+        int threshold_sq = (int)(threshold * threshold);
 
-            if (rand() % 10 < chance) {
-                strcpy(dot->type, "Land");
-                num_land_dots++;
-            }
+        int chance = (min <= threshold_sq) ? 9 : 1;
 
+        if (rand() % 10 < chance) {
+            strcpy(dot->type, "Land");
+            num_land_dots++;
         }
 
         atomic_fetch_add(&section_progress[2], 1);
@@ -421,77 +471,80 @@ void smooth_coastlines(
 
             const bool land_dot = (dot->type[4] == '\0');
 
-            if (land_dot || dot->type[5] == '\0') { // dot.type == "Land" || "Water"
+            if (!land_dot && dot->type[5] != '\0') {
+                // ignore if dot.type != "Land" || "Water"
+                atomic_fetch_add(&section_progress[3], 1);
+                continue;
+            }
 
-                long sum_land;
-                long sum_water;
+            long sum_land;
+            long sum_water;
 
-                for (int ii = 0; ii < 2; ii++) {
+            for (int ii = 0; ii < 2; ii++) {
 
-                    int dists[coastline_smoothing];
-                    for (int iii = 0; iii < coastline_smoothing; iii++) {
-                        dists[iii] = INT_MAX;
-                    }
-                    int max_dist = INT_MAX;
-
-                    int num_comp_dots;
-                    if (ii == 0) {
-                        num_comp_dots = num_land_dots;
-                    } else {
-                        num_comp_dots = num_water_dots;
-                    }
-
-                    for (int iii = 0; iii < num_comp_dots; iii++) {
-
-                        int diff_x;
-                        int diff_y;
-                        if (ii == 0) {
-                            diff_x = land_dots[iii * 2] - dot_x;
-                            diff_y = land_dots[iii * 2 + 1] - dot_y;
-                        } else {
-                            diff_x = water_dots[iii * 2] - dot_x;
-                            diff_y = water_dots[iii * 2 + 1] - dot_y;
-                        }
-                        const int dist = diff_x * diff_x + diff_y * diff_y;
-
-                        if (dist < max_dist) {
-
-                            int pos_max = 0;
-                            for (int iv = 1; iv < coastline_smoothing; iv++) {
-                                if (dists[iv] > dists[pos_max]) {
-                                    pos_max = iv;
-                                }
-                            }
-
-                            dists[pos_max] = dist;
-                            max_dist = dist;
-
-                        }
-
-                    }
-
-                    long sum = 0l;
-                    for (int iii = 0; iii < coastline_smoothing; iii++) {
-                        sum += dists[iii];
-                    }
-                    if (ii == 0) {
-                        sum_land = sum;
-                    } else {
-                        sum_water = sum;
-                    }
-
+                int dists[coastline_smoothing];
+                for (int iii = 0; iii < coastline_smoothing; iii++) {
+                    dists[iii] = INT_MAX;
                 }
+                int max_dist = INT_MAX;
 
-                if (land_dot) {
-                    if (sum_land > sum_water) {
-                        strcpy(dot->type, "Water");
-                    }
+                int num_comp_dots;
+                if (ii == 0) {
+                    num_comp_dots = num_land_dots;
                 } else {
-                    if (sum_water > sum_land) {
-                        strcpy(dot->type, "Land");
-                    }
+                    num_comp_dots = num_water_dots;
                 }
 
+                for (int iii = 0; iii < num_comp_dots; iii++) {
+
+                    int diff_x;
+                    int diff_y;
+                    if (ii == 0) {
+                        diff_x = land_dots[iii * 2] - dot_x;
+                        diff_y = land_dots[iii * 2 + 1] - dot_y;
+                    } else {
+                        diff_x = water_dots[iii * 2] - dot_x;
+                        diff_y = water_dots[iii * 2 + 1] - dot_y;
+                    }
+                    const int dist = diff_x * diff_x + diff_y * diff_y;
+
+                    if (dist >= max_dist) {
+                        // Outside dists, ignore
+                        continue;
+                    }
+
+                    int pos_max = 0;
+                    for (int iv = 1; iv < coastline_smoothing; iv++) {
+                        if (dists[iv] > dists[pos_max]) {
+                            pos_max = iv;
+                        }
+                    }
+
+                    dists[pos_max] = dist;
+                    max_dist = dist;
+
+                }
+
+                long sum = 0l;
+                for (int iii = 0; iii < coastline_smoothing; iii++) {
+                    sum += dists[iii];
+                }
+                if (ii == 0) {
+                    sum_land = sum;
+                } else {
+                    sum_water = sum;
+                }
+
+            }
+
+            if (land_dot) {
+                if (sum_land > sum_water) {
+                    strcpy(dot->type, "Water");
+                }
+            } else {
+                if (sum_water > sum_land) {
+                    strcpy(dot->type, "Land");
+                }
             }
 
             atomic_fetch_add(&section_progress[3], 1);
