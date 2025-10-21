@@ -184,12 +184,13 @@ float sum_list_float(float *list, int list_len) {
 Node *insert_recursive(Node *node, const int coord[2], int depth) {
 
     if (node == NULL) {
-        Node *new_node;
-        new_node->coord[0] = coord[0];
-        new_node->coord[1] = coord[1];
-        new_node->left = NULL;
-        new_node->right = NULL;
-        return new_node;
+        Node new_node;
+        new_node.coord[0] = coord[0];
+        new_node.coord[1] = coord[1];
+        new_node.left = NULL;
+        new_node.right = NULL;
+        Node *new_node_ptr = &new_node;
+        return new_node_ptr;
     }
 
     int axis = depth % 2;
@@ -197,7 +198,7 @@ Node *insert_recursive(Node *node, const int coord[2], int depth) {
     if (coord[axis] < node->coord[axis]) {
         node->left = insert_recursive(node->left, coord, depth + 1);
     } else {
-        node->right = insert_recursize(node->right, coord, depth + 1);
+        node->right = insert_recursive(node->right, coord, depth + 1);
     }
 
     return node;
@@ -421,12 +422,69 @@ void assign_sections(
 
 }
 
+void smooth_coastlines(
+    const int coastline_smoothing, const int width, const int start_index, const int end_index,
+    const int num_dots, const int num_special_dots, const int num_reg_dots,
+    Dot *dots, _Atomic int *section_progress
+) {
+
+    // Note for later, check (n + 1) nearest dots for same bc closest dot will be self
+
+    // Setting Worker Process Title
+
+    #ifdef __linux__
+
+        prctl(PR_SET_NAME, "biomegen-worker", 0, 0, 0);
+
+    #elif BSD || __Apple__
+
+        setproctitle("biomegen-worker");
+
+    #endif
+
+    for (int _ = 0; _ < 2; _++) {
+
+        Node *land_tree_root = NULL;
+        Node *water_tree_root = NULL;
+
+        for (int i = num_special_dots; i < num_dots; i++) {
+            Dot *dot = &dots[i];
+            if (dot->type[4] == '\0') {
+                int coord[2] = {dot->x, dot->y};
+                land_tree_root = insert_recursive(land_tree_root, coord, 0);
+            } else if (dot->type[5] == '\0') {
+                int coord[2] = {dot->x, dot->y};
+                water_tree_root = insert_recursive(water_tree_root, coord, 0);
+            }
+        }
+
+        for (int i = start_index; i < end_index; i++) {
+
+            Dot *dot = &dots[i];
+            int dot_coord[2] = {dot->x, dot->y};
+
+            const bool land_dot = (dot->type[4] == '\0');
+
+            if(!land_dot && dot->type[5] != '\0') {
+                // ignore if dot.type != "Land" or "Water"
+                atomic_fetch_add(&section_progress[3], 1);
+                continue;
+            }
+
+            atomic_fetch_add(&section_progress[3], 1);
+            
+        }
+
+    }
+
+}
+
 /**
  * Smooth map coastlines for a more realistic, aesthetically pleasing map.
  * Reassigns land and water dots based on the average distance of the nearest
  * coastline_smoothing dots of the same and opposite types.
  */
-void smooth_coastlines(
+void smooth_coastlines_old(
     const int coastline_smoothing, const int width, const int start_index, const int end_index,
     const int num_dots, const int num_special_dots, const int num_reg_dots,
     Dot *dots, _Atomic int *section_progress
@@ -773,9 +831,7 @@ int main(int argc, char *argv[]) {
 
         used_coords[ii] = true;
 
-        Dot new_dot;
-        new_dot.x = ii % width;
-        new_dot.y = ii / width;
+        Dot new_dot = { .x = ii % width, .y = ii / width };
         if (i < num_special_dots / 2) {
             strcpy(new_dot.type, "Land Origin"); // Origin points for islands
         } else if (i < num_special_dots) {
