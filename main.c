@@ -181,7 +181,7 @@ float sum_list_float(float *list, int list_len) {
 
 // 2-Dimensional KDTree Functions
 
-Node *insert_recursive(Node *node, const int coord[2], int depth) {
+Node *insert_recursive(Node *node, const int coord[2], const int depth) {
 
     if (node == NULL) {
         Node new_node;
@@ -190,6 +190,7 @@ Node *insert_recursive(Node *node, const int coord[2], int depth) {
         new_node.left = NULL;
         new_node.right = NULL;
         Node *new_node_ptr = &new_node;
+        record_val(new_node_ptr, "new node pointer");
         return new_node_ptr;
     }
 
@@ -205,7 +206,7 @@ Node *insert_recursive(Node *node, const int coord[2], int depth) {
 
 }
 
-bool search_recursive(Node *node, const int coord[2], int depth) {
+bool search_recursive(const Node *node, const int coord[2], const int depth) {
 
     if (node == NULL) {
         return false;
@@ -222,6 +223,22 @@ bool search_recursive(Node *node, const int coord[2], int depth) {
     } else {
         return search_recursive(node->right, coord, depth + 1);
     }
+
+}
+
+void print_recursive(const Node *node, const int depth) {
+
+    if (node == NULL) {
+        return;
+    }
+
+    for (int i = 0; i < depth; i++) {
+        printf(" ");
+    }
+    printf("(%d, %d)\n", node->coord[0], node->coord[1]);
+
+    print_recursive(node->left, depth + 1);
+    print_recursive(node->right, depth + 1);
 
 }
 
@@ -449,14 +466,21 @@ void smooth_coastlines(
 
         for (int i = num_special_dots; i < num_dots; i++) {
             Dot *dot = &dots[i];
+            int coord[2] = {dot->x, dot->y};
             if (dot->type[4] == '\0') {
-                int coord[2] = {dot->x, dot->y};
                 land_tree_root = insert_recursive(land_tree_root, coord, 0);
-            } else if (dot->type[5] == '\0') {
-                int coord[2] = {dot->x, dot->y};
+            } else {
                 water_tree_root = insert_recursive(water_tree_root, coord, 0);
             }
+            break;
         }
+
+        record_val(land_tree_root, "land tree root");
+        record_val(water_tree_root, "water tree root");
+
+        print_recursive(land_tree_root, 0);
+        print_recursive(water_tree_root, 0);
+        return;
 
         for (int i = start_index; i < end_index; i++) {
 
