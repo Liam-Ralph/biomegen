@@ -75,6 +75,12 @@ void record_str(const char *str, const char *name) {
         fclose(fptr);
 }
 
+void record_ptr(const Node *ptr, const char *name) {
+    FILE *fptr = fopen("production-files/record.txt", "a");
+    fprintf(fptr, "%s | %p\n", name, ptr);
+    fclose(fptr);
+}
+
 void record_times(const float times[4], const int num) {
     char fname[100] = "production-files/record";
     char numname[50];
@@ -184,14 +190,15 @@ float sum_list_float(float *list, int list_len) {
 Node *insert_recursive(Node *node, const int coord[2], const int depth) {
 
     if (node == NULL) {
-        node->coord[0] = coord[0];
-        node->coord[1] = coord[1];
-        node->left = NULL;
-        node->right = NULL;
-        return node;
+        Node *new_node = malloc(sizeof(Node));
+        new_node->coord[0] = coord[0];
+        new_node->coord[1] = coord[1];
+        new_node->left = NULL;
+        new_node->right = NULL;
+        return new_node;
     }
 
-    int axis = depth % 2;
+    const int axis = depth % 2;
 
     if (coord[axis] < node->coord[axis]) {
         node->left = insert_recursive(node->left, coord, depth + 1);
@@ -213,7 +220,7 @@ bool search_recursive(const Node *node, const int coord[2], const int depth) {
         return true;
     }
 
-    int axis = depth % 2;
+    const int axis = depth % 2;
 
     if (coord[axis] < node->coord[axis]) {
         return search_recursive(node->left, coord, depth + 1);
@@ -236,6 +243,20 @@ void print_recursive(const Node *node, const int depth) {
 
     print_recursive(node->left, depth + 1);
     print_recursive(node->right, depth + 1);
+
+}
+
+Node *query_recursive(const Node *node, const int coord[2], const int depth) {
+
+    // if node matches
+
+    const int axis = depth % 2;
+
+    if (coord[axis] < node->coord[axis]) {
+        query_recursive(node->left, coord, depth + 1);
+    } else {
+        query_recursive(node->right, coord, depth + 1);
+    }
 
 }
 
@@ -469,19 +490,7 @@ void smooth_coastlines(
             } else {
                 water_tree_root = insert_recursive(water_tree_root, coord, 0);
             }
-            break;
         }
-
-        FILE *fptr = fopen("production-files/record.txt", "w");
-        if (land_tree_root != NULL) {
-            fprintf(fptr, "(%d, %d)\n", land_tree_root->coord[0], land_tree_root->coord[1]);
-            fprintf(fptr, "%p\n", land_tree_root->left);
-            fprintf(fptr, "%p\n", land_tree_root->right);
-        }
-        fclose(fptr);
-
-        // print_recursive(land_tree_root, 0);
-        // print_recursive(water_tree_root, 0);
 
         for (int i = start_index; i < end_index; i++) {
 
@@ -496,9 +505,29 @@ void smooth_coastlines(
                 continue;
             }
 
+            int sums[2]; // same type, opposite
+            Node *tree_roots[2];
+
+            if (land_dot) {
+                tree_roots[0] = land_tree_root;
+                tree_roots[1] = water_tree_root;
+            } else {
+                tree_roots[0] = water_tree_root;
+                tree_roots[1] = land_tree_root;
+            }
+
+            for (int ii = 0; ii < 2; ii++) {
+
+                
+
+            }
+
             atomic_fetch_add(&section_progress[3], 1);
             
         }
+
+        free(land_tree_root);
+        free(water_tree_root);
 
     }
 
