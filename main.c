@@ -184,14 +184,11 @@ float sum_list_float(float *list, int list_len) {
 Node *insert_recursive(Node *node, const int coord[2], const int depth) {
 
     if (node == NULL) {
-        Node new_node;
-        new_node.coord[0] = coord[0];
-        new_node.coord[1] = coord[1];
-        new_node.left = NULL;
-        new_node.right = NULL;
-        Node *new_node_ptr = &new_node;
-        record_val(new_node_ptr, "new node pointer");
-        return new_node_ptr;
+        node->coord[0] = coord[0];
+        node->coord[1] = coord[1];
+        node->left = NULL;
+        node->right = NULL;
+        return node;
     }
 
     int axis = depth % 2;
@@ -475,12 +472,16 @@ void smooth_coastlines(
             break;
         }
 
-        record_val(land_tree_root, "land tree root");
-        record_val(water_tree_root, "water tree root");
+        FILE *fptr = fopen("production-files/record.txt", "w");
+        if (land_tree_root != NULL) {
+            fprintf(fptr, "(%d, %d)\n", land_tree_root->coord[0], land_tree_root->coord[1]);
+            fprintf(fptr, "%p\n", land_tree_root->left);
+            fprintf(fptr, "%p\n", land_tree_root->right);
+        }
+        fclose(fptr);
 
-        print_recursive(land_tree_root, 0);
-        print_recursive(water_tree_root, 0);
-        return;
+        // print_recursive(land_tree_root, 0);
+        // print_recursive(water_tree_root, 0);
 
         for (int i = start_index; i < end_index; i++) {
 
