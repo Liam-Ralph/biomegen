@@ -240,6 +240,13 @@ void print_recursive(const Node *node, const int depth) {
         printf(" ");
     }
     printf("(%d, %d)\n", node->coord[0], node->coord[1]);
+    
+    FILE *fptr = fopen("production-files/record.txt", "a");
+    for (int i = 0; i < depth; i++) {
+        fprintf(fptr, " ");
+    }
+    fprintf(fptr, "(%d, %d)\n", node->coord[0], node->coord[1]);
+    fclose(fptr);
 
     print_recursive(node->left, depth + 1);
     print_recursive(node->right, depth + 1);
@@ -249,6 +256,8 @@ void print_recursive(const Node *node, const int depth) {
 Node *query_recursive(const Node *node, const int coord[2], const int depth) {
 
     // if node matches
+
+    return node;
 
     const int axis = depth % 2;
 
@@ -491,6 +500,11 @@ void smooth_coastlines(
                 water_tree_root = insert_recursive(water_tree_root, coord, 0);
             }
         }
+
+        record_val(0, "clear");
+        print_recursive(land_tree_root, 0);
+        record_str("asdf", "asdf");
+        print_recursive(water_tree_root, 0);
 
         for (int i = start_index; i < end_index; i++) {
 
