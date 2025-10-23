@@ -253,7 +253,7 @@ void print_recursive(const Node *node, const int depth) {
 
 }
 
-Node *query_recursive(const Node *node, const int coord[2], const int depth) {
+Node *query_recursive(const Node *node, const int coord[2], const int depth, int *dists) {
 
     // if node matches
 
@@ -501,11 +501,6 @@ void smooth_coastlines(
             }
         }
 
-        record_val(0, "clear");
-        print_recursive(land_tree_root, 0);
-        record_str("asdf", "asdf");
-        print_recursive(water_tree_root, 0);
-
         for (int i = start_index; i < end_index; i++) {
 
             Dot *dot = &dots[i];
@@ -532,7 +527,12 @@ void smooth_coastlines(
 
             for (int ii = 0; ii < 2; ii++) {
 
-                
+                int dists[coastline_smoothing];
+                for (int iii = 0; iii < coastline_smoothing; iii++) {
+                    dists[i] = INT_MAX;
+                }
+
+
 
             }
 
