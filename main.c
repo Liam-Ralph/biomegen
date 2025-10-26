@@ -69,10 +69,9 @@ void record_val(const long value, const char *name) {
 }
 
 void record_str(const char *str, const char *name) {
-
-        FILE *fptr = fopen("production-files/record.txt", "a");
-        fprintf(fptr, "%s | %s\n", name, str);
-        fclose(fptr);
+    FILE *fptr = fopen("production-files/record.txt", "a");
+    fprintf(fptr, "%s | %s\n", name, str);
+    fclose(fptr);
 }
 
 void record_ptr(const Node *ptr, const char *name) {
@@ -81,50 +80,9 @@ void record_ptr(const Node *ptr, const char *name) {
     fclose(fptr);
 }
 
-void record_times(const float times[4], const int num) {
-    char fname[100] = "production-files/record";
-    char numname[50];
-    sprintf(numname, "%d", num);
-    strcat(fname, numname);
-    strcat(fname, ".txt");
-    FILE *fptr = fopen(fname, "w");
-    fprintf(fptr, "%f\n%f\n%f\n%f\n", times[0], times[1], times[2], times[3]);
-    fclose(fptr);
-}
-
 
 // Functions
 // (Alphabetical order)
-
-/**
- * Calculates the difference in seconds between two timespecs, start and end.
-*/
-float calc_time_diff(struct timespec start, struct timespec end) {
-    int diff_sec = end.tv_sec - start.tv_sec;
-    int diff_nsec = end.tv_nsec - start.tv_nsec;
-    return (float)diff_sec + diff_nsec / 1000000000.0f;
-}
-
-/**
- * Clears all output from the terminal.
- */
-void clear_screen() {
-    char command[6] = "clear";
-    system(command);
-}
-
-/**
- * Formats a time in seconds into a string, placing the output in buffer.
- * Output string has the format "MM:SS.SSS", e.g. 12:34.567.
- */
-void format_time(char *buffer, size_t buffer_size, float time_seconds) {
-
-    int minutes = (int)time_seconds / 60;
-    float seconds = fmod(time_seconds, 60.0f);
-
-    snprintf(buffer, buffer_size, "%2d:%06.3f", minutes, seconds);
-
-}
 
 /**
  * Get a sanitized integer input from the user between min and max,
@@ -187,7 +145,7 @@ float sum_list_float(float *list, int list_len) {
 
 // 2-Dimensional KDTree Functions
 
-Node *insert_recursive(Node *node, const int coord[2], const int depth) {
+Node *insert_recursive(Node *node, const int *coord, const int depth) {
 
     if (node == NULL) {
         Node *new_node = malloc(sizeof(Node));
@@ -210,61 +168,61 @@ Node *insert_recursive(Node *node, const int coord[2], const int depth) {
 
 }
 
-bool search_recursive(const Node *node, const int coord[2], const int depth) {
+// bool search_recursive(const Node *node, const int *coord, const int depth) {
 
-    if (node == NULL) {
-        return false;
-    }
+//     if (node == NULL) {
+//         return false;
+//     }
 
-    if (node->coord[0] == coord[0] && node->coord[1] == coord[1]) {
-        return true;
-    }
+//     if (node->coord[0] == coord[0] && node->coord[1] == coord[1]) {
+//         return true;
+//     }
 
-    const int axis = depth % 2;
+//     const int axis = depth % 2;
 
-    if (coord[axis] < node->coord[axis]) {
-        return search_recursive(node->left, coord, depth + 1);
-    } else {
-        return search_recursive(node->right, coord, depth + 1);
-    }
+//     if (coord[axis] < node->coord[axis]) {
+//         return search_recursive(node->left, coord, depth + 1);
+//     } else {
+//         return search_recursive(node->right, coord, depth + 1);
+//     }
 
-}
+// }
 
-void print_recursive(const Node *node, const int depth) {
+// void print_recursive(const Node *node, const int depth) {
 
-    if (node == NULL) {
-        return;
-    }
+//     if (node == NULL) {
+//         return;
+//     }
 
-    for (int i = 0; i < depth; i++) {
-        printf(" ");
-    }
-    printf("(%d, %d)\n", node->coord[0], node->coord[1]);
+//     for (int i = 0; i < depth; i++) {
+//         printf(" ");
+//     }
+//     printf("(%d, %d)\n", node->coord[0], node->coord[1]);
     
-    FILE *fptr = fopen("production-files/record.txt", "a");
-    for (int i = 0; i < depth; i++) {
-        fprintf(fptr, " ");
-    }
-    fprintf(fptr, "(%d, %d)\n", node->coord[0], node->coord[1]);
-    fclose(fptr);
+//     FILE *fptr = fopen("production-files/record.txt", "a");
+//     for (int i = 0; i < depth; i++) {
+//         fprintf(fptr, " ");
+//     }
+//     fprintf(fptr, "(%d, %d)\n", node->coord[0], node->coord[1]);
+//     fclose(fptr);
 
-    print_recursive(node->left, depth + 1);
-    print_recursive(node->right, depth + 1);
+//     print_recursive(node->left, depth + 1);
+//     print_recursive(node->right, depth + 1);
 
-}
+// }
 
-Node *query_recursive(const Node *node, const int coord[2], const int depth, int *dists) {
+void query_recursive(
+    const Node *node, const int *coord, const int dists_len, int *dists, const int depth
+) {
 
-    // if node matches
-
-    return node;
+    return;
 
     const int axis = depth % 2;
 
     if (coord[axis] < node->coord[axis]) {
-        query_recursive(node->left, coord, depth + 1);
+        query_recursive(node->left, coord, dists_len, dists, depth + 1);
     } else {
-        query_recursive(node->right, coord, depth + 1);
+        query_recursive(node->right, coord, dists_len, dists, depth + 1);
     }
 
 }
@@ -305,15 +263,16 @@ void track_progress(
 
     while (true) {
 
-        clear_screen();
+        system("clear");
 
         // Section Progress
 
         struct timespec time_now;
         clock_gettime(CLOCK_REALTIME, &time_now);
-        float time_diff = calc_time_diff(start_time, time_now);
+        float time_diff = (float)(time_now.tv_sec - start_time.tv_sec) +
+            (time_now.tv_nsec - start_time.tv_nsec) / 1000000000.0;
 
-        float total_progress = 0.0f;
+        float total_progress = 0.0;
 
         for (int i = 0; i < 7; i++) {
 
@@ -355,7 +314,9 @@ void track_progress(
                 printf("█");
             }
             char formatted_time[10];
-            format_time(formatted_time, sizeof(formatted_time), section_time);
+            snprintf(
+                formatted_time, 10, "%2d:%06.3f", (int)section_time / 60, fmod(section_time, 60.0f)
+            );
             printf("%s%s\n", ANSI_RESET, formatted_time);
 
         }
@@ -379,7 +340,9 @@ void track_progress(
             printf("█");
         }
         char formatted_time[10];
-        format_time(formatted_time, sizeof(formatted_time), calc_time_diff(start_time, time_now));
+        float total_time = (float)(time_now.tv_sec - start_time.tv_sec) +
+            (time_now.tv_nsec - start_time.tv_nsec) / 1000000000.0;
+        snprintf(formatted_time, 10, "%2d:%06.3f", (int)total_time / 60, fmod(total_time, 60.0f));
         printf("%s%s\n", ANSI_RESET, formatted_time);
 
         // Checking Exit Status
@@ -514,7 +477,7 @@ void smooth_coastlines(
                 continue;
             }
 
-            int sums[2]; // same type, opposite
+            long sums[2] = {0, 0}; // same type, opposite
             Node *tree_roots[2];
 
             if (land_dot) {
@@ -532,8 +495,16 @@ void smooth_coastlines(
                     dists[i] = INT_MAX;
                 }
 
+                query_recursive(tree_roots[ii], dot_coord, coastline_smoothing, dists, 0);
 
+                for (int iii = 0; iii < coastline_smoothing; ii++) {
+                    sums[ii] += dists[iii];
+                }
 
+            }
+
+            if (sums[0] > sums[1]) {
+                (land_dot) ? strcpy(dot->type, "Water") : strcpy(dot->type, "Land");
             }
 
             atomic_fetch_add(&section_progress[3], 1);
@@ -654,7 +625,7 @@ void smooth_coastlines_old(
 
                 }
 
-                long sum = 0l;
+                long sum = 0;
                 for (int iii = 0; iii < coastline_smoothing; iii++) {
                     sum += dists[iii];
                 }
@@ -736,7 +707,7 @@ int main(int argc, char *argv[]) {
         version[strlen(version) - 1] = '\0';
 
         // Copyright, license notice, etc.
-        clear_screen();
+        system("clear");
         printf(
             "Welcome to BiomeGen v%s\n"
             "Copyright (C) 2025 Liam Ralph\n"
@@ -752,7 +723,7 @@ int main(int argc, char *argv[]) {
         epilepsy or not, but I put this just in case
         */
         getchar();
-        clear_screen();
+        system("clear");
 
         printf("Map Width (pixels):\n");
         width = get_int(500, 10000);
@@ -806,7 +777,7 @@ int main(int argc, char *argv[]) {
         );
         processes = get_int(1, 64); // Change this for CPUs with >64 threads
 
-        clear_screen();
+        system("clear");
 
     } else {
 
@@ -871,7 +842,8 @@ int main(int argc, char *argv[]) {
 
     struct timespec time_now;
     clock_gettime(CLOCK_REALTIME, &time_now);
-    section_times[0] = calc_time_diff(start_time, time_now);
+    section_times[0] = (float)(time_now.tv_sec - start_time.tv_sec) +
+        (time_now.tv_nsec - start_time.tv_nsec) / 1000000000.0;
     atomic_store(&section_progress[0], 1);
 
     // Section Generation
@@ -917,7 +889,8 @@ int main(int argc, char *argv[]) {
     free(used_coords);
 
     clock_gettime(CLOCK_REALTIME, &time_now);
-    section_times[1] = calc_time_diff(start_time, time_now) - sum_list_float(section_times, 7);
+    section_times[1] = (float)(time_now.tv_sec - start_time.tv_sec) +
+        (time_now.tv_nsec - start_time.tv_nsec) / 1000000000.0 - sum_list_float(section_times, 7);
 
     // Section Assignment
     // Assigning dots as "Land", "Land Origin", "Water", or "Water Forced"
@@ -966,7 +939,8 @@ int main(int argc, char *argv[]) {
     }
 
     clock_gettime(CLOCK_REALTIME, &time_now);
-    section_times[2] = calc_time_diff(start_time, time_now) - sum_list_float(section_times, 7);
+    section_times[2] = (float)(time_now.tv_sec - start_time.tv_sec) +
+        (time_now.tv_nsec - start_time.tv_nsec) / 1000000000.0 - sum_list_float(section_times, 7);
 
     // Coastline Smoothing
 
@@ -995,12 +969,14 @@ int main(int argc, char *argv[]) {
     }
 
     clock_gettime(CLOCK_REALTIME, &time_now);
-    section_times[3] = calc_time_diff(start_time, time_now) - sum_list_float(section_times, 7);
+    section_times[3] = (float)(time_now.tv_sec - start_time.tv_sec) +
+        (time_now.tv_nsec - start_time.tv_nsec) / 1000000000.0 - sum_list_float(section_times, 7);
 
     // Finish
 
     clock_gettime(CLOCK_REALTIME, &time_now);
-    section_times[6] = calc_time_diff(start_time, time_now) - sum_list_float(section_times, 7);
+    section_times[6] = (float)(time_now.tv_sec - start_time.tv_sec) +
+        (time_now.tv_nsec - start_time.tv_nsec) / 1000000000.0 - sum_list_float(section_times, 7);
     atomic_store(&section_progress[6], 1);
 
     if (!auto_mode) {
@@ -1019,7 +995,8 @@ int main(int argc, char *argv[]) {
 
     struct timespec end_time;
     clock_gettime(CLOCK_REALTIME, &end_time);
-    float completion_time = calc_time_diff(start_time, end_time);
+    float completion_time = (float)(time_now.tv_sec - start_time.tv_sec) +
+        (time_now.tv_nsec - start_time.tv_nsec) / 1000000000.0;
 
     if (!auto_mode) {
 
