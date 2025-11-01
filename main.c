@@ -211,18 +211,28 @@ Node *insert_recursive(Node *node, const int *coord, const int depth) {
 
 // }
 
-void query_recursive(
-    const Node *node, const int *coord, const int dists_len, int *dists, const int depth
-) {
+void query_recursive(Node *node, const int *coord, int *dists, const int dists_len, int max_dist) {
 
-    return;
+    const int diff_x = node->coord[0] - coord[0];
+    const int diff_y = node->coord[1] - coord[1];
+    const int dist = diff_x * diff_x + diff_y * diff_y;
 
-    const int axis = depth % 2;
+    if (dist < max_dist && dist != 0) {
+        int pos_max = 0;
+        for (int i = 1; i < dists_len; i++) {
+            if (dists[i] > dists[pos_max]) {
+                pos_max = i;
+            }
+        }
+        dists[pos_max] = dist;
+        max_dist = dist;
+    }
 
-    if (coord[axis] < node->coord[axis]) {
-        query_recursive(node->left, coord, dists_len, dists, depth + 1);
-    } else {
-        query_recursive(node->right, coord, dists_len, dists, depth + 1);
+    if (node->left != NULL) {
+        query_recursive(node->left, coord, dists, dists_len, max_dist);
+    }
+    if (node->right != NULL) {
+        query_recursive(node->right, coord, dists, dists_len, max_dist);
     }
 
 }
@@ -313,9 +323,9 @@ void track_progress(
             for (int ii = 0; ii < 20 - green_bars; ii++) {
                 printf("█");
             }
-            char formatted_time[10];
+            char formatted_time[32];
             snprintf(
-                formatted_time, 10, "%2d:%06.3f", (int)section_time / 60, fmod(section_time, 60.0f)
+                formatted_time, 32, "%2d:%06.3f", (int)section_time / 60, fmod(section_time, 60.0f)
             );
             printf("%s%s\n", ANSI_RESET, formatted_time);
 
@@ -339,10 +349,10 @@ void track_progress(
         for (int i = 0; i < 20 - green_bars; i++) {
             printf("█");
         }
-        char formatted_time[10];
+        char formatted_time[32];
         float total_time = (float)(time_now.tv_sec - start_time.tv_sec) +
             (time_now.tv_nsec - start_time.tv_nsec) / 1000000000.0;
-        snprintf(formatted_time, 10, "%2d:%06.3f", (int)total_time / 60, fmod(total_time, 60.0f));
+        snprintf(formatted_time, 32, "%2d:%06.3f", (int)total_time / 60, fmod(total_time, 60.0f));
         printf("%s%s\n", ANSI_RESET, formatted_time);
 
         // Checking Exit Status
@@ -492,12 +502,13 @@ void smooth_coastlines(
 
                 int dists[coastline_smoothing];
                 for (int iii = 0; iii < coastline_smoothing; iii++) {
-                    dists[i] = INT_MAX;
+                    dists[iii] = INT_MAX;
                 }
 
-                query_recursive(tree_roots[ii], dot_coord, coastline_smoothing, dists, 0);
+                query_recursive(tree_roots[ii], dot_coord, dists, coastline_smoothing, INT_MAX);
 
                 for (int iii = 0; iii < coastline_smoothing; ii++) {
+                    record_val(dists[iii], "dists iii");
                     sums[ii] += dists[iii];
                 }
 
@@ -665,6 +676,8 @@ void smooth_coastlines_old(
  * Main Function. argc and argv used for automated inputs mode.
  */
 int main(int argc, char *argv[]) {
+
+    record_val(0, "clear");
 
     // Setting Main Process Title
 
