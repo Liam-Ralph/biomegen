@@ -59,7 +59,7 @@ typedef struct Node {
 void record_val(const long value, const char *name) {
     if (strcmp(name, "clear") == 0) {
         FILE *fptr = fopen("production-files/record.txt", "w");
-        fprintf(fptr, "\n");
+        fprintf(fptr, "");
         fclose(fptr);
     } else {
         FILE *fptr = fopen("production-files/record.txt", "a");
@@ -168,50 +168,7 @@ Node *insert_recursive(Node *node, const int *coord, const int depth) {
 
 }
 
-// bool search_recursive(const Node *node, const int *coord, const int depth) {
-
-//     if (node == NULL) {
-//         return false;
-//     }
-
-//     if (node->coord[0] == coord[0] && node->coord[1] == coord[1]) {
-//         return true;
-//     }
-
-//     const int axis = depth % 2;
-
-//     if (coord[axis] < node->coord[axis]) {
-//         return search_recursive(node->left, coord, depth + 1);
-//     } else {
-//         return search_recursive(node->right, coord, depth + 1);
-//     }
-
-// }
-
-// void print_recursive(const Node *node, const int depth) {
-
-//     if (node == NULL) {
-//         return;
-//     }
-
-//     for (int i = 0; i < depth; i++) {
-//         printf(" ");
-//     }
-//     printf("(%d, %d)\n", node->coord[0], node->coord[1]);
-    
-//     FILE *fptr = fopen("production-files/record.txt", "a");
-//     for (int i = 0; i < depth; i++) {
-//         fprintf(fptr, " ");
-//     }
-//     fprintf(fptr, "(%d, %d)\n", node->coord[0], node->coord[1]);
-//     fclose(fptr);
-
-//     print_recursive(node->left, depth + 1);
-//     print_recursive(node->right, depth + 1);
-
-// }
-
-void query_recursive(Node *node, const int *coord, int *dists, const int dists_len, int max_dist) {
+void query_recursive(Node *node, const int *coord, int *dists, const int dists_len, int max_dist, bool rec) {
 
     const int diff_x = node->coord[0] - coord[0];
     const int diff_y = node->coord[1] - coord[1];
@@ -225,14 +182,30 @@ void query_recursive(Node *node, const int *coord, int *dists, const int dists_l
             }
         }
         dists[pos_max] = dist;
+        int omd = max_dist;
         max_dist = dist;
+
+        if (rec) {
+            
+            FILE *fptr = fopen("production-files/record-query.txt", "a");
+            for (int i = 0; i < dists_len; i++) {
+                fprintf(fptr, "%d", dists[i]);
+                if (i == pos_max)
+                    fprintf(fptr, " *");
+                fprintf(fptr, "\n");
+            }
+            fprintf(fptr, "%d Old Max\n", omd);
+            fprintf(fptr, "%d Max\n\n", max_dist);
+            fclose(fptr);
+        }
+
     }
 
     if (node->left != NULL) {
-        query_recursive(node->left, coord, dists, dists_len, max_dist);
+        query_recursive(node->left, coord, dists, dists_len, max_dist, rec);
     }
     if (node->right != NULL) {
-        query_recursive(node->right, coord, dists, dists_len, max_dist);
+        query_recursive(node->right, coord, dists, dists_len, max_dist, rec);
     }
 
 }
@@ -505,10 +478,12 @@ void smooth_coastlines(
                     dists[iii] = INT_MAX;
                 }
 
-                query_recursive(tree_roots[ii], dot_coord, dists, coastline_smoothing, INT_MAX);
+                bool rec = false;
+                if (i == 1000 && ii == 0 && _ == 0) {rec = true;}
 
-                for (int iii = 0; iii < coastline_smoothing; ii++) {
-                    record_val(dists[iii], "dists iii");
+                query_recursive(tree_roots[ii], dot_coord, dists, coastline_smoothing, INT_MAX, rec);
+
+                for (int iii = 0; iii < coastline_smoothing; iii++) {
                     sums[ii] += dists[iii];
                 }
 
