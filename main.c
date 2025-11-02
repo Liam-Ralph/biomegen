@@ -59,7 +59,7 @@ typedef struct Node {
 void record_val(const long value, const char *name) {
     if (strcmp(name, "clear") == 0) {
         FILE *fptr = fopen("production-files/record.txt", "w");
-        fprintf(fptr, "");
+        fprintf(fptr, "Record Cleared\n");
         fclose(fptr);
     } else {
         FILE *fptr = fopen("production-files/record.txt", "a");
@@ -142,9 +142,11 @@ float sum_list_float(float *list, int list_len) {
     return sum;
 }
 
-
-// 2-Dimensional KDTree Functions
-
+/**
+ * Insert a coordinate into the KDTree. The function will recursive navigate
+ * down the tree based on the coordinate's position until it finds a null node,
+ * where it creates a new node with the coordinate.
+ */
 Node *insert_recursive(Node *node, const int *coord, const int depth) {
 
     if (node == NULL) {
@@ -168,13 +170,21 @@ Node *insert_recursive(Node *node, const int *coord, const int depth) {
 
 }
 
-void query_recursive(Node *node, const int *coord, int *dists, const int dists_len, int max_dist, bool rec) {
+/**
+ * Query the KDTree to modify dists, the distances of the nearest dists_len
+ * points to coord. Recursively navigates down the KDTree, editing dists and
+ * the value at max_dist_ptr whenever it finds a node whose distance is less
+ * than the value at max_dist_ptr. All distances are squared for efficiency.
+ */
+void query_recursive(
+    Node *node, const int *coord, int *dists, const int dists_len, int *max_dist_ptr
+) {
 
     const int diff_x = node->coord[0] - coord[0];
     const int diff_y = node->coord[1] - coord[1];
     const int dist = diff_x * diff_x + diff_y * diff_y;
 
-    if (dist < max_dist && dist != 0) {
+    if (dist < *max_dist_ptr && dist != 0) {
         int pos_max = 0;
         for (int i = 1; i < dists_len; i++) {
             if (dists[i] > dists[pos_max]) {
@@ -182,30 +192,16 @@ void query_recursive(Node *node, const int *coord, int *dists, const int dists_l
             }
         }
         dists[pos_max] = dist;
-        int omd = max_dist;
-        max_dist = dist;
-
-        if (rec) {
-            
-            FILE *fptr = fopen("production-files/record-query.txt", "a");
-            for (int i = 0; i < dists_len; i++) {
-                fprintf(fptr, "%d", dists[i]);
-                if (i == pos_max)
-                    fprintf(fptr, " *");
-                fprintf(fptr, "\n");
-            }
-            fprintf(fptr, "%d Old Max\n", omd);
-            fprintf(fptr, "%d Max\n\n", max_dist);
-            fclose(fptr);
-        }
+        int omd = *max_dist_ptr;
+        *max_dist_ptr = dist;
 
     }
 
     if (node->left != NULL) {
-        query_recursive(node->left, coord, dists, dists_len, max_dist, rec);
+        query_recursive(node->left, coord, dists, dists_len, max_dist_ptr);
     }
     if (node->right != NULL) {
-        query_recursive(node->right, coord, dists, dists_len, max_dist, rec);
+        query_recursive(node->right, coord, dists, dists_len, max_dist_ptr);
     }
 
 }
@@ -412,6 +408,11 @@ void assign_sections(
 
 }
 
+/**
+ * Smooth map coastlines for a more realistic, aesthetically pleasing map.
+ * Reassigns land and water dots based on the average distance of the nearest
+ * coastline_smoothing dots of the same and opposite types.
+ */
 void smooth_coastlines(
     const int coastline_smoothing, const int width, const int start_index, const int end_index,
     const int num_dots, const int num_special_dots, const int num_reg_dots,
@@ -478,10 +479,12 @@ void smooth_coastlines(
                     dists[iii] = INT_MAX;
                 }
 
-                bool rec = false;
-                if (i == 1000 && ii == 0 && _ == 0) {rec = true;}
+                int max_dist = INT_MAX;
+                int *max_dist_ptr = &max_dist;
 
-                query_recursive(tree_roots[ii], dot_coord, dists, coastline_smoothing, INT_MAX, rec);
+                query_recursive(
+                    tree_roots[ii], dot_coord, dists, coastline_smoothing, max_dist_ptr
+                );
 
                 for (int iii = 0; iii < coastline_smoothing; iii++) {
                     sums[ii] += dists[iii];
@@ -651,8 +654,6 @@ void smooth_coastlines_old(
  * Main Function. argc and argv used for automated inputs mode.
  */
 int main(int argc, char *argv[]) {
-
-    record_val(0, "clear");
 
     // Setting Main Process Title
 
