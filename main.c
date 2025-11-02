@@ -74,12 +74,6 @@ void record_str(const char *str, const char *name) {
     fclose(fptr);
 }
 
-void record_ptr(const Node *ptr, const char *name) {
-    FILE *fptr = fopen("production-files/record.txt", "a");
-    fprintf(fptr, "%s | %p\n", name, ptr);
-    fclose(fptr);
-}
-
 
 // Functions
 // (Alphabetical order)
@@ -142,6 +136,9 @@ float sum_list_float(float *list, int list_len) {
     return sum;
 }
 
+
+// KDTree Functions
+
 /**
  * Insert a coordinate into the KDTree. The function will recursive navigate
  * down the tree based on the coordinate's position until it finds a null node,
@@ -192,7 +189,6 @@ void query_recursive(
             }
         }
         dists[pos_max] = dist;
-        int omd = *max_dist_ptr;
         *max_dist_ptr = dist;
 
     }
