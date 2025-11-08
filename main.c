@@ -174,7 +174,8 @@ Node *insert_recursive(Node *node, const int *coord, const int depth) {
  * than the value at max_dist_ptr. All distances are squared for efficiency.
  */
 void query_recursive(
-    Node *node, const int *coord, int *dists, const int dists_len, int *max_dist_ptr
+    Node *node, const int *coord, const int depth,
+    int *dists, const int dists_len, int *max_dist_ptr
 ) {
 
     const int diff_x = node->coord[0] - coord[0];
@@ -190,14 +191,21 @@ void query_recursive(
         }
         dists[pos_max] = dist;
         *max_dist_ptr = dist;
-
     }
+
+    const int axis = depth % 2;
 
     if (node->left != NULL) {
-        query_recursive(node->left, coord, dists, dists_len, max_dist_ptr);
+        const int min_dist_left = node->left->coord[axis] - coord[axis];
+        if (min_dist_left * min_dist_left < *max_dist_ptr) {
+            query_recursive(node->left, coord, depth + 1, dists, dists_len, max_dist_ptr);
+        }
     }
     if (node->right != NULL) {
-        query_recursive(node->right, coord, dists, dists_len, max_dist_ptr);
+        const int min_dist_right = node->right->coord[axis] - coord[axis];
+        if (min_dist_right * min_dist_right < *max_dist_ptr) {
+            query_recursive(node->right, coord, depth + 1, dists, dists_len, max_dist_ptr);
+        }
     }
 
 }
@@ -479,7 +487,7 @@ void smooth_coastlines(
                 int *max_dist_ptr = &max_dist;
 
                 query_recursive(
-                    tree_roots[ii], dot_coord, dists, coastline_smoothing, max_dist_ptr
+                    tree_roots[ii], dot_coord, 0, dists, coastline_smoothing, max_dist_ptr
                 );
 
                 for (int iii = 0; iii < coastline_smoothing; iii++) {
@@ -495,9 +503,6 @@ void smooth_coastlines(
             atomic_fetch_add(&section_progress[3], 1);
             
         }
-
-        free(land_tree_root);
-        free(water_tree_root);
 
     }
 
@@ -956,6 +961,10 @@ int main(int argc, char *argv[]) {
     clock_gettime(CLOCK_REALTIME, &time_now);
     section_times[3] = (float)(time_now.tv_sec - start_time.tv_sec) +
         (time_now.tv_nsec - start_time.tv_nsec) / 1000000000.0 - sum_list_float(section_times, 7);
+
+    
+    atomic_store(&section_progress[4], 1);
+    atomic_store(&section_progress[5], 1);
 
     // Finish
 
