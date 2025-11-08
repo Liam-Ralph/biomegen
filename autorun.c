@@ -5,18 +5,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/prctl.h>
 #include <unistd.h>
-
-// OS Specific Includes
-
-#ifdef __linux__
-    #include <sys/prctl.h>
-#elif _WIN32
-    #include <windows.h>
-    #include <io.h>
-    #define F_OK 0
-    #define access _access
-#endif
 
 
 // Main Function
@@ -27,15 +17,15 @@ int main() {
 
     #ifdef __linux__
 
-        prctl(PR_SET_NAME, "BiomeGenAutorun", 0, 0, 0);
+        prctl(PR_SET_NAME, "biomegenautorun", 0, 0, 0);
 
     #elif BSD
 
-        setproctitle("BiomeGen Autorun");
+        setproctitle("biomegen-autorun");
 
     #elif __Apple__
 
-        setproctitle("BiomeGen Autorun");
+        setproctitle("biomegen-autorun");
     
     #endif
 
