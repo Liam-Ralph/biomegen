@@ -203,12 +203,14 @@ int comp_coords_y(const void *pa, const void *pb) {
 Node *build_recursive(const int num_coords, int coords[num_coords * 4], const int depth) {
 
     const int axis = depth % 2;
+    const int offset = axis * num_coords;
+    const int reverse_offset = ((depth + 1) % 2) * num_coords;
 
     record_val(1, "check");
 
     record_val(2, "check");
 
-    const int med_pos = axis * num_coords + num_coords / 2;
+    const int med_pos = offset + num_coords / 2;
     Node *node = malloc(sizeof(Node));
     node->coord[0] = coords[med_pos * 2];
     node->coord[1] = coords[med_pos * 2 + 1];
@@ -220,21 +222,21 @@ Node *build_recursive(const int num_coords, int coords[num_coords * 4], const in
     const int num_coords_right = num_coords - 1 - med_pos;
     if (num_coords_right > 0) {
 
-        // fix coords_right and coords_left
-        int *coords_right = malloc(num_coords_right * 2 * sizeof(int));
+        // fix coords_right and coords_left for other axis
+        int *coords_right = malloc(num_coords_right * 4 * sizeof(int));
         for (int i = med_pos + 1; i < num_coords; i++) {
-            coords_right[(i - med_pos - 1) * 2] = coords[i * 2];
-            coords_right[(i - med_pos - 1) * 2 + 1] = coords[i * 2 + 1];
+            coords_right[offset + (i - med_pos - 1) * 2] = coords[i * 2];
+            coords_right[offset + (i - med_pos - 1) * 2 + 1] = coords[i * 2 + 1];
         }
         node->right = build_recursive(num_coords_right, coords_right, depth + 1);
         free(coords_right);
 
         const int num_coords_left = num_coords - num_coords_right;
         if (num_coords_left > 0) {
-            int *coords_left = malloc(num_coords_left * 2 * sizeof(int));
+            int *coords_left = malloc(num_coords_left * 4 * sizeof(int));
             for (int i = 0; i < med_pos; i++) {
-                coords_left[i * 2] = coords[i * 2];
-                coords_left[i * 2 + 1] = coords[i * 2 + 1];
+                coords_left[offset + i * 2] = coords[i * 2];
+                coords_left[offset + i * 2 + 1] = coords[i * 2 + 1];
             }
             node->left = build_recursive(num_coords_left, coords_left, depth + 1);
             free(coords_left);
