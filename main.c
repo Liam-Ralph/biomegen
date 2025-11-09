@@ -139,6 +139,17 @@ float sum_list_float(float *list, int list_len) {
 
 // KDTree Functions
 
+int get_depth(struct Node* root) {
+    if (root == NULL)
+        return -1;
+
+    // compute the height of left and right subtrees
+    int lHeight = get_depth(root->left);
+    int rHeight = get_depth(root->right);
+
+    return (lHeight > rHeight ? lHeight : rHeight) + 1;
+}
+
 /**
  * Insert a coordinate into the KDTree. The function will recursive navigate
  * down the tree based on the coordinate's position until it finds a null node,
@@ -162,6 +173,76 @@ Node *insert_recursive(Node *node, const int *coord, const int depth) {
     } else {
         node->right = insert_recursive(node->right, coord, depth + 1);
     }
+
+    return node;
+
+}
+
+int comp_coords_x(const void *pa, const void *pb) {
+    const int *a = *(const int **)pa;
+    const int *b = *(const int **)pb;
+    if (a[0] < b[0]) {
+        return -1;
+    } else if (a[0] > b[0]) {
+        return 1;
+    }
+    return 0;
+}
+
+int comp_coords_y(const void *pa, const void *pb) {
+    const int *a = *(const int **)pa;
+    const int *b = *(const int **)pb;
+    if (a[1] < b[1]) {
+        return -1;
+    } else if (a[1] > b[1]) {
+        return 1;
+    }
+    return 0;
+}
+
+Node *build_recursive(const int num_coords, int coords[num_coords * 4], const int depth) {
+
+    const int axis = depth % 2;
+
+    record_val(1, "check");
+
+    record_val(2, "check");
+
+    const int med_pos = axis * num_coords + num_coords / 2;
+    Node *node = malloc(sizeof(Node));
+    node->coord[0] = coords[med_pos * 2];
+    node->coord[1] = coords[med_pos * 2 + 1];
+    node->left = NULL;
+    node->right = NULL;
+
+    record_val(3, "check");
+
+    const int num_coords_right = num_coords - 1 - med_pos;
+    if (num_coords_right > 0) {
+
+        // fix coords_right and coords_left
+        int *coords_right = malloc(num_coords_right * 2 * sizeof(int));
+        for (int i = med_pos + 1; i < num_coords; i++) {
+            coords_right[(i - med_pos - 1) * 2] = coords[i * 2];
+            coords_right[(i - med_pos - 1) * 2 + 1] = coords[i * 2 + 1];
+        }
+        node->right = build_recursive(num_coords_right, coords_right, depth + 1);
+        free(coords_right);
+
+        const int num_coords_left = num_coords - num_coords_right;
+        if (num_coords_left > 0) {
+            int *coords_left = malloc(num_coords_left * 2 * sizeof(int));
+            for (int i = 0; i < med_pos; i++) {
+                coords_left[i * 2] = coords[i * 2];
+                coords_left[i * 2 + 1] = coords[i * 2 + 1];
+            }
+            node->left = build_recursive(num_coords_left, coords_left, depth + 1);
+            free(coords_left);
+        }
+
+    }
+
+    record_val(4, "check");
 
     return node;
 
@@ -208,6 +289,17 @@ void query_recursive(
         }
     }
 
+}
+
+void free_recursive(Node *node) {
+    if (node->left != NULL) {
+        free_recursive(node->left);
+    }
+    if (node->right != NULL) {
+        free_recursive(node->right);
+    }
+    free(node);
+    node = NULL;
 }
 
 
@@ -298,7 +390,7 @@ void track_progress(
             }
             char formatted_time[32];
             snprintf(
-                formatted_time, 32, "%2d:%06.3f", (int)section_time / 60, fmod(section_time, 60.0f)
+                formatted_time, 32, "%2d:%08.5f", (int)section_time / 60, fmod(section_time, 60.0f)
             );
             printf("%s%s\n", ANSI_RESET, formatted_time);
 
@@ -325,7 +417,7 @@ void track_progress(
         char formatted_time[32];
         float total_time = (float)(time_now.tv_sec - start_time.tv_sec) +
             (time_now.tv_nsec - start_time.tv_nsec) / 1000000000.0;
-        snprintf(formatted_time, 32, "%2d:%06.3f", (int)total_time / 60, fmod(total_time, 60.0f));
+        snprintf(formatted_time, 32, "%2d:%08.5f", (int)total_time / 60, fmod(total_time, 60.0f));
         printf("%s%s\n", ANSI_RESET, formatted_time);
 
         // Checking Exit Status
@@ -418,12 +510,11 @@ void assign_sections(
  * coastline_smoothing dots of the same and opposite types.
  */
 void smooth_coastlines(
-    const int coastline_smoothing, const int width, const int start_index, const int end_index,
+    const int coastline_smoothing, const int width, const int height,
+    const int start_index, const int end_index,
     const int num_dots, const int num_special_dots, const int num_reg_dots,
     Dot *dots, _Atomic int *section_progress
 ) {
-
-    // Note for later, check (n + 1) nearest dots for same bc closest dot will be self
 
     // Setting Worker Process Title
 
@@ -441,8 +532,8 @@ void smooth_coastlines(
 
         int num_land_dots = 0;
         int num_water_dots = 0;
-        int *land_dots = malloc(num_reg_dots * 2 * sizeof(int)); // list of land dot coords
-        int *water_dots = malloc(num_reg_dots * 2 * sizeof(int));
+        int *land_dots = malloc(num_reg_dots * 4 * sizeof(int));
+        int *water_dots = malloc(num_reg_dots * 4 * sizeof(int));
 
         for (int i = num_special_dots; i < num_dots; i++) {
             if (dots[i].type[4] == '\0') {
@@ -471,26 +562,67 @@ void smooth_coastlines(
         //     }
         // }
 
-        int depth = 0;
-        while (num_land_dots > 0) {
+        for (int axis = 0; axis < 2; axis++) {
 
-            const int axis = depth % 2;
-            const int num_new_dots = pow(2, depth);
+            const int start = axis * num_land_dots;
+            const int end = (axis + 1) * num_land_dots;
 
-            if (num_new_dots >= num_land_dots) {
-                for (int i = 0; i < num_land_dots; i++) {
-                    const int coord[2] = {land_dots[i * 2], land_dots[i * 2 + 1]};
-                    land_tree_root = insert_recursive(land_tree_root, coord, 0);
+            for (int i = start; i < end - 1; i++) {
+
+                bool swapped = false;
+
+                for (int ii = start; ii < end - i - 1; ii++) {
+                    if (land_dots[ii * 2 + axis] < land_dots[(ii + 1) * 2 + axis]) {
+                        int temp[2] = {land_dots[ii * 2], land_dots[ii * 2 + 1]};
+                        land_dots[ii * 2] = land_dots[(ii + 1) * 2];
+                        land_dots[ii * 2 + 1] = land_dots[(ii + 1) * 2 + 1];
+                        land_dots[(ii + 1) * 2] = temp[0];
+                        land_dots[(ii + 1) * 2 + 1] = temp[1];
+                        swapped = true;
+                    }
                 }
-                break;
-            }
 
-            
+                if (!swapped) {
+                    break;
+                }
+
+            }
 
         }
 
-        free(land_dots);
-        free(water_dots);
+        for (int axis = 0; axis < 2; axis++) {
+
+            const int start = axis * num_water_dots;
+            const int end = (axis + 1) * num_water_dots;
+
+            for (int i = start; i < end - 1; i++) {
+
+                bool swapped = false;
+
+                for (int ii = start; ii < end - i - 1; ii++) {
+                    if (water_dots[ii * 2 + axis] < water_dots[(ii + 1) * 2 + axis]) {
+                        int temp[2] = {water_dots[ii * 2], water_dots[ii * 2 + 1]};
+                        water_dots[ii * 2] = water_dots[(ii + 1) * 2];
+                        water_dots[ii * 2 + 1] = water_dots[(ii + 1) * 2 + 1];
+                        water_dots[(ii + 1) * 2] = temp[0];
+                        water_dots[(ii + 1) * 2 + 1] = temp[1];
+                        swapped = true;
+                    }
+                }
+
+                if (!swapped) {
+                    break;
+                }
+
+            }
+
+        }
+
+        land_tree_root = build_recursive(num_land_dots, land_dots, 0);
+        water_tree_root = build_recursive(num_water_dots, water_dots, 0);
+
+        // free(land_dots);
+        // free(water_dots);
 
         for (int i = start_index; i < end_index; i++) {
 
@@ -543,6 +675,9 @@ void smooth_coastlines(
             atomic_fetch_add(&section_progress[3], 1);
             
         }
+
+        free_recursive(land_tree_root);
+        free_recursive(water_tree_root);
 
     }
 
@@ -695,6 +830,8 @@ void smooth_coastlines_old(
  * Main Function. argc and argv used for automated inputs mode.
  */
 int main(int argc, char *argv[]) {
+
+    record_val(0, "clear");
 
     // Setting Main Process Title
 
@@ -982,7 +1119,7 @@ int main(int argc, char *argv[]) {
             fork_pids[i] = fork();
             if (fork_pids[i] == 0) {
                 smooth_coastlines(
-                    coastline_smoothing, width, piece_starts[i], piece_starts[i + 1],
+                    coastline_smoothing, width, height, piece_starts[i], piece_starts[i + 1],
                     num_dots, num_special_dots, num_reg_dots, dots, section_progress
                 );
                 exit(0);
