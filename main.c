@@ -439,18 +439,58 @@ void smooth_coastlines(
 
     for (int _ = 0; _ < 2; _++) {
 
+        int num_land_dots = 0;
+        int num_water_dots = 0;
+        int *land_dots = malloc(num_reg_dots * 2 * sizeof(int)); // list of land dot coords
+        int *water_dots = malloc(num_reg_dots * 2 * sizeof(int));
+
+        for (int i = num_special_dots; i < num_dots; i++) {
+            if (dots[i].type[4] == '\0') {
+                Dot *dot = &dots[i];
+                land_dots[num_land_dots * 2] = dot->x;
+                land_dots[num_land_dots * 2 + 1] = dot->y;
+                num_land_dots++;
+            } else if (dots[i].type[5] == '\0') {
+                Dot *dot = &dots[i];
+                water_dots[num_water_dots * 2] = dot->x;
+                water_dots[num_water_dots * 2 + 1] = dot->y;
+                num_water_dots++;
+            }
+        }
+
         Node *land_tree_root = NULL;
         Node *water_tree_root = NULL;
 
-        for (int i = num_special_dots; i < num_dots; i++) {
-            Dot *dot = &dots[i];
-            int coord[2] = {dot->x, dot->y};
-            if (dot->type[4] == '\0') {
-                land_tree_root = insert_recursive(land_tree_root, coord, 0);
-            } else {
-                water_tree_root = insert_recursive(water_tree_root, coord, 0);
+        // for (int i = num_special_dots; i < num_dots; i++) {
+        //     Dot *dot = &dots[i];
+        //     int coord[2] = {dot->x, dot->y};
+        //     if (dot->type[4] == '\0') {
+        //         land_tree_root = insert_recursive(land_tree_root, coord, 0);
+        //     } else {
+        //         water_tree_root = insert_recursive(water_tree_root, coord, 0);
+        //     }
+        // }
+
+        int depth = 0;
+        while (num_land_dots > 0) {
+
+            const int axis = depth % 2;
+            const int num_new_dots = pow(2, depth);
+
+            if (num_new_dots >= num_land_dots) {
+                for (int i = 0; i < num_land_dots; i++) {
+                    const int coord[2] = {land_dots[i * 2], land_dots[i * 2 + 1]};
+                    land_tree_root = insert_recursive(land_tree_root, coord, 0);
+                }
+                break;
             }
+
+            
+
         }
+
+        free(land_dots);
+        free(water_dots);
 
         for (int i = start_index; i < end_index; i++) {
 
