@@ -178,7 +178,7 @@ Node *insert_recursive(Node *node, const int *coord, const int depth) {
 
 }
 
-Node *build_recursive(const int num_coords, int coords[num_coords * 4], const int depth) {
+Node *build_recursive(const int num_coords, int coords[num_coords * 2], const int depth) {
 
     const int axis = depth % 2;
 
@@ -199,7 +199,7 @@ Node *build_recursive(const int num_coords, int coords[num_coords * 4], const in
         }
     }
 
-    const int med_pos = axis * num_coords + num_coords / 2;
+    const int med_pos = num_coords / 2;
     Node *node = malloc(sizeof(Node));
     node->coord[0] = coords[med_pos * 2];
     node->coord[1] = coords[med_pos * 2 + 1];
@@ -209,7 +209,6 @@ Node *build_recursive(const int num_coords, int coords[num_coords * 4], const in
     const int num_coords_right = num_coords - 1 - med_pos;
     if (num_coords_right > 0) {
 
-        // fix coords_right and coords_left
         int *coords_right = malloc(num_coords_right * 2 * sizeof(int));
         for (int i = med_pos + 1; i < num_coords; i++) {
             coords_right[(i - med_pos - 1) * 2] = coords[i * 2];
@@ -519,8 +518,8 @@ void smooth_coastlines(
 
         int num_land_dots = 0;
         int num_water_dots = 0;
-        int *land_dots = malloc(num_reg_dots * 4 * sizeof(int));
-        int *water_dots = malloc(num_reg_dots * 4 * sizeof(int));
+        int *land_dots = malloc(num_reg_dots * 2 * sizeof(int));
+        int *water_dots = malloc(num_reg_dots * 2 * sizeof(int));
 
         for (int i = num_special_dots; i < num_dots; i++) {
             if (dots[i].type[4] == '\0') {
@@ -549,67 +548,11 @@ void smooth_coastlines(
         //     }
         // }
 
-        for (int axis = 0; axis < 2; axis++) {
-
-            const int start = axis * num_land_dots;
-            const int end = (axis + 1) * num_land_dots;
-
-            for (int i = start; i < end - 1; i++) {
-
-                bool swapped = false;
-
-                for (int ii = start; ii < end - i - 1; ii++) {
-                    if (land_dots[ii * 2 + axis] < land_dots[(ii + 1) * 2 + axis]) {
-                        int temp[2] = {land_dots[ii * 2], land_dots[ii * 2 + 1]};
-                        land_dots[ii * 2] = land_dots[(ii + 1) * 2];
-                        land_dots[ii * 2 + 1] = land_dots[(ii + 1) * 2 + 1];
-                        land_dots[(ii + 1) * 2] = temp[0];
-                        land_dots[(ii + 1) * 2 + 1] = temp[1];
-                        swapped = true;
-                    }
-                }
-
-                if (!swapped) {
-                    break;
-                }
-
-            }
-
-        }
-
-        for (int axis = 0; axis < 2; axis++) {
-
-            const int start = axis * num_water_dots;
-            const int end = (axis + 1) * num_water_dots;
-
-            for (int i = start; i < end - 1; i++) {
-
-                bool swapped = false;
-
-                for (int ii = start; ii < end - i - 1; ii++) {
-                    if (water_dots[ii * 2 + axis] < water_dots[(ii + 1) * 2 + axis]) {
-                        int temp[2] = {water_dots[ii * 2], water_dots[ii * 2 + 1]};
-                        water_dots[ii * 2] = water_dots[(ii + 1) * 2];
-                        water_dots[ii * 2 + 1] = water_dots[(ii + 1) * 2 + 1];
-                        water_dots[(ii + 1) * 2] = temp[0];
-                        water_dots[(ii + 1) * 2 + 1] = temp[1];
-                        swapped = true;
-                    }
-                }
-
-                if (!swapped) {
-                    break;
-                }
-
-            }
-
-        }
-
         land_tree_root = build_recursive(num_land_dots, land_dots, 0);
         water_tree_root = build_recursive(num_water_dots, water_dots, 0);
 
-        // free(land_dots);
-        // free(water_dots);
+        free(land_dots);
+        free(water_dots);
 
         for (int i = start_index; i < end_index; i++) {
 
