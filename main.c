@@ -178,35 +178,28 @@ Node *insert_recursive(Node *node, const int *coord, const int depth) {
 
 }
 
-int comp_coords_x(const void *pa, const void *pb) {
-    const int *a = *(const int **)pa;
-    const int *b = *(const int **)pb;
-    if (a[0] < b[0]) {
-        return -1;
-    } else if (a[0] > b[0]) {
-        return 1;
-    }
-    return 0;
-}
-
-int comp_coords_y(const void *pa, const void *pb) {
-    const int *a = *(const int **)pa;
-    const int *b = *(const int **)pb;
-    if (a[1] < b[1]) {
-        return -1;
-    } else if (a[1] > b[1]) {
-        return 1;
-    }
-    return 0;
-}
-
 Node *build_recursive(const int num_coords, int coords[num_coords * 4], const int depth) {
 
     const int axis = depth % 2;
-    const int offset = axis * num_coords * 2;
-    const int reverse_offset = ((depth + 1) % 2) * num_coords * 2;
 
-    const int med_pos = offset + num_coords / 2;
+    for (int i = 0; i < num_coords - 1; i++) {
+        bool swapped = false;
+        for (int ii = 0; ii < num_coords - i - 1; ii++) {
+            if (coords[ii * 2 + axis] > coords[(ii + 1) * 2 + axis]) {
+                int temp[2] = {coords[ii * 2], coords[ii * 2 + 1]};
+                coords[ii * 2] = coords[(ii + 1) * 2];
+                coords[ii * 2 + 1] = coords[(ii + 1) * 2 + 1];
+                coords[(ii + 1) * 2] = temp[0];
+                coords[(ii + 1) * 2 + 1] = temp[1];
+                swapped = true;
+            }
+        }
+        if (!swapped) {
+            break;
+        }
+    }
+
+    const int med_pos = axis * num_coords + num_coords / 2;
     Node *node = malloc(sizeof(Node));
     node->coord[0] = coords[med_pos * 2];
     node->coord[1] = coords[med_pos * 2 + 1];
@@ -214,76 +207,27 @@ Node *build_recursive(const int num_coords, int coords[num_coords * 4], const in
     node->right = NULL;
 
     const int num_coords_right = num_coords - 1 - med_pos;
-
     if (num_coords_right > 0) {
 
-        record_val(depth, "check1");
-
-        int *coords_right = malloc(num_coords_right * 4 * sizeof(int));
-        const int offset_r = axis * num_coords_right * 2;
-        const int reverse_offset_r = ((depth + 1) % 2) * num_coords_right * 2;
-
+        // fix coords_right and coords_left
+        int *coords_right = malloc(num_coords_right * 2 * sizeof(int));
         for (int i = med_pos + 1; i < num_coords; i++) {
-            coords_right[offset_r + (i - med_pos - 1) * 2] = coords[i * 2];
-            coords_right[offset_r + (i - med_pos - 1) * 2 + 1] = coords[i * 2 + 1];
+            coords_right[(i - med_pos - 1) * 2] = coords[i * 2];
+            coords_right[(i - med_pos - 1) * 2 + 1] = coords[i * 2 + 1];
         }
+        node->right = build_recursive(num_coords_right, coords_right, depth + 1);
+        free(coords_right);
 
         const int num_coords_left = num_coords - num_coords_right;
-        int *coords_left = malloc(num_coords_left * 4 * sizeof(int));
-        const int offset_l = axis * num_coords_left * 2;
-        const int reverse_offset_l = ((depth + 1) % 2) * num_coords_left * 2;
-
-        for (int i = 0; i < med_pos; i++) {
-            coords_left[offset_l + i * 2] = coords[i * 2];
-            coords_left[offset_l + i * 2 + 1] = coords[i * 2 + 1];
-        }
-
-        int ir = 0;
-        int il = 0;
-        for (int i = 0; i < num_coords; i++) {
-
-            bool right = false;
-            for (int ii = 1; ii < num_coords; ii++) {
-                const int reg_x = offset_r + ii * 2;
-                const int rev_x = reverse_offset + i * 2;
-                if (
-                    coords_right[reg_x] == coords[rev_x] &&
-                    coords_right[reg_x + 1] == coords[rev_x + 1]
-                ) {
-                    right = true;
-                    break;
-                }
-            }
-            
-            if (right) {
-                const int right_x = reverse_offset_r + ir * 2;
-                const int x = reverse_offset + ir * 2;
-                coords_right[right_x] = coords[x];
-                coords_right[right_x + 1] = coords[x + 1];
-                ir++;
-            } else {
-                const int left_x = reverse_offset_l + il * 2;
-                const int x = reverse_offset + il * 2;
-                coords_right[left_x] = coords[x];
-                coords_right[left_x + 1] = coords[x + 1];
-                il++;
-            }
-
-        }
-
-        node->right = build_recursive(num_coords_right, coords_right, depth + 1);
-        // free(coords_right);
-
-        record_val(depth, "check2");
-
         if (num_coords_left > 0) {
-
+            int *coords_left = malloc(num_coords_left * 2 * sizeof(int));
+            for (int i = 0; i < med_pos; i++) {
+                coords_left[i * 2] = coords[i * 2];
+                coords_left[i * 2 + 1] = coords[i * 2 + 1];
+            }
             node->left = build_recursive(num_coords_left, coords_left, depth + 1);
-            // free(coords_left);
-
+            free(coords_left);
         }
-
-        record_val(depth, "check3");
 
     }
 
@@ -470,7 +414,7 @@ void track_progress(
         } else {
             // Sleep 0.1 seconds
             struct timespec sleep_time;
-            sleep_time.tv_sec = 1;
+            sleep_time.tv_sec = 0;
             sleep_time.tv_nsec = 100000000;
             nanosleep(&sleep_time, &sleep_time);
         }
@@ -873,8 +817,6 @@ void smooth_coastlines_old(
  * Main Function. argc and argv used for automated inputs mode.
  */
 int main(int argc, char *argv[]) {
-
-    record_val(0, "clear");
 
     // Setting Main Process Title
 
