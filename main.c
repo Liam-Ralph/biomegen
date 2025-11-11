@@ -178,26 +178,38 @@ Node *insert_recursive(Node *node, const int *coord, const int depth) {
 
 }
 
+void nth_sort_recursive(int array[], int low, int high) {
+
+    if (low < high) {
+
+        
+
+    }
+
+}
+
 Node *build_recursive(const int num_coords, int coords[num_coords * 2], const int depth) {
 
     const int axis = depth % 2;
 
-    for (int i = 0; i < num_coords - 1; i++) {
-        bool swapped = false;
-        for (int ii = 0; ii < num_coords - i - 1; ii++) {
-            if (coords[ii * 2 + axis] > coords[(ii + 1) * 2 + axis]) {
-                int temp[2] = {coords[ii * 2], coords[ii * 2 + 1]};
-                coords[ii * 2] = coords[(ii + 1) * 2];
-                coords[ii * 2 + 1] = coords[(ii + 1) * 2 + 1];
-                coords[(ii + 1) * 2] = temp[0];
-                coords[(ii + 1) * 2 + 1] = temp[1];
-                swapped = true;
-            }
-        }
-        if (!swapped) {
-            break;
-        }
-    }
+    // for (int i = 0; i < num_coords - 1; i++) {
+    //     bool swapped = false;
+    //     for (int ii = 0; ii < num_coords - i - 1; ii++) {
+    //         if (coords[ii * 2 + axis] > coords[(ii + 1) * 2 + axis]) {
+    //             int temp[2] = {coords[ii * 2], coords[ii * 2 + 1]};
+    //             coords[ii * 2] = coords[(ii + 1) * 2];
+    //             coords[ii * 2 + 1] = coords[(ii + 1) * 2 + 1];
+    //             coords[(ii + 1) * 2] = temp[0];
+    //             coords[(ii + 1) * 2 + 1] = temp[1];
+    //             swapped = true;
+    //         }
+    //     }
+    //     if (!swapped) {
+    //         break;
+    //     }
+    // }
+
+    nth_sort_recursive(coords, 0, num_coords - 1);
 
     const int med_pos = num_coords / 2;
     Node *node = malloc(sizeof(Node));
