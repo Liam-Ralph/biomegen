@@ -178,11 +178,34 @@ Node *insert_recursive(Node *node, const int *coord, const int depth) {
 
 }
 
-void nth_sort_recursive(int array[], int low, int high) {
+void nth_sort_recursive(int coords[], int low, int high, const int axis) {
 
     if (low < high) {
 
-        
+        int pivot = {coords[(rand() % high) * 2 + axis]};
+
+        int i = low - 1;
+
+        for (int ii = low; ii <= high - 1; ii++) {
+            if (coords[ii * 2 + axis] < pivot) {
+                i++;
+                const int temp[2] = {coords[i * 2], coords[i * 2 + 1]};
+                coords[i * 2] = coords[ii * 2];
+                coords[i * 2 + 1] = coords[ii * 2 + 1];
+                coords[ii * 2] = temp[0];
+                coords[ii * 2 + 1] = temp[1];
+            }
+        }
+
+        i++;
+        const int temp[2] = {coords[i * 2], coords[i * 2 + 1]};
+        coords[i * 2] = coords[high * 2];
+        coords[i * 2 + 1] = coords[high * 2];
+        coords[high * 2] = temp[0];
+        coords[high * 2 + 1] = temp[1];
+
+        nth_sort_recursive(coords, low, i - 1, axis);
+        nth_sort_recursive(coords, i + 1, high, axis);
 
     }
 
@@ -209,7 +232,7 @@ Node *build_recursive(const int num_coords, int coords[num_coords * 2], const in
     //     }
     // }
 
-    nth_sort_recursive(coords, 0, num_coords - 1);
+    nth_sort_recursive(coords, 0, num_coords - 1, axis);
 
     const int med_pos = num_coords / 2;
     Node *node = malloc(sizeof(Node));
