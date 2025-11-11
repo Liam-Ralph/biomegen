@@ -42,9 +42,27 @@ BiomeGen, a terminal application for generating png maps.
 // Structs
 
 typedef struct {
-    int x;
-    int y;
-    char type[13];
+    short x;
+    short y;
+    char type;
+    /*
+    s = Shallow Water
+    W = Water
+    d = Deep Water
+
+    I = Ice
+    R = Rock
+    D = Desert
+    J = Jungle
+    F = Forest
+    P = Plains
+    T = Taiga
+    S = Snow
+    
+    w = Water Forced
+    L = Land
+    l = Land Origin
+    */
 } Dot;
 
 typedef struct Node {
@@ -494,8 +512,8 @@ void assign_sections(
 
         Dot *dot = &dots[i];
 
-        if (dot->type[5] != '\0') {
-        // Ignore "Water Forced" and "Land Origin", which are not 6 characters
+        if (dot->type != 'W') {
+        // Ignore "Water Forced" and "Land Origin"
             atomic_fetch_add(&section_progress[2], 1);
             continue;
         }
@@ -519,7 +537,7 @@ void assign_sections(
         int chance = (min <= threshold_sq) ? 9 : 1;
 
         if (rand() % 10 < chance) {
-            strcpy(dot->type, "Land");
+            dot->type = 'L'; // Land
             num_land_dots++;
         }
 
@@ -563,12 +581,12 @@ void smooth_coastlines(
         int *water_dots = malloc(num_reg_dots * 2 * sizeof(int));
 
         for (int i = num_special_dots; i < num_dots; i++) {
-            if (dots[i].type[4] == '\0') {
+            if (dots[i].type == 'L') {
                 Dot *dot = &dots[i];
                 land_dots[num_land_dots * 2] = dot->x;
                 land_dots[num_land_dots * 2 + 1] = dot->y;
                 num_land_dots++;
-            } else if (dots[i].type[5] == '\0') {
+            } else if (dots[i].type == 'W') {
                 Dot *dot = &dots[i];
                 water_dots[num_water_dots * 2] = dot->x;
                 water_dots[num_water_dots * 2 + 1] = dot->y;
@@ -582,7 +600,7 @@ void smooth_coastlines(
         // for (int i = num_special_dots; i < num_dots; i++) {
         //     Dot *dot = &dots[i];
         //     int coord[2] = {dot->x, dot->y};
-        //     if (dot->type[4] == '\0') {
+        //     if (dot->type == 'L') {
         //         land_tree_root = insert_recursive(land_tree_root, coord, 0);
         //     } else {
         //         water_tree_root = insert_recursive(water_tree_root, coord, 0);
@@ -600,9 +618,9 @@ void smooth_coastlines(
             Dot *dot = &dots[i];
             int dot_coord[2] = {dot->x, dot->y};
 
-            const bool land_dot = (dot->type[4] == '\0');
+            const bool land_dot = (dot->type == 'L');
 
-            if(!land_dot && dot->type[5] != '\0') {
+            if(!land_dot && dot->type != 'W') {
                 // ignore if dot.type != "Land" or "Water"
                 atomic_fetch_add(&section_progress[3], 1);
                 continue;
@@ -640,7 +658,7 @@ void smooth_coastlines(
             }
 
             if (sums[0] > sums[1]) {
-                (land_dot) ? strcpy(dot->type, "Water") : strcpy(dot->type, "Land");
+                dot->type = (land_dot) ? 'W' : 'L';
             }
 
             atomic_fetch_add(&section_progress[3], 1);
@@ -686,12 +704,12 @@ void smooth_coastlines_old(
         int num_water_dots = 0;
 
         for (int i = num_special_dots; i < num_dots; i++) {
-            if (dots[i].type[4] == '\0') {
+            if (dots[i].type == 'L') {
                 Dot *dot = &dots[i];
                 land_dots[num_land_dots * 2] = dot->x;
                 land_dots[num_land_dots * 2 + 1] = dot->y;
                 num_land_dots++;
-            } else if (dots[i].type[5] == '\0') {
+            } else if (dots[i].type == 'W') {
                 Dot *dot = &dots[i];
                 water_dots[num_water_dots * 2] = dot->x;
                 water_dots[num_water_dots * 2 + 1] = dot->y;
@@ -705,9 +723,9 @@ void smooth_coastlines_old(
             int dot_x = dot->x;
             int dot_y = dot->y;
 
-            const bool land_dot = (dot->type[4] == '\0');
+            const bool land_dot = (dot->type == 'L');
 
-            if (!land_dot && dot->type[5] != '\0') {
+            if (!land_dot && dot->type != 'W') {
                 // ignore if dot.type != "Land" || "Water"
                 atomic_fetch_add(&section_progress[3], 1);
                 continue;
@@ -775,11 +793,11 @@ void smooth_coastlines_old(
 
             if (land_dot) {
                 if (sum_land > sum_water) {
-                    strcpy(dot->type, "Water");
+                    dot->type = 'W';
                 }
             } else {
                 if (sum_water > sum_land) {
-                    strcpy(dot->type, "Land");
+                    dot->type = 'L';
                 }
             }
 
@@ -961,6 +979,11 @@ int main(int argc, char *argv[]) {
         NULL, sizeof(Dot) * num_dots, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0
     );
 
+    char *image = mmap(
+        NULL, sizeof(char) * width * height,
+        PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0
+    );
+
     int tracker_process_pid = -1;
 
     if (!auto_mode) {
@@ -1009,11 +1032,11 @@ int main(int argc, char *argv[]) {
 
         Dot new_dot = { .x = ii % width, .y = ii / width };
         if (i < num_special_dots / 2) {
-            strcpy(new_dot.type, "Land Origin"); // Origin points for islands
+            new_dot.type = 'l'; // Land Origin, origin points for islands
         } else if (i < num_special_dots) {
-            strcpy(new_dot.type, "Water Forced"); // Forced water (good for making lakes)
+            new_dot.type = 'w'; // Water Forced (good for making lakes)
         } else {
-            strcpy(new_dot.type, "Water"); // Water (default)
+            new_dot.type = 'W'; // Water (default)
         }
 
         dots[i] = new_dot;
@@ -1130,6 +1153,7 @@ int main(int argc, char *argv[]) {
     munmap(section_progress_total, sizeof(int) * 7);
     munmap(section_times, sizeof(float) * 7);
     munmap(dots, sizeof(Dot) * num_dots);
+    munmap(image, sizeof(char) * width * height);
 
     // Completion
 
