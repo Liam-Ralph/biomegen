@@ -178,11 +178,14 @@ Node *insert_recursive(Node *node, const int *coord, const int depth) {
 
 }
 
-void nth_sort_recursive(int coords[], int low, int high, const int axis) {
+void nth_sort_recursive(
+    int coords[], const int low, const int high, const int axis, const int med_index
+) {
 
     if (low < high) {
 
-        int pivot = {coords[(rand() % high) * 2 + axis]};
+        const int pivot_index = rand() % high;
+        int pivot = {coords[(pivot_index) * 2 + axis]};
 
         int i = low - 1;
 
@@ -199,13 +202,16 @@ void nth_sort_recursive(int coords[], int low, int high, const int axis) {
 
         i++;
         const int temp[2] = {coords[i * 2], coords[i * 2 + 1]};
-        coords[i * 2] = coords[high * 2];
-        coords[i * 2 + 1] = coords[high * 2];
+        coords[i * 2] = coords[pivot_index * 2];
+        coords[i * 2 + 1] = coords[pivot_index * 2];
         coords[high * 2] = temp[0];
         coords[high * 2 + 1] = temp[1];
 
-        nth_sort_recursive(coords, low, i - 1, axis);
-        nth_sort_recursive(coords, i + 1, high, axis);
+        if (pivot_index > med_index) {
+            nth_sort_recursive(coords, low, i - 1, axis, med_index);
+        } else {
+            nth_sort_recursive(coords, i + 1, high, axis, med_index);
+        }
 
     }
 
@@ -232,7 +238,7 @@ Node *build_recursive(const int num_coords, int coords[num_coords * 2], const in
     //     }
     // }
 
-    nth_sort_recursive(coords, 0, num_coords - 1, axis);
+    nth_sort_recursive(coords, 0, num_coords - 1, axis, num_coords / 2);
 
     const int med_pos = num_coords / 2;
     Node *node = malloc(sizeof(Node));
@@ -585,6 +591,11 @@ void smooth_coastlines(
 
         land_tree_root = build_recursive(num_land_dots, land_dots, 0);
         water_tree_root = build_recursive(num_water_dots, water_dots, 0);
+
+        record_val((int)(log(num_land_dots) / log(2)), "min land depth");
+        record_val(get_depth(land_tree_root), "actual land depth");
+        record_val((int)(log(num_water_dots) / log(2)), "min water depth");
+        record_val(get_depth(water_tree_root), "actual water depth");
 
         free(land_dots);
         free(water_dots);
