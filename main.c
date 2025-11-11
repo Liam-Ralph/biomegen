@@ -209,7 +209,7 @@ void nth_sort_recursive(
 
         if (pivot_index > med_index) {
             nth_sort_recursive(coords, low, i - 1, axis, med_index);
-        } else {
+        } else if (pivot_index < med_index) {
             nth_sort_recursive(coords, i + 1, high, axis, med_index);
         }
 
@@ -587,15 +587,10 @@ void smooth_coastlines(
         //     } else {
         //         water_tree_root = insert_recursive(water_tree_root, coord, 0);
         //     }
-        // }
+        // } // leave for now, delete after adding image generation
 
         land_tree_root = build_recursive(num_land_dots, land_dots, 0);
         water_tree_root = build_recursive(num_water_dots, water_dots, 0);
-
-        record_val((int)(log(num_land_dots) / log(2)), "min land depth");
-        record_val(get_depth(land_tree_root), "actual land depth");
-        record_val((int)(log(num_water_dots) / log(2)), "min water depth");
-        record_val(get_depth(water_tree_root), "actual water depth");
 
         free(land_dots);
         free(water_dots);
