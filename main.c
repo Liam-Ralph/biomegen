@@ -336,6 +336,37 @@ void query_dist_recursive(
 
 }
 
+void query_recursive(
+    Node *node, const int *coord, const int depth, int *x_ptr, int *y_ptr, int *max_dist_ptr
+) {
+
+    const int diff_x = node->coord[0] - coord[0];
+    const int diff_y = node->coord[1] - coord[1];
+    const int dist = diff_x * diff_x + diff_y * diff_y;
+
+    if (dist < *max_dist_ptr) {
+        *x_ptr = node->coord[0];
+        *y_ptr = node->coord[1];
+        *max_dist_ptr = dist;
+    }
+
+    const int axis = depth % 2;
+
+    if (node->left != NULL) {
+        const int min_dist_left = node->left->coord[axis] - coord[axis];
+        if (min_dist_left * min_dist_left < *max_dist_ptr) {
+            query_recursive(node->left, coord, depth + 1, x_ptr, y_ptr, max_dist_ptr);
+        }
+    }
+    if (node->right != NULL) {
+        const int min_dist_right = node->right->coord[axis] - coord[axis];
+        if (min_dist_right * min_dist_right < *max_dist_ptr) {
+            query_recursive(node->right, coord, depth + 1, x_ptr, y_ptr, max_dist_ptr);
+        }
+    }
+
+}
+
 void free_recursive(Node *node) {
     if (node->left != NULL) {
         free_recursive(node->left);
@@ -582,12 +613,12 @@ void smooth_coastlines(
 
         for (int i = num_special_dots; i < num_dots; i++) {
             if (dots[i].type == 'L') {
-                Dot *dot = &dots[i];
+                const Dot *dot = &dots[i];
                 land_dots[num_land_dots * 2] = dot->x;
                 land_dots[num_land_dots * 2 + 1] = dot->y;
                 num_land_dots++;
             } else if (dots[i].type == 'W') {
-                Dot *dot = &dots[i];
+                const Dot *dot = &dots[i];
                 water_dots[num_water_dots * 2] = dot->x;
                 water_dots[num_water_dots * 2 + 1] = dot->y;
                 num_water_dots++;
@@ -822,7 +853,7 @@ void generate_image(
     int *dot_coords = malloc(num_dots * 2 * sizeof(int));
 
     for (int i = 0; i < num_dots; i++) {
-        Dot *dot = &dots[i];
+        const Dot *dot = &dots[i];
         dot_coords[i * 2] = dot->x;
         dot_coords[i * 2 + 1] = dot->y;
     }
@@ -837,10 +868,32 @@ void generate_image(
         for (int x = 0; x < width; x++) {
 
             char pixel_type = 'E';
+            int nearest_x = -1, nearest_y = -1;
+            int *nearest_x_ptr = &nearest_x;
+            int *nearest_y_ptr = &nearest_y;
+            int max_dist = INT_MAX;
+            int *max_dist_ptr = &max_dist;
+
+            const int coord[2] = {x, y};
+            query_recursive(tree_root, coord, 0, nearest_x_ptr, nearest_y_ptr, max_dist_ptr);
+
+            for (int i = 1; i < num_dots; i++) {
+                const Dot *dot = &dots[i];
+                if (nearest_x == dot->x && nearest_y == dot->y) {
+                    pixel_type = dot->type;
+                    break;
+                }
+            }
+
+            image[y * width + x] = pixel_type;
 
         }
 
+        atomic_fetch_add(&section_progress[5], 1);
+
     }
+
+    free_recursive(tree_root);
 
     for (int i = 0; i < 11; i++) {
         type_counts[i] += local_type_counts[i];
