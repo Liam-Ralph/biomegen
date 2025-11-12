@@ -881,14 +881,16 @@ void generate_image(
 
     for (int y = start_height; y < end_height; y++) {
 
+        int min_dist = INT_MAX - 1;
+        int *min_dist_ptr = &min_dist;
+
         for (int x = 0; x < width; x++) {
 
             char pixel_type = 'E';
             int nearest_x = -1, nearest_y = -1;
             int *nearest_x_ptr = &nearest_x;
             int *nearest_y_ptr = &nearest_y;
-            int min_dist = INT_MAX;
-            int *min_dist_ptr = &min_dist;
+            min_dist++;
 
             const int coord[2] = {x, y};
             query_recursive(tree_root, coord, 0, nearest_x_ptr, nearest_y_ptr, min_dist_ptr);
