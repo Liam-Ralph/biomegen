@@ -170,36 +170,8 @@ int get_depth(struct Node* root) {
     return (lHeight > rHeight ? lHeight : rHeight) + 1;
 }
 
-/**
- * Insert a coordinate into the KDTree. The function will recursive navigate
- * down the tree based on the coordinate's position until it finds a null node,
- * where it creates a new node with the coordinate.
- */
-Node *insert_recursive(Node *node, const int *coord, const int depth) {
-
-    if (node == NULL) {
-        Node *new_node = malloc(sizeof(Node));
-        new_node->coord[0] = coord[0];
-        new_node->coord[1] = coord[1];
-        new_node->left = NULL;
-        new_node->right = NULL;
-        return new_node;
-    }
-
-    const int axis = depth % 2;
-
-    if (coord[axis] < node->coord[axis]) {
-        node->left = insert_recursive(node->left, coord, depth + 1);
-    } else {
-        node->right = insert_recursive(node->right, coord, depth + 1);
-    }
-
-    return node;
-
-}
-
 void nth_sort_recursive(
-    int coords[], const int low, const int high, const int axis, const int med_index
+    int *coords, const int low, const int high, const int axis, const int med_index
 ) {
 
     if (low < high) {
@@ -255,7 +227,7 @@ Node *build_recursive(const int num_coords, int coords[num_coords * 3], const in
     node->left = NULL;
     node->right = NULL;
 
-    const int num_coords_right = num_coords - 1 - med_pos;
+    const int num_coords_right = num_coords - med_pos - 1;
     if (num_coords_right > 0) {
 
         int *coords_right = malloc(num_coords_right * 3 * sizeof(int));
