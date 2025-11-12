@@ -692,14 +692,17 @@ void generate_image(
 
     for (int y = start_height; y < end_height; y++) {
 
-        int min_dist = INT_MAX - 1;
+        int min_dist = INT_MAX;
         int *min_dist_ptr = &min_dist;
 
         for (int x = 0; x < width; x++) {
 
-            int nearest_index = -1;
+            int nearest_index = 0;
             int *nearest_index_ptr = &nearest_index;
-            min_dist++;
+            if (min_dist != INT_MAX) {
+                const int min_dist_sqrt = (int)ceil(sqrt(min_dist)) + 1;
+                min_dist = min_dist_sqrt * min_dist_sqrt;
+            }
 
             const int coord[2] = {x, y};
             query_recursive(tree_root, coord, 0, nearest_index_ptr, min_dist_ptr);
