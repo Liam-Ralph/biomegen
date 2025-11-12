@@ -20,6 +20,7 @@ BiomeGen, a terminal application for generating png maps.
 
 #include <limits.h>
 #include <math.h>
+#include <png.h>
 #include <stdatomic.h>
 #include <stdbool.h>
 #include <stdio.h>
@@ -861,7 +862,7 @@ void smooth_coastlines_old(
 
 void generate_image(
     const int start_height, const int end_height, const int width, const int num_dots,
-    const Dot *dots, char *image, int *type_counts, _Atomic int *section_progress
+    const Dot *dots, int *image_indexes, int *type_counts, _Atomic int *section_progress
 ) {
 
     int local_type_counts[11] = {0};
@@ -886,7 +887,6 @@ void generate_image(
 
         for (int x = 0; x < width; x++) {
 
-            char pixel_type = 'E';
             int nearest_x = -1, nearest_y = -1;
             int *nearest_x_ptr = &nearest_x;
             int *nearest_y_ptr = &nearest_y;
@@ -898,12 +898,10 @@ void generate_image(
             for (int i = 1; i < num_dots; i++) {
                 const Dot *dot = &dots[i];
                 if (nearest_x == dot->x && nearest_y == dot->y) {
-                    pixel_type = dot->type;
+                    image_indexes[y * width + x] = i;
                     break;
                 }
             }
-
-            image[y * width + x] = pixel_type;
 
         }
 
@@ -1086,10 +1084,14 @@ int main(int argc, char *argv[]) {
         NULL, sizeof(Dot) * num_dots, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0
     );
 
-    char *image = mmap(
-        NULL, sizeof(char) * width * height,
+    int *image_indexes = mmap(
+        NULL, sizeof(int) * width * height,
         PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0
     );
+
+    for (int i = 0; i < width * height; i++) {
+        image_indexes[i] = 0;
+    }
 
     int *type_counts = mmap(
         NULL, sizeof(int) * 11, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0
@@ -1266,7 +1268,7 @@ int main(int argc, char *argv[]) {
         if (fork_pids[i] == 0) {
             generate_image(
                 section_starts[i], section_starts[i + 1], width,
-                num_dots, dots, image, type_counts, section_progress
+                num_dots, dots, image_indexes, type_counts, section_progress
             );
             exit(0);
         }
@@ -1274,6 +1276,111 @@ int main(int argc, char *argv[]) {
     for (int i = 0; i < processes; i++) {
         waitpid(fork_pids[i], NULL, 0);
     }
+
+    FILE *fptr = fopen(output_file, "w");
+    png_structp png_ptr = png_create_write_struct(PNG_LIBPNG_VER_STRING, NULL, NULL, NULL);
+    png_infop info_ptr = png_create_info_struct(png_ptr);
+
+    png_set_IHDR(
+        png_ptr, info_ptr, width, height,
+        8, PNG_COLOR_TYPE_RGB, PNG_INTERLACE_NONE,
+        PNG_COMPRESSION_TYPE_DEFAULT, PNG_FILTER_TYPE_DEFAULT
+    );
+
+    png_byte **row_pointers = png_malloc(png_ptr, height * sizeof(png_byte *));
+    for (int y = 0; y < height; y++) {
+        png_byte *row = png_malloc(png_ptr, 3 * sizeof(unsigned char) * width);
+        row_pointers[y] = row;
+        for (int x = 0; x < width; x++) {
+            int rgb[3] = {204, 0, 82};
+            const int image_index = image_indexes[y * width + x];
+            switch (dots[image_index].type) {
+                case 's':
+                    rgb[0] = 0;
+                    rgb[1] = 0;
+                    rgb[2] = 255;
+                    break;
+                case 'W':
+                    rgb[0] = 0;
+                    rgb[1] = 0;
+                    rgb[2] = 179;
+                    break;
+                case 'd':
+                    rgb[0] = 0;
+                    rgb[1] = 0;
+                    rgb[2] = 128;
+                    break;
+                case 'I':
+                    rgb[0] = 153;
+                    rgb[1] = 221;
+                    rgb[2] = 255;
+                    break;
+                case 'R':
+                    rgb[0] = 128;
+                    rgb[1] = 128;
+                    rgb[2] = 128;
+                    break;
+                case 'D':
+                    rgb[0] = 255;
+                    rgb[1] = 185;
+                    rgb[2] = 109;
+                    break;
+                case 'J':
+                    rgb[0] = 0;
+                    rgb[1] = 77;
+                    rgb[2] = 0;
+                    break;
+                case 'F':
+                    rgb[0] = 0;
+                    rgb[1] = 128;
+                    rgb[2] = 0;
+                    break;
+                case 'P':
+                    rgb[0] = 0;
+                    rgb[1] = 179;
+                    rgb[2] = 0;
+                    break;
+                case 'T':
+                    rgb[0] = 152;
+                    rgb[1] = 251;
+                    rgb[2] = 152;
+                    break;
+                case 'S':
+                    rgb[0] = 245;
+                    rgb[1] = 245;
+                    rgb[2] = 245;
+                    break;
+            }
+            for (int i = 0; i < 3; i++) {
+                /*
+                Adds slight color variation
+                Every pixel around the same dot has the same variation
+                */
+                int rgb_val = rgb[i];
+                rgb_val += image_index % 20 - 10;
+                if (rgb_val > 255){
+                    rgb_val = 255;
+                } else if (rgb_val < 0) {
+                    rgb_val = 0;
+                }
+                rgb[i] = rgb_val;
+            }
+            *row++ = rgb[0];
+            *row++ = rgb[1];
+            *row++ = rgb[2];
+        }
+    }
+
+    png_init_io(png_ptr, fptr);
+    png_set_rows(png_ptr, info_ptr, row_pointers);
+    png_write_png(png_ptr, info_ptr, PNG_TRANSFORM_IDENTITY, NULL);
+
+    for (int y = 0; y < height; y++) {
+        png_free(png_ptr, row_pointers[y]);
+    }
+    png_free(png_ptr, row_pointers);
+
+    fclose(fptr);
 
     clock_gettime(CLOCK_REALTIME, &time_now);
     section_times[5] = (float)(time_now.tv_sec - start_time.tv_sec) +
@@ -1297,7 +1404,7 @@ int main(int argc, char *argv[]) {
     munmap(section_progress_total, sizeof(int) * 7);
     munmap(section_times, sizeof(float) * 7);
     munmap(dots, sizeof(Dot) * num_dots);
-    munmap(image, sizeof(char) * width * height);
+    munmap(image_indexes, sizeof(int) * width * height);
 
     // Completion
 
