@@ -321,47 +321,63 @@ void query_dist_recursive(
 
     const int axis = depth % 2;
 
+    // if (node->left != NULL) {
+    //     const int min_dist_left = node->left->coord[axis] - coord[axis];
+    //     if (min_dist_left * min_dist_left < *max_dist_ptr) {
+    //         query_dist_recursive(node->left, coord, depth + 1, dists, dists_len, max_dist_ptr);
+    //     }
+    // }
+    // if (node->right != NULL) {
+    //     const int min_dist_right = node->right->coord[axis] - coord[axis];
+    //     if (min_dist_right * min_dist_right < *max_dist_ptr) {
+    //         query_dist_recursive(node->right, coord, depth + 1, dists, dists_len, max_dist_ptr);
+    //     }
+    // }
+
+    const int dist_line = node->coord[axis] - coord[axis];
+    const bool line_close = (dist_line * dist_line < *max_dist_ptr);
+    // whether distance to splitting line is less than max_dist
     if (node->left != NULL) {
-        const int min_dist_left = node->left->coord[axis] - coord[axis];
-        if (min_dist_left * min_dist_left < *max_dist_ptr) {
+        if (line_close || coord[axis] < node->coord[axis]) {
             query_dist_recursive(node->left, coord, depth + 1, dists, dists_len, max_dist_ptr);
         }
     }
     if (node->right != NULL) {
-        const int min_dist_right = node->right->coord[axis] - coord[axis];
-        if (min_dist_right * min_dist_right < *max_dist_ptr) {
-            query_dist_recursive(node->right, coord, depth + 1, dists, dists_len, max_dist_ptr);
+        if (line_close || coord[axis] >= node->coord[axis]) {
+            query_dist_recursive(node->left, coord, depth + 1, dists, dists_len, max_dist_ptr);
         }
     }
 
 }
 
 void query_recursive(
-    Node *node, const int *coord, const int depth, int *x_ptr, int *y_ptr, int *max_dist_ptr
+    Node *node, const int *coord, const int depth, int *x_ptr, int *y_ptr, int *min_dist_ptr
 ) {
 
     const int diff_x = node->coord[0] - coord[0];
     const int diff_y = node->coord[1] - coord[1];
     const int dist = diff_x * diff_x + diff_y * diff_y;
 
-    if (dist < *max_dist_ptr) {
-        *x_ptr = node->coord[0];
-        *y_ptr = node->coord[1];
-        *max_dist_ptr = dist;
+    if (dist < *min_dist_ptr) {
+        if (x_ptr != NULL) {
+            *x_ptr = node->coord[0];
+            *y_ptr = node->coord[1];
+        }
+        *min_dist_ptr = dist;
     }
 
     const int axis = depth % 2;
 
+    const int dist_line = node->coord[axis] - coord[axis];
+    const bool line_close = (dist_line * dist_line < *min_dist_ptr);
     if (node->left != NULL) {
-        const int min_dist_left = node->left->coord[axis] - coord[axis];
-        if (min_dist_left * min_dist_left < *max_dist_ptr) {
-            query_recursive(node->left, coord, depth + 1, x_ptr, y_ptr, max_dist_ptr);
+        if (line_close || coord[axis] < node->coord[axis]) {
+            query_recursive(node->left, coord, depth + 1, x_ptr, y_ptr, min_dist_ptr);
         }
     }
     if (node->right != NULL) {
-        const int min_dist_right = node->right->coord[axis] - coord[axis];
-        if (min_dist_right * min_dist_right < *max_dist_ptr) {
-            query_recursive(node->right, coord, depth + 1, x_ptr, y_ptr, max_dist_ptr);
+        if (line_close || coord[axis] >= node->coord[axis]) {
+            query_recursive(node->left, coord, depth + 1, x_ptr, y_ptr, min_dist_ptr);
         }
     }
 
@@ -871,11 +887,11 @@ void generate_image(
             int nearest_x = -1, nearest_y = -1;
             int *nearest_x_ptr = &nearest_x;
             int *nearest_y_ptr = &nearest_y;
-            int max_dist = INT_MAX;
-            int *max_dist_ptr = &max_dist;
+            int min_dist = INT_MAX;
+            int *min_dist_ptr = &min_dist;
 
             const int coord[2] = {x, y};
-            query_recursive(tree_root, coord, 0, nearest_x_ptr, nearest_y_ptr, max_dist_ptr);
+            query_recursive(tree_root, coord, 0, nearest_x_ptr, nearest_y_ptr, min_dist_ptr);
 
             for (int i = 1; i < num_dots; i++) {
                 const Dot *dot = &dots[i];
