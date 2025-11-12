@@ -68,6 +68,7 @@ typedef struct {
 
 typedef struct Node {
     int coord[2];
+    int index;
     struct Node *left;
     struct Node *right;
 } Node;
@@ -204,27 +205,31 @@ void nth_sort_recursive(
     if (low < high) {
 
         const int pivot_index = rand() % high;
-        int pivot = {coords[(pivot_index) * 2 + axis]};
+        int pivot = {coords[(pivot_index) * 3 + axis]};
 
         int i = low - 1;
 
         for (int ii = low; ii <= high - 1; ii++) {
-            if (coords[ii * 2 + axis] < pivot) {
+            if (coords[ii * 3 + axis] < pivot) {
                 i++;
-                const int temp[2] = {coords[i * 2], coords[i * 2 + 1]};
-                coords[i * 2] = coords[ii * 2];
-                coords[i * 2 + 1] = coords[ii * 2 + 1];
-                coords[ii * 2] = temp[0];
-                coords[ii * 2 + 1] = temp[1];
+                const int temp[3] = {coords[i * 3], coords[i * 3 + 1], coords[i * 3 + 2]};
+                coords[i * 3] = coords[ii * 3];
+                coords[i * 3 + 1] = coords[ii * 3 + 1];
+                coords[i * 3 + 2] = coords[ii * 3 + 2];
+                coords[ii * 3] = temp[0];
+                coords[ii * 3 + 1] = temp[1];
+                coords[ii * 3 + 2] = temp[2];
             }
         }
 
         i++;
-        const int temp[2] = {coords[i * 2], coords[i * 2 + 1]};
-        coords[i * 2] = coords[pivot_index * 2];
-        coords[i * 2 + 1] = coords[pivot_index * 2];
-        coords[high * 2] = temp[0];
-        coords[high * 2 + 1] = temp[1];
+        const int temp[3] = {coords[i * 3], coords[i * 3 + 1], coords[i * 3 + 2]};
+        coords[i * 3] = coords[pivot_index * 3];
+        coords[i * 3 + 1] = coords[pivot_index * 3 + 1];
+        coords[i * 3 + 2] = coords[pivot_index * 3 + 2];
+        coords[high * 3] = temp[0];
+        coords[high * 3 + 1] = temp[1];
+        coords[high * 3 + 2] = temp[2];
 
         if (pivot_index > med_index) {
             nth_sort_recursive(coords, low, i - 1, axis, med_index);
@@ -236,53 +241,40 @@ void nth_sort_recursive(
 
 }
 
-Node *build_recursive(const int num_coords, int coords[num_coords * 2], const int depth) {
+Node *build_recursive(const int num_coords, int coords[num_coords * 3], const int depth) {
 
     const int axis = depth % 2;
-
-    // for (int i = 0; i < num_coords - 1; i++) {
-    //     bool swapped = false;
-    //     for (int ii = 0; ii < num_coords - i - 1; ii++) {
-    //         if (coords[ii * 2 + axis] > coords[(ii + 1) * 2 + axis]) {
-    //             int temp[2] = {coords[ii * 2], coords[ii * 2 + 1]};
-    //             coords[ii * 2] = coords[(ii + 1) * 2];
-    //             coords[ii * 2 + 1] = coords[(ii + 1) * 2 + 1];
-    //             coords[(ii + 1) * 2] = temp[0];
-    //             coords[(ii + 1) * 2 + 1] = temp[1];
-    //             swapped = true;
-    //         }
-    //     }
-    //     if (!swapped) {
-    //         break;
-    //     }
-    // }
 
     nth_sort_recursive(coords, 0, num_coords - 1, axis, num_coords / 2);
 
     const int med_pos = num_coords / 2;
     Node *node = malloc(sizeof(Node));
-    node->coord[0] = coords[med_pos * 2];
-    node->coord[1] = coords[med_pos * 2 + 1];
+    node->coord[0] = coords[med_pos * 3];
+    node->coord[1] = coords[med_pos * 3 + 1];
+    node->index = coords[med_pos * 3 + 2];
     node->left = NULL;
     node->right = NULL;
 
     const int num_coords_right = num_coords - 1 - med_pos;
     if (num_coords_right > 0) {
 
-        int *coords_right = malloc(num_coords_right * 2 * sizeof(int));
+        int *coords_right = malloc(num_coords_right * 3 * sizeof(int));
         for (int i = med_pos + 1; i < num_coords; i++) {
-            coords_right[(i - med_pos - 1) * 2] = coords[i * 2];
-            coords_right[(i - med_pos - 1) * 2 + 1] = coords[i * 2 + 1];
+            const int index = i - med_pos - 1;
+            coords_right[index * 3] = coords[i * 3];
+            coords_right[index * 3 + 1] = coords[i * 3 + 1];
+            coords_right[index * 3 + 2] = coords[i * 3 + 2];
         }
         node->right = build_recursive(num_coords_right, coords_right, depth + 1);
         free(coords_right);
 
         const int num_coords_left = num_coords - num_coords_right;
         if (num_coords_left > 0) {
-            int *coords_left = malloc(num_coords_left * 2 * sizeof(int));
+            int *coords_left = malloc(num_coords_left * 3 * sizeof(int));
             for (int i = 0; i < med_pos; i++) {
-                coords_left[i * 2] = coords[i * 2];
-                coords_left[i * 2 + 1] = coords[i * 2 + 1];
+                coords_left[i * 3] = coords[i * 3];
+                coords_left[i * 3 + 1] = coords[i * 3 + 1];
+                coords_left[i * 3 + 2] = coords[i * 3 + 2];
             }
             node->left = build_recursive(num_coords_left, coords_left, depth + 1);
             free(coords_left);
@@ -322,19 +314,6 @@ void query_dist_recursive(
 
     const int axis = depth % 2;
 
-    // if (node->left != NULL) {
-    //     const int min_dist_left = node->left->coord[axis] - coord[axis];
-    //     if (min_dist_left * min_dist_left < *max_dist_ptr) {
-    //         query_dist_recursive(node->left, coord, depth + 1, dists, dists_len, max_dist_ptr);
-    //     }
-    // }
-    // if (node->right != NULL) {
-    //     const int min_dist_right = node->right->coord[axis] - coord[axis];
-    //     if (min_dist_right * min_dist_right < *max_dist_ptr) {
-    //         query_dist_recursive(node->right, coord, depth + 1, dists, dists_len, max_dist_ptr);
-    //     }
-    // }
-
     const int dist_line = node->coord[axis] - coord[axis];
     const bool line_close = (dist_line * dist_line < *max_dist_ptr);
     // whether distance to splitting line is less than max_dist
@@ -352,7 +331,7 @@ void query_dist_recursive(
 }
 
 void query_recursive(
-    Node *node, const int *coord, const int depth, int *x_ptr, int *y_ptr, int *min_dist_ptr
+    Node *node, const int *coord, const int depth, int *index_ptr, int *min_dist_ptr
 ) {
 
     const int diff_x = node->coord[0] - coord[0];
@@ -360,9 +339,8 @@ void query_recursive(
     const int dist = diff_x * diff_x + diff_y * diff_y;
 
     if (dist < *min_dist_ptr) {
-        if (x_ptr != NULL) {
-            *x_ptr = node->coord[0];
-            *y_ptr = node->coord[1];
+        if (index_ptr != NULL) {
+            *index_ptr = node->index;
         }
         *min_dist_ptr = dist;
     }
@@ -373,12 +351,12 @@ void query_recursive(
     const bool line_close = (dist_line * dist_line < *min_dist_ptr);
     if (node->left != NULL) {
         if (line_close || coord[axis] < node->coord[axis]) {
-            query_recursive(node->left, coord, depth + 1, x_ptr, y_ptr, min_dist_ptr);
+            query_recursive(node->left, coord, depth + 1, index_ptr, min_dist_ptr);
         }
     }
     if (node->right != NULL) {
         if (line_close || coord[axis] >= node->coord[axis]) {
-            query_recursive(node->left, coord, depth + 1, x_ptr, y_ptr, min_dist_ptr);
+            query_recursive(node->left, coord, depth + 1, index_ptr, min_dist_ptr);
         }
     }
 
@@ -537,7 +515,7 @@ void track_progress(
 void assign_sections(
     const int map_resolution, const float island_size, const int start_index, const int end_index,
     const int num_origin_dots, const int origin_dots[num_origin_dots][2],
-    Dot *dots, _Atomic int *section_progress, int return_pipe[2]
+    Dot *dots, _Atomic int *section_progress
 ) {
 
     // Setting Worker Process Title
@@ -552,8 +530,6 @@ void assign_sections(
 
     #endif
 
-    int num_land_dots = 0;
-
     srand(time(NULL));
 
     for (int i = start_index; i < end_index; i++) {
@@ -566,14 +542,14 @@ void assign_sections(
             continue;
         }
 
-        int min; // min and dist are squared, sqrt is not done until later
+        int min = INT_MAX; // min and dist are squared, sqrt is not done until later
         for (int ii = 0; ii < num_origin_dots; ii++) {
 
             const int diff_x = origin_dots[ii][0] - dot->x;
             const int diff_y = origin_dots[ii][1] - dot->y;
             const int dist = diff_x * diff_x + diff_y * diff_y;
 
-            if (ii == 0 || dist < min) {
+            if (dist < min) {
                 min = dist;
             }
 
@@ -586,14 +562,11 @@ void assign_sections(
 
         if (rand() % 10 < chance) {
             dot->type = 'L'; // Land
-            num_land_dots++;
         }
 
         atomic_fetch_add(&section_progress[2], 1);
 
     }
-
-    write(return_pipe[1], &num_land_dots, sizeof(int));
 
 }
 
@@ -625,35 +598,27 @@ void smooth_coastlines(
 
         int num_land_dots = 0;
         int num_water_dots = 0;
-        int *land_dots = malloc(num_reg_dots * 2 * sizeof(int));
-        int *water_dots = malloc(num_reg_dots * 2 * sizeof(int));
+        int *land_dots = malloc(num_reg_dots * 3 * sizeof(int));
+        int *water_dots = malloc(num_reg_dots * 3 * sizeof(int));
 
         for (int i = num_special_dots; i < num_dots; i++) {
             if (dots[i].type == 'L') {
                 const Dot *dot = &dots[i];
-                land_dots[num_land_dots * 2] = dot->x;
-                land_dots[num_land_dots * 2 + 1] = dot->y;
+                land_dots[num_land_dots * 3] = dot->x;
+                land_dots[num_land_dots * 3 + 1] = dot->y;
+                land_dots[num_land_dots * 3 + 2] = i;
                 num_land_dots++;
             } else if (dots[i].type == 'W') {
                 const Dot *dot = &dots[i];
-                water_dots[num_water_dots * 2] = dot->x;
-                water_dots[num_water_dots * 2 + 1] = dot->y;
+                water_dots[num_water_dots * 3] = dot->x;
+                water_dots[num_water_dots * 3 + 1] = dot->y;
+                water_dots[num_water_dots * 3 + 2] = i;
                 num_water_dots++;
             }
         }
 
         Node *land_tree_root = NULL;
         Node *water_tree_root = NULL;
-
-        // for (int i = num_special_dots; i < num_dots; i++) {
-        //     Dot *dot = &dots[i];
-        //     int coord[2] = {dot->x, dot->y};
-        //     if (dot->type == 'L') {
-        //         land_tree_root = insert_recursive(land_tree_root, coord, 0);
-        //     } else {
-        //         water_tree_root = insert_recursive(water_tree_root, coord, 0);
-        //     }
-        // } // leave for now, delete after adding image generation
 
         land_tree_root = build_recursive(num_land_dots, land_dots, 0);
         water_tree_root = build_recursive(num_water_dots, water_dots, 0);
@@ -720,146 +685,6 @@ void smooth_coastlines(
 
 }
 
-/**
- * Smooth map coastlines for a more realistic, aesthetically pleasing map.
- * Reassigns land and water dots based on the average distance of the nearest
- * coastline_smoothing dots of the same and opposite types.
- */
-void smooth_coastlines_old(
-    const int coastline_smoothing, const int width, const int start_index, const int end_index,
-    const int num_dots, const int num_special_dots, const int num_reg_dots,
-    Dot *dots, _Atomic int *section_progress
-) {
-
-    // Setting Worker Process Title
-
-    #ifdef __linux__
-
-        prctl(PR_SET_NAME, "biomegen-worker", 0, 0, 0);
-
-    #elif BSD || __Apple__
-
-        setproctitle("biomegen-worker");
-
-    #endif
-
-    int *land_dots = malloc(num_reg_dots * 2 * sizeof(int)); // list of land dot coords
-    int *water_dots = malloc(num_reg_dots * 2 * sizeof(int));
-
-    for (int _ = 0; _ < 2; _++) {
-
-        int num_land_dots = 0;
-        int num_water_dots = 0;
-
-        for (int i = num_special_dots; i < num_dots; i++) {
-            if (dots[i].type == 'L') {
-                Dot *dot = &dots[i];
-                land_dots[num_land_dots * 2] = dot->x;
-                land_dots[num_land_dots * 2 + 1] = dot->y;
-                num_land_dots++;
-            } else if (dots[i].type == 'W') {
-                Dot *dot = &dots[i];
-                water_dots[num_water_dots * 2] = dot->x;
-                water_dots[num_water_dots * 2 + 1] = dot->y;
-                num_water_dots++;
-            }
-        }
-
-        for (int i = start_index; i < end_index; i++) {
-
-            Dot *dot = &dots[i];
-            int dot_x = dot->x;
-            int dot_y = dot->y;
-
-            const bool land_dot = (dot->type == 'L');
-
-            if (!land_dot && dot->type != 'W') {
-                // ignore if dot.type != "Land" || "Water"
-                atomic_fetch_add(&section_progress[3], 1);
-                continue;
-            }
-
-            long sum_land;
-            long sum_water;
-
-            for (int ii = 0; ii < 2; ii++) {
-
-                int dists[coastline_smoothing];
-                for (int iii = 0; iii < coastline_smoothing; iii++) {
-                    dists[iii] = INT_MAX;
-                }
-                int max_dist = INT_MAX;
-
-                int num_comp_dots;
-                if (ii == 0) {
-                    num_comp_dots = num_land_dots;
-                } else {
-                    num_comp_dots = num_water_dots;
-                }
-
-                for (int iii = 0; iii < num_comp_dots; iii++) {
-
-                    int diff_x;
-                    int diff_y;
-                    if (ii == 0) {
-                        diff_x = land_dots[iii * 2] - dot_x;
-                        diff_y = land_dots[iii * 2 + 1] - dot_y;
-                    } else {
-                        diff_x = water_dots[iii * 2] - dot_x;
-                        diff_y = water_dots[iii * 2 + 1] - dot_y;
-                    }
-                    const int dist = diff_x * diff_x + diff_y * diff_y;
-
-                    if (dist >= max_dist) {
-                        // Outside dists, ignore
-                        continue;
-                    }
-
-                    int pos_max = 0;
-                    for (int iv = 1; iv < coastline_smoothing; iv++) {
-                        if (dists[iv] > dists[pos_max]) {
-                            pos_max = iv;
-                        }
-                    }
-
-                    dists[pos_max] = dist;
-                    max_dist = dist;
-
-                }
-
-                long sum = 0;
-                for (int iii = 0; iii < coastline_smoothing; iii++) {
-                    sum += dists[iii];
-                }
-                if (ii == 0) {
-                    sum_land = sum;
-                } else {
-                    sum_water = sum;
-                }
-
-            }
-
-            if (land_dot) {
-                if (sum_land > sum_water) {
-                    dot->type = 'W';
-                }
-            } else {
-                if (sum_water > sum_land) {
-                    dot->type = 'L';
-                }
-            }
-
-            atomic_fetch_add(&section_progress[3], 1);
-
-        }
-
-    }
-
-    free(land_dots);
-    free(water_dots);
-
-}
-
 void clean_dots(const int start_index, const int end_index, Dot *dots) {
     for (int i = start_index; i < end_index; i++) {
         Dot *dot = &dots[i];
@@ -879,12 +704,13 @@ void generate_image(
     int local_type_counts[11] = {0};
     const char types[11] = {'I', 's', 'W', 'd', 'R', 'J', 'F', 'P', 'T', 'S'};
 
-    int *dot_coords = malloc(num_dots * 2 * sizeof(int));
+    int *dot_coords = malloc(num_dots * 3 * sizeof(int));
 
     for (int i = 0; i < num_dots; i++) {
         const Dot *dot = &dots[i];
-        dot_coords[i * 2] = dot->x;
-        dot_coords[i * 2 + 1] = dot->y;
+        dot_coords[i * 3] = dot->x;
+        dot_coords[i * 3 + 1] = dot->y;
+        dot_coords[i * 3 + 2] = i;
     }
 
     Node *tree_root = NULL;
@@ -899,24 +725,17 @@ void generate_image(
 
         for (int x = 0; x < width; x++) {
 
-            int nearest_x = -1, nearest_y = -1;
-            int *nearest_x_ptr = &nearest_x;
-            int *nearest_y_ptr = &nearest_y;
+            int nearest_index = -1;
+            int *nearest_index_ptr = &nearest_index;
             min_dist++;
 
             const int coord[2] = {x, y};
-            query_recursive(tree_root, coord, 0, nearest_x_ptr, nearest_y_ptr, min_dist_ptr);
+            query_recursive(tree_root, coord, 0, nearest_index_ptr, min_dist_ptr);
 
-            for (int i = 1; i < num_dots; i++) {
-                const Dot *dot = &dots[i];
-                if (nearest_x == dot->x && nearest_y == dot->y) {
-                    image_indexes[y * width + x] = i;
-                    for (int ii = 0; ii < 11; ii++) {
-                        if (dot->type == types[ii]) {
-                            local_type_counts[ii]++;
-                            break;
-                        }
-                    }
+            image_indexes[y * width + x] = nearest_index;
+            for (int i = 0; i < 11; i++) {
+                if (dots[nearest_index].type == types[i]) {
+                    local_type_counts[i]++;
                     break;
                 }
             }
@@ -942,6 +761,8 @@ void generate_image(
  * Main Function. argc and argv used for automated inputs mode.
  */
 int main(int argc, char *argv[]) {
+    
+    record_val(0, "clear");
 
     // Setting Main Process Title
 
@@ -1194,7 +1015,7 @@ int main(int argc, char *argv[]) {
         origin_dots[ii][1] = dot->y;
     }
 
-    const int piece_length = num_reg_dots / processes;
+    int piece_length = num_reg_dots / processes;
 
     int piece_starts[processes + 1];
     for (int i = 0; i < processes; i++) {
@@ -1206,25 +1027,19 @@ int main(int argc, char *argv[]) {
     last piece may be larger, special dots are skipped
     */
 
-    int num_land_dots = 0;
-    int return_pipe[2];
-    pipe(return_pipe);
     int fork_pids[processes];
     for (int i = 0; i < processes; i++) {
         fork_pids[i] = fork();
         if (fork_pids[i] == 0) {
             assign_sections(
                 map_resolution, island_size, piece_starts[i], piece_starts[i + 1],
-                num_special_dots / 2, origin_dots, dots, section_progress, return_pipe
+                num_special_dots / 2, origin_dots, dots, section_progress
             );
             exit(0);
         }
     }
     for (int i = 0; i < processes; i++) {
         waitpid(fork_pids[i], NULL, 0);
-        int return_val;
-        read(return_pipe[0], &return_val, sizeof(int));
-        num_land_dots += return_val;
     }
 
     clock_gettime(CLOCK_REALTIME, &time_now);
@@ -1264,6 +1079,13 @@ int main(int argc, char *argv[]) {
     // Biome Generation
 
     // Removing "Land Origin" and "Water Forced" dots
+
+    piece_length = num_dots / processes;
+
+    for (int i = 0; i < processes; i++) {
+        piece_starts[i] = i * piece_length;
+    }
+    piece_starts[processes] = num_dots;
 
     for (int i = 0; i < processes; i++) {
         fork_pids[i] = fork();
