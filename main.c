@@ -47,11 +47,11 @@ typedef struct {
     short y;
     char type;
     /*
+    I = Ice
     s = Shallow Water
     W = Water
     d = Deep Water
 
-    I = Ice
     R = Rock
     D = Desert
     J = Jungle
@@ -860,12 +860,24 @@ void smooth_coastlines_old(
 
 }
 
+void clean_dots(const int start_index, const int end_index, Dot *dots) {
+    for (int i = start_index; i < end_index; i++) {
+        Dot *dot = &dots[i];
+        if (dot->type == 'l') {
+            dot->type = 'L';
+        } else if (dot->type == 'w') {
+            dot->type = 'W';
+        }
+    }
+}
+
 void generate_image(
     const int start_height, const int end_height, const int width, const int num_dots,
     const Dot *dots, int *image_indexes, int *type_counts, _Atomic int *section_progress
 ) {
 
     int local_type_counts[11] = {0};
+    const char types[11] = {'I', 's', 'W', 'd', 'R', 'J', 'F', 'P', 'T', 'S'};
 
     int *dot_coords = malloc(num_dots * 2 * sizeof(int));
 
@@ -899,6 +911,12 @@ void generate_image(
                 const Dot *dot = &dots[i];
                 if (nearest_x == dot->x && nearest_y == dot->y) {
                     image_indexes[y * width + x] = i;
+                    for (int ii = 0; ii < 11; ii++) {
+                        if (dot->type == types[ii]) {
+                            local_type_counts[ii]++;
+                            break;
+                        }
+                    }
                     break;
                 }
             }
@@ -950,7 +968,7 @@ int main(int argc, char *argv[]) {
 
         auto_mode = false;
 
-        output_file = "result.png";
+        output_file = "production-files/result.png";
 
         // Getting Program Version
 
@@ -1245,6 +1263,19 @@ int main(int argc, char *argv[]) {
 
     // Biome Generation
 
+    // Removing "Land Origin" and "Water Forced" dots
+
+    for (int i = 0; i < processes; i++) {
+        fork_pids[i] = fork();
+        if (fork_pids[i] == 0) {
+            clean_dots(piece_starts[i], piece_starts[i + 1], dots);
+            exit(0);
+        }
+    }
+    for (int i = 0; i < processes; i++) {
+        waitpid(fork_pids[i], NULL, 0);
+    }
+
     atomic_store(&section_progress[4], 1);
 
     clock_gettime(CLOCK_REALTIME, &time_now);
@@ -1292,9 +1323,14 @@ int main(int argc, char *argv[]) {
         png_byte *row = png_malloc(png_ptr, 3 * sizeof(unsigned char) * width);
         row_pointers[y] = row;
         for (int x = 0; x < width; x++) {
-            int rgb[3] = {204, 0, 82};
+            int rgb[3] = {20, 0, 0};
             const int image_index = image_indexes[y * width + x];
             switch (dots[image_index].type) {
+                case 'I':
+                    rgb[0] = 153;
+                    rgb[1] = 221;
+                    rgb[2] = 255;
+                    break;
                 case 's':
                     rgb[0] = 0;
                     rgb[1] = 0;
@@ -1309,11 +1345,6 @@ int main(int argc, char *argv[]) {
                     rgb[0] = 0;
                     rgb[1] = 0;
                     rgb[2] = 128;
-                    break;
-                case 'I':
-                    rgb[0] = 153;
-                    rgb[1] = 221;
-                    rgb[2] = 255;
                     break;
                 case 'R':
                     rgb[0] = 128;
@@ -1349,6 +1380,16 @@ int main(int argc, char *argv[]) {
                     rgb[0] = 245;
                     rgb[1] = 245;
                     rgb[2] = 245;
+                    break;
+                case 'L':
+                    rgb[0] = 0;
+                    rgb[1] = 255;
+                    rgb[2] = 0;
+                    break;
+                default:
+                    rgb[0] = 40;
+                    rgb[1] = 0;
+                    rgb[2] = 0;
                     break;
             }
             for (int i = 0; i < 3; i++) {
@@ -1416,6 +1457,49 @@ int main(int argc, char *argv[]) {
     if (!auto_mode) {
 
         // Print Result Statistics
+
+        printf(
+            "%sGeneration Complete%s %.5fs\n\nStatistics\n", ANSI_GREEN, ANSI_RESET, completion_time
+        );
+
+        int count_water = 0;
+        int count_land = 0;
+        for (int i = 0; i < 4; i++) {
+            count_water += type_counts[i];
+        }
+        for (int i = 4; i < 11; i++) {
+            count_land += type_counts[i];
+        }
+        float tot_pct_denom = height * width * 100.0; // total percentage denominator
+        printf(
+            "Water %6.2f%%\nLand  %6.2f%%\n",
+            count_water / tot_pct_denom, count_land / tot_pct_denom
+        );
+
+        int text_colors[11] = {117, 21, 19, 17, 243, 229, 22, 28, 40, 48, 255};
+        char types[11][14] = {
+            "Ice", "Shallow Water", "Water", "Deep Water",
+            "Rock", "Desert", "Jungle", "Forest", "Plains", "Taiga", "Snow"
+        };
+
+        printf("     %% of Land/Water | %% of Total\n");
+        for (int i = 0; i < 11; i++) {
+
+            float group_pct_denom = 100.0;
+            if (i < 4) {
+                group_pct_denom *= count_water;
+            } else {
+                group_pct_denom *= count_land;
+            }
+
+            printf(
+                "\033[48;5;%dm%-14s%s" // Label
+                "%7.2f%% | %6.2f%%\n", // Pct of Group | Pct of Total
+                text_colors[i], types[i], ANSI_RESET,
+                type_counts[i] / group_pct_denom, type_counts[i] / tot_pct_denom
+            );
+
+        }
 
     } else {
 
