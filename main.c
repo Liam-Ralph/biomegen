@@ -299,7 +299,7 @@ Node *build_recursive(const int num_coords, int coords[num_coords * 2], const in
  * the value at max_dist_ptr whenever it finds a node whose distance is less
  * than the value at max_dist_ptr. All distances are squared for efficiency.
  */
-void query_recursive(
+void query_dist_recursive(
     Node *node, const int *coord, const int depth,
     int *dists, const int dists_len, int *max_dist_ptr
 ) {
@@ -324,13 +324,13 @@ void query_recursive(
     if (node->left != NULL) {
         const int min_dist_left = node->left->coord[axis] - coord[axis];
         if (min_dist_left * min_dist_left < *max_dist_ptr) {
-            query_recursive(node->left, coord, depth + 1, dists, dists_len, max_dist_ptr);
+            query_dist_recursive(node->left, coord, depth + 1, dists, dists_len, max_dist_ptr);
         }
     }
     if (node->right != NULL) {
         const int min_dist_right = node->right->coord[axis] - coord[axis];
         if (min_dist_right * min_dist_right < *max_dist_ptr) {
-            query_recursive(node->right, coord, depth + 1, dists, dists_len, max_dist_ptr);
+            query_dist_recursive(node->right, coord, depth + 1, dists, dists_len, max_dist_ptr);
         }
     }
 
@@ -647,7 +647,7 @@ void smooth_coastlines(
                 int max_dist = INT_MAX;
                 int *max_dist_ptr = &max_dist;
 
-                query_recursive(
+                query_dist_recursive(
                     tree_roots[ii], dot_coord, 0, dists, coastline_smoothing, max_dist_ptr
                 );
 
@@ -809,6 +809,42 @@ void smooth_coastlines_old(
 
     free(land_dots);
     free(water_dots);
+
+}
+
+void generate_image(
+    const int start_height, const int end_height, const int width, const int num_dots,
+    const Dot *dots, char *image, int *type_counts, _Atomic int *section_progress
+) {
+
+    int local_type_counts[11] = {0};
+
+    int *dot_coords = malloc(num_dots * 2 * sizeof(int));
+
+    for (int i = 0; i < num_dots; i++) {
+        Dot *dot = &dots[i];
+        dot_coords[i * 2] = dot->x;
+        dot_coords[i * 2 + 1] = dot->y;
+    }
+
+    Node *tree_root = NULL;
+    tree_root = build_recursive(num_dots, dot_coords, 0);
+
+    free(dot_coords);
+
+    for (int y = start_height; y < end_height; y++) {
+
+        for (int x = 0; x < width; x++) {
+
+            char pixel_type = 'E';
+
+        }
+
+    }
+
+    for (int i = 0; i < 11; i++) {
+        type_counts[i] += local_type_counts[i];
+    }
 
 }
 
@@ -984,6 +1020,10 @@ int main(int argc, char *argv[]) {
         PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0
     );
 
+    int *type_counts = mmap(
+        NULL, sizeof(int) * 11, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0
+    );
+
     int tracker_process_pid = -1;
 
     if (!auto_mode) {
@@ -1069,7 +1109,6 @@ int main(int argc, char *argv[]) {
     for (int i = 0; i < processes; i++) {
         piece_starts[i] = i * piece_length + num_special_dots;
     }
-    piece_starts[processes - 1] = num_dots - piece_length;
     piece_starts[processes] = num_dots;
     /*
     used to create x pieces of size num_reg_dots / x, where x = processes
@@ -1131,9 +1170,43 @@ int main(int argc, char *argv[]) {
     section_times[3] = (float)(time_now.tv_sec - start_time.tv_sec) +
         (time_now.tv_nsec - start_time.tv_nsec) / 1000000000.0 - sum_list_float(section_times, 7);
 
-    
+    // Biome Generation
+
     atomic_store(&section_progress[4], 1);
-    atomic_store(&section_progress[5], 1);
+
+    clock_gettime(CLOCK_REALTIME, &time_now);
+    section_times[4] = (float)(time_now.tv_sec - start_time.tv_sec) +
+        (time_now.tv_nsec - start_time.tv_nsec) / 1000000000.0 - sum_list_float(section_times, 7);
+
+    // Image Generation
+
+    atomic_store(&section_progress_total[5], height);
+
+    const int section_height = height / processes;
+
+    int section_starts[processes + 1];
+    for (int i = 0; i < processes; i++) {
+        section_starts[i] = i * section_height;
+    }
+    section_starts[processes] = height;
+
+    for (int i = 0; i < processes; i++) {
+        fork_pids[i] = fork();
+        if (fork_pids[i] == 0) {
+            generate_image(
+                section_starts[i], section_starts[i + 1], width,
+                num_dots, dots, image, type_counts, section_progress
+            );
+            exit(0);
+        }
+    }
+    for (int i = 0; i < processes; i++) {
+        waitpid(fork_pids[i], NULL, 0);
+    }
+
+    clock_gettime(CLOCK_REALTIME, &time_now);
+    section_times[5] = (float)(time_now.tv_sec - start_time.tv_sec) +
+        (time_now.tv_nsec - start_time.tv_nsec) / 1000000000.0 - sum_list_float(section_times, 7);
 
     // Finish
 
@@ -1171,6 +1244,8 @@ int main(int argc, char *argv[]) {
         printf("%f\n", completion_time);
 
     }
+
+    munmap(type_counts, sizeof(int) * 11);
 
     return 0;
 
