@@ -668,13 +668,30 @@ void clean_dots(const int start_index, const int end_index, Dot *dots) {
     }
 }
 
+void print_recursive(Node* node, int depth) {
+    // Base case: If node is null, return
+    if (node == NULL){ record_val(depth, "depth");
+        return;
+    }
+
+    // Print current node with indentation based on depth
+    FILE *fp = fopen("production-files/s.txt", "a");
+    for (int i = 0; i < depth; i++) fprintf(fp, " ");
+    fprintf(fp, "%d\n", node->index);
+    fclose(fp);
+
+    // Recursively print left and right children
+    print_recursive(node->left, depth + 1);
+    print_recursive(node->right, depth + 1);
+}
+
 void generate_image(
     const int start_height, const int end_height, const int width, const int num_dots,
     const Dot *dots, int *image_indexes, int *type_counts, _Atomic int *section_progress
 ) {
 
     int local_type_counts[11] = {0};
-    const char types[11] = {'I', 's', 'W', 'd', 'R', 'J', 'F', 'P', 'T', 'S'};
+    const char types[11] = {'I', 's', 'W', 'd', 'R', 'D', 'J', 'F', 'P', 'T', 'S'};
 
     int *dot_coords = malloc(num_dots * 3 * sizeof(int));
 
@@ -687,6 +704,9 @@ void generate_image(
 
     Node *tree_root = NULL;
     tree_root = build_recursive(num_dots, dot_coords, 0);
+    if (start_height == 0) {
+        print_recursive(tree_root, 0);
+    }
 
     free(dot_coords);
 
@@ -700,7 +720,7 @@ void generate_image(
             int nearest_index = 0;
             int *nearest_index_ptr = &nearest_index;
             if (min_dist != INT_MAX) {
-                const int min_dist_sqrt = (int)ceil(sqrt(min_dist)) + 1;
+                const int min_dist_sqrt = (int)ceil(sqrt(min_dist)) + 2;
                 min_dist = min_dist_sqrt * min_dist_sqrt;
             }
 
@@ -1073,6 +1093,12 @@ int main(int argc, char *argv[]) {
         waitpid(fork_pids[i], NULL, 0);
     }
 
+    for (int i = 0; i < num_dots; i++) {
+        if (dots[i].type == 'L') {
+            dots[i].type = 'F';
+        }
+    }
+
     atomic_store(&section_progress[4], 1);
 
     clock_gettime(CLOCK_REALTIME, &time_now);
@@ -1178,11 +1204,6 @@ int main(int argc, char *argv[]) {
                     rgb[1] = 245;
                     rgb[2] = 245;
                     break;
-                case 'L':
-                    rgb[0] = 0;
-                    rgb[1] = 255;
-                    rgb[2] = 0;
-                    break;
                 default:
                     rgb[0] = 40;
                     rgb[1] = 0;
@@ -1267,10 +1288,10 @@ int main(int argc, char *argv[]) {
         for (int i = 4; i < 11; i++) {
             count_land += type_counts[i];
         }
-        float tot_pct_denom = height * width * 100.0; // total percentage denominator
+        float tot_pct_fact = 100.0 / (height * width); // total percentage factor
         printf(
             "Water %6.2f%%\nLand  %6.2f%%\n",
-            count_water / tot_pct_denom, count_land / tot_pct_denom
+            count_water * tot_pct_fact, count_land * tot_pct_fact
         );
 
         int text_colors[11] = {117, 21, 19, 17, 243, 229, 22, 28, 40, 48, 255};
@@ -1282,18 +1303,18 @@ int main(int argc, char *argv[]) {
         printf("     %% of Land/Water | %% of Total\n");
         for (int i = 0; i < 11; i++) {
 
-            float group_pct_denom = 100.0;
+            float group_pct_fact = 100.0;
             if (i < 4) {
-                group_pct_denom *= count_water;
+                group_pct_fact /= count_water;
             } else {
-                group_pct_denom *= count_land;
+                group_pct_fact /= count_land;
             }
 
             printf(
                 "\033[48;5;%dm%-14s%s" // Label
                 "%7.2f%% | %6.2f%%\n", // Pct of Group | Pct of Total
                 text_colors[i], types[i], ANSI_RESET,
-                type_counts[i] / group_pct_denom, type_counts[i] / tot_pct_denom
+                type_counts[i] * group_pct_fact, type_counts[i] * tot_pct_fact
             );
 
         }
