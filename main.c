@@ -177,7 +177,7 @@ void nth_sort_recursive(
     if (low < high) {
 
         const int pivot_index = rand() % high;
-        int pivot = {coords[(pivot_index) * 3 + axis]};
+        int pivot = coords[pivot_index * 3 + axis];
 
         int i = low - 1;
 
@@ -328,7 +328,7 @@ void query_recursive(
     }
     if (node->right != NULL) {
         if (line_close || coord[axis] >= node->coord[axis]) {
-            query_recursive(node->left, coord, depth + 1, index_ptr, min_dist_ptr);
+            query_recursive(node->right, coord, depth + 1, index_ptr, min_dist_ptr);
         }
     }
 
@@ -670,9 +670,7 @@ void clean_dots(const int start_index, const int end_index, Dot *dots) {
 
 void print_recursive(Node* node, int depth) {
     // Base case: If node is null, return
-    if (node == NULL){ record_val(depth, "depth");
-        return;
-    }
+    if (node == NULL) return;
 
     // Print current node with indentation based on depth
     FILE *fp = fopen("production-files/s.txt", "a");
@@ -705,24 +703,19 @@ void generate_image(
     Node *tree_root = NULL;
     tree_root = build_recursive(num_dots, dot_coords, 0);
     if (start_height == 0) {
-        print_recursive(tree_root, 0);
+        // print_recursive(tree_root, 0);
     }
 
     free(dot_coords);
 
     for (int y = start_height; y < end_height; y++) {
 
-        int min_dist = INT_MAX;
-        int *min_dist_ptr = &min_dist;
-
         for (int x = 0; x < width; x++) {
 
             int nearest_index = 0;
             int *nearest_index_ptr = &nearest_index;
-            if (min_dist != INT_MAX) {
-                const int min_dist_sqrt = (int)ceil(sqrt(min_dist)) + 2;
-                min_dist = min_dist_sqrt * min_dist_sqrt;
-            }
+            int min_dist = INT_MAX;
+            int *min_dist_ptr = &min_dist;
 
             const int coord[2] = {x, y};
             query_recursive(tree_root, coord, 0, nearest_index_ptr, min_dist_ptr);
