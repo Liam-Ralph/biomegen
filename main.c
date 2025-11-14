@@ -373,6 +373,21 @@ void free_recursive(Node *node) {
     node = NULL;
 }
 
+void print_recursive(Node* node, int depth) {
+    // Base case: If node is null, return
+    if (node == NULL) return;
+
+    // Print current node with indentation based on depth
+    FILE *fp = fopen("production-files/s.txt", "a");
+    for (int i = 0; i < depth; i++) fprintf(fp, " ");
+    fprintf(fp, "%d (%d, %d)\n", node->index, node->coord[0], node->coord[1]);
+    fclose(fp);
+
+    // Recursively print left and right children
+    print_recursive(node->left, depth + 1);
+    print_recursive(node->right, depth + 1);
+}
+
 
 // Multiprocessing Functions
 // (Order of use)
@@ -679,7 +694,7 @@ void smooth_coastlines(
             }
 
             if (sums[0] > sums[1]) {
-                dot->type = (land_dot) ? 'W' : 'L';
+                // dot->type = (land_dot) ? 'W' : 'L';
             }
 
             atomic_fetch_add(&section_progress[3], 1);
@@ -702,21 +717,6 @@ void clean_dots(const int start_index, const int end_index, Dot *dots) {
             dot->type = 'W';
         }
     }
-}
-
-void print_recursive(Node* node, int depth) {
-    // Base case: If node is null, return
-    if (node == NULL) return;
-
-    // Print current node with indentation based on depth
-    FILE *fp = fopen("production-files/s.txt", "a");
-    for (int i = 0; i < depth; i++) fprintf(fp, " ");
-    fprintf(fp, "%d\n", node->index);
-    fclose(fp);
-
-    // Recursively print left and right children
-    print_recursive(node->left, depth + 1);
-    print_recursive(node->right, depth + 1);
 }
 
 void generate_image(
