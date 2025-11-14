@@ -296,7 +296,7 @@ void query_dist_recursive(
     }
     if (node->right != NULL) {
         if (line_close || coord[axis] >= node->coord[axis]) {
-            query_dist_recursive(node->left, coord, depth + 1, dists, dists_len, max_dist_ptr);
+            query_dist_recursive(node->right, coord, depth + 1, dists, dists_len, max_dist_ptr);
         }
     }
 
@@ -502,7 +502,7 @@ void assign_sections(
 
     #endif
 
-    srand(time(NULL));
+    srand(time(NULL) + getpid());
 
     for (int i = start_index; i < end_index; i++) {
 
@@ -515,6 +515,7 @@ void assign_sections(
         }
 
         int min = INT_MAX; // min and dist are squared, sqrt is not done until later
+        int min_index = 0;
         for (int ii = 0; ii < num_origin_dots; ii++) {
 
             const int diff_x = origin_dots[ii][0] - dot->x;
@@ -523,14 +524,15 @@ void assign_sections(
 
             if (dist < min) {
                 min = dist;
+                min_index = ii;
             }
 
         }
 
-        float threshold = ((float)(rand() % 20) / 19.0f * 1.5f + 0.25f) * island_size;
-        int threshold_sq = (int)(threshold * threshold);
+        float dist = sqrt(min) / sqrt(map_resolution);
+        float threshold = ((float)(min_index % 20) / 19.0f * 1.5f + 0.25f) * island_size;
 
-        int chance = (min <= threshold_sq) ? 9 : 1;
+        int chance = (dist <= threshold) ? 9 : 1;
 
         if (rand() % 10 < chance) {
             dot->type = 'L'; // Land
