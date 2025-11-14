@@ -596,12 +596,27 @@ void smooth_coastlines(
 
     #endif
 
+    Node *land_tree_root = NULL;
+    Node *water_tree_root = NULL;
+
+    // remove later
+    for (int i = num_special_dots; i < num_dots; i++) {
+        const Dot *dot = &dots[i];
+        const int coord[2] = {dot->x, dot->y};
+        if (dot->type == 'L') {
+            land_tree_root = insert_recursive(land_tree_root, coord, 0, 0);
+        } else {
+            water_tree_root = insert_recursive(water_tree_root, coord, 0, 0);
+        }
+    }
+    // end
+
     for (int _ = 0; _ < 2; _++) {
 
-        int num_land_dots = 0;
-        int num_water_dots = 0;
-        int *land_dots = malloc(num_reg_dots * 3 * sizeof(int));
-        int *water_dots = malloc(num_reg_dots * 3 * sizeof(int));
+        // int num_land_dots = 0;
+        // int num_water_dots = 0;
+        // int *land_dots = malloc(num_dots * 3 * sizeof(int));
+        // int *water_dots = malloc(num_dots * 3 * sizeof(int));
 
         // for (int i = num_special_dots; i < num_dots; i++) {
         //     if (dots[i].type == 'L') {
@@ -619,26 +634,11 @@ void smooth_coastlines(
         //     }
         // }
 
-        Node *land_tree_root = NULL;
-        Node *water_tree_root = NULL;
-
-        // remove later
-        for (int i = num_special_dots; i < num_dots; i++) {
-            const Dot *dot = &dots[i];
-            const int coord[2] = {dot->x, dot->y};
-            if (dots[i].type == 'L') {
-                land_tree_root = insert_recursive(land_tree_root, coord, 0, 0);
-            } else if (dots[i].type == 'W') {
-                water_tree_root = insert_recursive(water_tree_root, coord, 0, 0);
-            }
-        }
-        // end
-
         // land_tree_root = build_recursive(num_land_dots, land_dots, 0);
         // water_tree_root = build_recursive(num_water_dots, water_dots, 0);
 
-        free(land_dots);
-        free(water_dots);
+        // free(land_dots);
+        // free(water_dots);
 
         for (int i = start_index; i < end_index; i++) {
 
@@ -646,12 +646,6 @@ void smooth_coastlines(
             int dot_coord[2] = {dot->x, dot->y};
 
             const bool land_dot = (dot->type == 'L');
-
-            if(!land_dot && dot->type != 'W') {
-                // ignore if dot.type != "Land" or "Water"
-                atomic_fetch_add(&section_progress[3], 1);
-                continue;
-            }
 
             long sums[2] = {0, 0}; // same type, opposite
             Node *tree_roots[2];
@@ -692,10 +686,10 @@ void smooth_coastlines(
             
         }
 
-        free_recursive(land_tree_root);
-        free_recursive(water_tree_root);
-
     }
+
+    free_recursive(land_tree_root);
+    free_recursive(water_tree_root);
 
 }
 
