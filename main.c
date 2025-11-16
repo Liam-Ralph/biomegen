@@ -309,7 +309,12 @@ void query_dist_recursive(
             }
         }
         dists[pos_max] = dist;
-        *max_dist_ptr = dist;
+        for (int i = 1; i < dists_len; i++) {
+            if (dists[i] > dists[pos_max]) {
+                pos_max = i;
+            }
+        }
+        *max_dist_ptr = dists[pos_max];
     }
 
     const int axis = depth % 2;
@@ -694,7 +699,7 @@ void smooth_coastlines(
             }
 
             if (sums[0] > sums[1]) {
-                // dot->type = (land_dot) ? 'W' : 'L';
+                dot->type = (land_dot) ? 'W' : 'L';
             }
 
             atomic_fetch_add(&section_progress[3], 1);
