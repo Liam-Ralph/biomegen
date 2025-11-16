@@ -281,7 +281,12 @@ void query_dist_recursive(
             }
         }
         dists[pos_max] = dist;
-        *max_dist_ptr = dist;
+        for (int i = 1; i < dists_len; i++) {
+            if (dists[i] > dists[pos_max]) {
+                pos_max = i;
+            }
+        }
+        *max_dist_ptr = dists[pos_max];
     }
 
     const int axis = depth % 2;
@@ -568,37 +573,37 @@ void smooth_coastlines(
 
     #endif
 
-    for (int _ = 0; _ < 2; _++) {
+    int num_land_dots = 0;
+    int num_water_dots = 0;
+    int *land_dots = malloc(num_reg_dots * 3 * sizeof(int));
+    int *water_dots = malloc(num_reg_dots * 3 * sizeof(int));
 
-        int num_land_dots = 0;
-        int num_water_dots = 0;
-        int *land_dots = malloc(num_reg_dots * 3 * sizeof(int));
-        int *water_dots = malloc(num_reg_dots * 3 * sizeof(int));
-
-        for (int i = num_special_dots; i < num_dots; i++) {
-            if (dots[i].type == 'L') {
-                const Dot *dot = &dots[i];
-                land_dots[num_land_dots * 3] = dot->x;
-                land_dots[num_land_dots * 3 + 1] = dot->y;
-                land_dots[num_land_dots * 3 + 2] = i;
-                num_land_dots++;
-            } else if (dots[i].type == 'W') {
-                const Dot *dot = &dots[i];
-                water_dots[num_water_dots * 3] = dot->x;
-                water_dots[num_water_dots * 3 + 1] = dot->y;
-                water_dots[num_water_dots * 3 + 2] = i;
-                num_water_dots++;
-            }
+    for (int i = num_special_dots; i < num_dots; i++) {
+        if (dots[i].type == 'L') {
+            const Dot *dot = &dots[i];
+            land_dots[num_land_dots * 3] = dot->x;
+            land_dots[num_land_dots * 3 + 1] = dot->y;
+            land_dots[num_land_dots * 3 + 2] = i;
+            num_land_dots++;
+        } else if (dots[i].type == 'W') {
+            const Dot *dot = &dots[i];
+            water_dots[num_water_dots * 3] = dot->x;
+            water_dots[num_water_dots * 3 + 1] = dot->y;
+            water_dots[num_water_dots * 3 + 2] = i;
+            num_water_dots++;
         }
+    }
 
-        Node *land_tree_root = NULL;
-        Node *water_tree_root = NULL;
+    Node *land_tree_root = NULL;
+    Node *water_tree_root = NULL;
 
-        land_tree_root = build_recursive(num_land_dots, land_dots, 0);
-        water_tree_root = build_recursive(num_water_dots, water_dots, 0);
+    land_tree_root = build_recursive(num_land_dots, land_dots, 0);
+    water_tree_root = build_recursive(num_water_dots, water_dots, 0);
 
-        free(land_dots);
-        free(water_dots);
+    free(land_dots);
+    free(water_dots);
+
+    for (int _ = 0; _ < 2; _++) {
 
         for (int i = start_index; i < end_index; i++) {
 
@@ -606,12 +611,6 @@ void smooth_coastlines(
             int dot_coord[2] = {dot->x, dot->y};
 
             const bool land_dot = (dot->type == 'L');
-
-            if(!land_dot && dot->type != 'W') {
-                // ignore if dot.type != "Land" or "Water"
-                atomic_fetch_add(&section_progress[3], 1);
-                continue;
-            }
 
             long sums[2] = {0, 0}; // same type, opposite
             Node *tree_roots[2];
@@ -652,10 +651,10 @@ void smooth_coastlines(
             
         }
 
-        free_recursive(land_tree_root);
-        free_recursive(water_tree_root);
-
     }
+
+    free_recursive(land_tree_root);
+    free_recursive(water_tree_root);
 
 }
 
@@ -668,21 +667,6 @@ void clean_dots(const int start_index, const int end_index, Dot *dots) {
             dot->type = 'W';
         }
     }
-}
-
-void print_recursive(Node* node, int depth) {
-    // Base case: If node is null, return
-    if (node == NULL) return;
-
-    // Print current node with indentation based on depth
-    FILE *fp = fopen("production-files/s.txt", "a");
-    for (int i = 0; i < depth; i++) fprintf(fp, " ");
-    fprintf(fp, "%d\n", node->index);
-    fclose(fp);
-
-    // Recursively print left and right children
-    print_recursive(node->left, depth + 1);
-    print_recursive(node->right, depth + 1);
 }
 
 void generate_image(
@@ -704,9 +688,6 @@ void generate_image(
 
     Node *tree_root = NULL;
     tree_root = build_recursive(num_dots, dot_coords, 0);
-    if (start_height == 0) {
-        // print_recursive(tree_root, 0);
-    }
 
     free(dot_coords);
 
