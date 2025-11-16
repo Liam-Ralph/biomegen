@@ -293,10 +293,6 @@ void query_dist_recursive(
     int *dists, const int dists_len, int *max_dist_ptr
 ) {
 
-    if (node == NULL) {
-        return;
-    }
-
     const int diff_x = node->coord[0] - coord[0];
     const int diff_y = node->coord[1] - coord[1];
     const int dist = diff_x * diff_x + diff_y * diff_y;
@@ -376,21 +372,6 @@ void free_recursive(Node *node) {
     }
     free(node);
     node = NULL;
-}
-
-void print_recursive(Node* node, int depth) {
-    // Base case: If node is null, return
-    if (node == NULL) return;
-
-    // Print current node with indentation based on depth
-    FILE *fp = fopen("production-files/s.txt", "a");
-    for (int i = 0; i < depth; i++) fprintf(fp, " ");
-    fprintf(fp, "%d (%d, %d)\n", node->index, node->coord[0], node->coord[1]);
-    fclose(fp);
-
-    // Recursively print left and right children
-    print_recursive(node->left, depth + 1);
-    print_recursive(node->right, depth + 1);
 }
 
 
@@ -750,9 +731,6 @@ void generate_image(
         tree_root = insert_recursive(tree_root, coord, i, 0);
     }
     // end
-    if (start_height == 0) {
-        // print_recursive(tree_root, 0);
-    }
 
     free(dot_coords);
 
