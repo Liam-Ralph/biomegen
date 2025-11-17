@@ -241,16 +241,13 @@ void nth_sort_recursive(int coords[], const int low, const int high, const int a
         coords[i * 3 + 2] = coords[high * 3 + 2];
         coords[high * 3] = temp[0];
         coords[high * 3 + 1] = temp[1];
-        coords[high * 3 + 2] = temp[2]; 
+        coords[high * 3 + 2] = temp[2];
 
-        // nth_sort_recursive(coords, low, i - 1, axis);
-        // nth_sort_recursive(coords, i + 1, high, axis);
-
-        // if (i < med_index) {
+        if (i > med_index) {
             nth_sort_recursive(coords, low, i - 1, axis, med_index);
-        // } else if (i > med_index) {
+        } else if (i < med_index) {
             nth_sort_recursive(coords, i + 1, high, axis, med_index);
-        // }
+        }
 
     }
 
