@@ -95,7 +95,7 @@ void record_str(const char *str, const char *name) {
 }
 
 
-// Functions
+// General Functions
 // (Alphabetical order)
 
 /**
@@ -159,17 +159,14 @@ float sum_list_float(float *list, int list_len) {
 
 // KDTree Functions
 
-int get_depth(struct Node* root) {
-    if (root == NULL)
-        return -1;
-
-    // compute the height of left and right subtrees
-    int lHeight = get_depth(root->left);
-    int rHeight = get_depth(root->right);
-
-    return (lHeight > rHeight ? lHeight : rHeight) + 1;
-}
-
+/**
+ * Sort the given array until the median index is correctly sorted. In other
+ * words, median index will be correct, everything before median index will be
+ * less than the value at median index, and everything after will be greater.
+ * Axis determines which value of a coordinate is its value (x or y) to sort
+ * based on. High and low determine the sorting bounds for a given level of
+ * recursion.
+ */
 void nth_sort_recursive(
     int coords[], const int low, const int high, const int axis, const int med_index
 ) {
@@ -212,6 +209,12 @@ void nth_sort_recursive(
 
 }
 
+/**
+ * Build a KDTree from coords, and return the root node. Ensures the KDTree is
+ * built with the lowest possible depth for maximum efficiency when querying the
+ * tree. Every recursion creates one dot and calls this function to insert its
+ * children from an array of possible dots.
+ */
 Node *build_recursive(const int num_coords, int coords[num_coords * 3], const int depth) {
 
     const int axis = depth % 2;
@@ -226,22 +229,10 @@ Node *build_recursive(const int num_coords, int coords[num_coords * 3], const in
     node->left = NULL;
     node->right = NULL;
 
-    const int num_coords_right = num_coords - med_pos - 1;
     const int num_coords_left = med_pos;
 
-    if (num_coords_right > 0) {
-        int *coords_right = malloc(num_coords_right * 3 * sizeof(int));
-        for (int i = 0; i < num_coords_right; i++) {
-            const int index = i + med_pos + 1;
-            coords_right[i * 3] = coords[index * 3];
-            coords_right[i * 3 + 1] = coords[index * 3 + 1];
-            coords_right[i * 3 + 2] = coords[index * 3 + 2];
-        }
-        node->right = build_recursive(num_coords_right, coords_right, depth + 1);
-        free(coords_right);
-    }
-
     if (num_coords_left > 0) {
+
         int *coords_left = malloc(num_coords_left * 3 * sizeof(int));
         for (int i = 0; i < med_pos; i++) {
             coords_left[i * 3] = coords[i * 3];
@@ -250,9 +241,62 @@ Node *build_recursive(const int num_coords, int coords[num_coords * 3], const in
         }
         node->left = build_recursive(num_coords_left, coords_left, depth + 1);
         free(coords_left);
+
+        const int num_coords_right = num_coords - med_pos - 1;
+
+        if (num_coords_right > 0) {
+            int *coords_right = malloc(num_coords_right * 3 * sizeof(int));
+            for (int i = 0; i < num_coords_right; i++) {
+                const int index = i + med_pos + 1;
+                coords_right[i * 3] = coords[index * 3];
+                coords_right[i * 3 + 1] = coords[index * 3 + 1];
+                coords_right[i * 3 + 2] = coords[index * 3 + 2];
+            }
+            node->right = build_recursive(num_coords_right, coords_right, depth + 1);
+            free(coords_right);
+        }
+
     }
 
     return node;
+
+}
+
+/**
+ * Query the KDTree to modify min_dist, the distance to the nearest node. When
+ * index_ptr is not null, it stores the index of the nearest node, which
+ * corresponds to the index of the dot it was created from. Calls itself
+ * recursively to query children of node.
+ */
+void query_recursive(
+    Node *node, const int *coord, const int depth, int *index_ptr, int *min_dist_ptr
+) {
+
+    const int diff_x = node->coord[0] - coord[0];
+    const int diff_y = node->coord[1] - coord[1];
+    const int dist = diff_x * diff_x + diff_y * diff_y;
+
+    if (dist < *min_dist_ptr) {
+        if (index_ptr != NULL) {
+            *index_ptr = node->index;
+        }
+        *min_dist_ptr = dist;
+    }
+
+    const int axis = depth % 2;
+
+    const int dist_line = node->coord[axis] - coord[axis];
+    const bool line_close = (dist_line * dist_line < *min_dist_ptr);
+    if (node->left != NULL) {
+        if (line_close || coord[axis] < node->coord[axis]) {
+            query_recursive(node->left, coord, depth + 1, index_ptr, min_dist_ptr);
+        }
+    }
+    if (node->right != NULL) {
+        if (line_close || coord[axis] >= node->coord[axis]) {
+            query_recursive(node->right, coord, depth + 1, index_ptr, min_dist_ptr);
+        }
+    }
 
 }
 
@@ -300,38 +344,6 @@ void query_dist_recursive(
     if (node->right != NULL) {
         if (line_close || coord[axis] >= node->coord[axis]) {
             query_dist_recursive(node->right, coord, depth + 1, dists, dists_len, max_dist_ptr);
-        }
-    }
-
-}
-
-void query_recursive(
-    Node *node, const int *coord, const int depth, int *index_ptr, int *min_dist_ptr
-) {
-
-    const int diff_x = node->coord[0] - coord[0];
-    const int diff_y = node->coord[1] - coord[1];
-    const int dist = diff_x * diff_x + diff_y * diff_y;
-
-    if (dist < *min_dist_ptr) {
-        if (index_ptr != NULL) {
-            *index_ptr = node->index;
-        }
-        *min_dist_ptr = dist;
-    }
-
-    const int axis = depth % 2;
-
-    const int dist_line = node->coord[axis] - coord[axis];
-    const bool line_close = (dist_line * dist_line < *min_dist_ptr);
-    if (node->left != NULL) {
-        if (line_close || coord[axis] < node->coord[axis]) {
-            query_recursive(node->left, coord, depth + 1, index_ptr, min_dist_ptr);
-        }
-    }
-    if (node->right != NULL) {
-        if (line_close || coord[axis] >= node->coord[axis]) {
-            query_recursive(node->right, coord, depth + 1, index_ptr, min_dist_ptr);
         }
     }
 
