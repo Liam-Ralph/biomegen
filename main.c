@@ -170,50 +170,33 @@ int get_depth(struct Node* root) {
     return (lHeight > rHeight ? lHeight : rHeight) + 1;
 }
 
-// void nth_sort_recursive(
-//     int *coords, const int low, const int high, const int axis, const int med_index
-// ) {
+Node *insert_recursive(Node *node, const int *coord, const int index, const int depth) {
 
-//     if (low < high) {
+    if (node == NULL) {
+        Node *new_node = malloc(sizeof(Node));
+        new_node->coord[0] = coord[0];
+        new_node->coord[1] = coord[1];
+        new_node->index = index;
+        new_node->left = NULL;
+        new_node->right = NULL;
+        return new_node;
+    }
 
-//         const int pivot_index = rand() % high;
-//         int pivot = coords[pivot_index * 3 + axis];
+    const int axis = depth % 2;
 
-//         int i = low - 1;
+    if (coord[axis] < node->coord[axis]) {
+        node->left = insert_recursive(node->left, coord, index, depth + 1);
+    } else {
+        node->right = insert_recursive(node->right, coord, index, depth + 1);
+    }
 
-//         for (int ii = low; ii <= high - 1; ii++) {
-//             if (coords[ii * 3 + axis] < pivot) {
-//                 i++;
-//                 const int temp[3] = {coords[i * 3], coords[i * 3 + 1], coords[i * 3 + 2]};
-//                 coords[i * 3] = coords[ii * 3];
-//                 coords[i * 3 + 1] = coords[ii * 3 + 1];
-//                 coords[i * 3 + 2] = coords[ii * 3 + 2];
-//                 coords[ii * 3] = temp[0];
-//                 coords[ii * 3 + 1] = temp[1];
-//                 coords[ii * 3 + 2] = temp[2];
-//             }
-//         }
+    return node;
 
-//         i++;
-//         const int temp[3] = {coords[i * 3], coords[i * 3 + 1], coords[i * 3 + 2]};
-//         coords[i * 3] = coords[pivot_index * 3];
-//         coords[i * 3 + 1] = coords[pivot_index * 3 + 1];
-//         coords[i * 3 + 2] = coords[pivot_index * 3 + 2];
-//         coords[high * 3] = temp[0];
-//         coords[high * 3 + 1] = temp[1];
-//         coords[high * 3 + 2] = temp[2];
+}
 
-//         if (pivot_index > med_index) {
-//             nth_sort_recursive(coords, low, i - 1, axis, med_index);
-//         } else if (pivot_index < med_index) {
-//             nth_sort_recursive(coords, i + 1, high, axis, med_index);
-//         }
-
-//     }
-
-// }
-
-void nth_sort_recursive(int coords[], const int low, const int high, const int axis, const int med_index) {
+void nth_sort_recursive(
+    int *coords, const int low, const int high, const int axis, const int med_index
+) {
 
     if (low < high) {
 
@@ -613,37 +596,49 @@ void smooth_coastlines(
 
     #endif
 
-    int num_land_dots = 0;
-    int num_water_dots = 0;
-    int *land_dots = malloc(num_reg_dots * 3 * sizeof(int));
-    int *water_dots = malloc(num_reg_dots * 3 * sizeof(int));
-
-    for (int i = num_special_dots; i < num_dots; i++) {
-        if (dots[i].type == 'L') {
-            const Dot *dot = &dots[i];
-            land_dots[num_land_dots * 3] = dot->x;
-            land_dots[num_land_dots * 3 + 1] = dot->y;
-            land_dots[num_land_dots * 3 + 2] = i;
-            num_land_dots++;
-        } else if (dots[i].type == 'W') {
-            const Dot *dot = &dots[i];
-            water_dots[num_water_dots * 3] = dot->x;
-            water_dots[num_water_dots * 3 + 1] = dot->y;
-            water_dots[num_water_dots * 3 + 2] = i;
-            num_water_dots++;
-        }
-    }
-
     Node *land_tree_root = NULL;
     Node *water_tree_root = NULL;
 
-    land_tree_root = build_recursive(num_land_dots, land_dots, 0);
-    water_tree_root = build_recursive(num_water_dots, water_dots, 0);
-
-    free(land_dots);
-    free(water_dots);
+    // remove later
+    for (int i = num_special_dots; i < num_dots; i++) {
+        const Dot *dot = &dots[i];
+        const int coord[2] = {dot->x, dot->y};
+        if (dot->type == 'L') {
+            land_tree_root = insert_recursive(land_tree_root, coord, 0, 0);
+        } else {
+            water_tree_root = insert_recursive(water_tree_root, coord, 0, 0);
+        }
+    }
+    // end
 
     for (int _ = 0; _ < 2; _++) {
+
+        // int num_land_dots = 0;
+        // int num_water_dots = 0;
+        // int *land_dots = malloc(num_dots * 3 * sizeof(int));
+        // int *water_dots = malloc(num_dots * 3 * sizeof(int));
+
+        // for (int i = num_special_dots; i < num_dots; i++) {
+        //     if (dots[i].type == 'L') {
+        //         const Dot *dot = &dots[i];
+        //         land_dots[num_land_dots * 3] = dot->x;
+        //         land_dots[num_land_dots * 3 + 1] = dot->y;
+        //         land_dots[num_land_dots * 3 + 2] = i;
+        //         num_land_dots++;
+        //     } else if (dots[i].type == 'W') {
+        //         const Dot *dot = &dots[i];
+        //         water_dots[num_water_dots * 3] = dot->x;
+        //         water_dots[num_water_dots * 3 + 1] = dot->y;
+        //         water_dots[num_water_dots * 3 + 2] = i;
+        //         num_water_dots++;
+        //     }
+        // }
+
+        // land_tree_root = build_recursive(num_land_dots, land_dots, 0);
+        // water_tree_root = build_recursive(num_water_dots, water_dots, 0);
+
+        // free(land_dots);
+        // free(water_dots);
 
         for (int i = start_index; i < end_index; i++) {
 
@@ -719,15 +714,22 @@ void generate_image(
 
     int *dot_coords = malloc(num_dots * 3 * sizeof(int));
 
-    for (int i = 0; i < num_dots; i++) {
-        const Dot *dot = &dots[i];
-        dot_coords[i * 3] = dot->x;
-        dot_coords[i * 3 + 1] = dot->y;
-        dot_coords[i * 3 + 2] = i;
-    }
+    // for (int i = 0; i < num_dots; i++) {
+    //     const Dot *dot = &dots[i];
+    //     dot_coords[i * 3] = dot->x;
+    //     dot_coords[i * 3 + 1] = dot->y;
+    //     dot_coords[i * 3 + 2] = i;
+    // }
 
     Node *tree_root = NULL;
-    tree_root = build_recursive(num_dots, dot_coords, 0);
+    // tree_root = build_recursive(num_dots, dot_coords, 0);
+    // remove later
+    for (int i = 0; i < num_dots; i++) {
+        const Dot *dot = &dots[i];
+        const int coord[2] = {dot->x, dot->y};
+        tree_root = insert_recursive(tree_root, coord, i, 0);
+    }
+    // end
 
     free(dot_coords);
 
