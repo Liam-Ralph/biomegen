@@ -99,7 +99,7 @@ void record_str(const char *str, const char *name) {
 // (Alphabetical order)
 
 /**
- * Get a sanitized integer input from the user between min and max,
+ * Get a sanitized integer input from the user between MIN and MAX,
  * both inclusive.
  */
 int get_int(const int min, const int max) {
@@ -160,11 +160,11 @@ float sum_list_float(float *list, int list_len) {
 // KDTree Functions
 
 /**
- * Sort the given array until the median index is correctly sorted. In other
+ * Sort the given COORDS until the median index is correctly sorted. In other
  * words, median index will be correct, everything before median index will be
  * less than the value at median index, and everything after will be greater.
- * Axis determines which value of a coordinate is its value (x or y) to sort
- * based on. High and low determine the sorting bounds for a given level of
+ * AXIS determines which value of a coordinate is its value (x or y) to sort
+ * based on. HIGH and LOW determine the sorting bounds for a given level of
  * recursion.
  */
 void nth_sort_recursive(
@@ -210,7 +210,7 @@ void nth_sort_recursive(
 }
 
 /**
- * Build a KDTree from coords, and return the root node. Ensures the KDTree is
+ * Build a KDTree from COORDS, and return the root node. Ensures the KDTree is
  * built with the lowest possible depth for maximum efficiency when querying the
  * tree. Every recursion creates one dot and calls this function to insert its
  * children from an array of possible dots.
@@ -263,10 +263,10 @@ Node *build_recursive(const int num_coords, int coords[num_coords * 3], const in
 }
 
 /**
- * Query the KDTree to modify min_dist, the distance to the nearest node. When
- * index_ptr is not null, it stores the index of the nearest node, which
+ * Query the KDTree to modify MIN_DIST, the distance to the nearest node. When
+ * INDEX_PTR is not null, it stores the index of the nearest node, which
  * corresponds to the index of the dot it was created from. Calls itself
- * recursively to query children of node.
+ * recursively to query children of NODE.
  */
 void query_recursive(
     Node *node, const int *coord, const int depth, int *index_ptr, int *min_dist_ptr
@@ -301,10 +301,10 @@ void query_recursive(
 }
 
 /**
- * Query the KDTree to modify dists, the distances of the nearest dists_len
- * points to coord. Recursively navigates down the KDTree, editing dists and
- * the value at max_dist_ptr whenever it finds a node whose distance is less
- * than the value at max_dist_ptr. All distances are squared for efficiency.
+ * Query the KDTree to modify DISTS, the distances of the nearest DISTS_LEN
+ * points to COORD. Recursively navigates down the KDTree, editing DISTS and
+ * the value at MAX_DIST_PTR whenever it finds a node whose distance is less
+ * than the value at MAX_DIST_PTR. All distances are squared for efficiency.
  */
 void query_dist_recursive(
     Node *node, const int *coord, const int depth,
@@ -349,6 +349,9 @@ void query_dist_recursive(
 
 }
 
+/**
+ * Recursively free NODE and its children.
+ */
 void free_recursive(Node *node) {
     if (node->left != NULL) {
         free_recursive(node->left);
@@ -366,7 +369,7 @@ void free_recursive(Node *node) {
 
 /**
  * Track the progress of map generation, and show the progress in the terminal.
- * start_time is the time at the start of map generation in main(), and the
+ * START_TIME is the time at the start of map generation in main(), and the
  * other inputs are all shared memory used to track section progress and times.
  * Not used in automated inputs mode.
  */
@@ -496,8 +499,7 @@ void track_progress(
 
 /**
  * Assign sections of the map. Land and water are randomly assigned based on a
- * dot's distance from the nearest land origin dot. Returns the number of land
- * dots assigned for use in later sections.
+ * dot's distance from the nearest land origin dot.
  */
 void assign_sections(
     const int map_resolution, const float island_size, const int start_index, const int end_index,
@@ -556,7 +558,7 @@ void assign_sections(
 /**
  * Smooth map coastlines for a more realistic, aesthetically pleasing map.
  * Reassigns land and water dots based on the average distance of the nearest
- * coastline_smoothing dots of the same and opposite types.
+ * COASTLINE_SMOOTHING dots of the same and opposite types.
  */
 void smooth_coastlines(
     const int coastline_smoothing, const int width, const int height,
@@ -657,6 +659,10 @@ void smooth_coastlines(
 
 }
 
+/**
+ * Remove all "Land Origin" and "Water Forced" dots from DOTS between
+ * START_INDEX and END_INDEX. Replaces them with "Land" and "Water".
+ */
 void clean_dots(const int start_index, const int end_index, Dot *dots) {
     for (int i = start_index; i < end_index; i++) {
         Dot *dot = &dots[i];
@@ -668,6 +674,11 @@ void clean_dots(const int start_index, const int end_index, Dot *dots) {
     }
 }
 
+/**
+ * Generate a section of the IMAGE_INDEXES, which contains the index in DOTS of
+ * the nearest dot to each pixel. Also count the number of pixels of each type
+ * for TYPE_COUNTS, to be used in statistics at the end of the main program.
+ */
 void generate_image(
     const int start_height, const int end_height, const int width, const int num_dots,
     const Dot *dots, int *image_indexes, int *type_counts, _Atomic int *section_progress
@@ -726,7 +737,7 @@ void generate_image(
 // Main Function
 
 /**
- * Main Function. argc and argv used for automated inputs mode.
+ * Main Function. ARGC and ARGV used for automated inputs mode.
  */
 int main(int argc, char *argv[]) {
 
