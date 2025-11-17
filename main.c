@@ -227,8 +227,9 @@ Node *build_recursive(const int num_coords, int coords[num_coords * 3], const in
     node->right = NULL;
 
     const int num_coords_right = num_coords - med_pos - 1;
-    if (num_coords_right > 0) {
+    const int num_coords_left = med_pos;
 
+    if (num_coords_right > 0) {
         int *coords_right = malloc(num_coords_right * 3 * sizeof(int));
         for (int i = 0; i < num_coords_right; i++) {
             const int index = i + med_pos + 1;
@@ -238,19 +239,17 @@ Node *build_recursive(const int num_coords, int coords[num_coords * 3], const in
         }
         node->right = build_recursive(num_coords_right, coords_right, depth + 1);
         free(coords_right);
+    }
 
-        const int num_coords_left = med_pos;
-        if (num_coords_left > 0) {
-            int *coords_left = malloc(num_coords_left * 3 * sizeof(int));
-            for (int i = 0; i < med_pos; i++) {
-                coords_left[i * 3] = coords[i * 3];
-                coords_left[i * 3 + 1] = coords[i * 3 + 1];
-                coords_left[i * 3 + 2] = coords[i * 3 + 2];
-            }
-            node->left = build_recursive(num_coords_left, coords_left, depth + 1);
-            free(coords_left);
+    if (num_coords_left > 0) {
+        int *coords_left = malloc(num_coords_left * 3 * sizeof(int));
+        for (int i = 0; i < med_pos; i++) {
+            coords_left[i * 3] = coords[i * 3];
+            coords_left[i * 3 + 1] = coords[i * 3 + 1];
+            coords_left[i * 3 + 2] = coords[i * 3 + 2];
         }
-
+        node->left = build_recursive(num_coords_left, coords_left, depth + 1);
+        free(coords_left);
     }
 
     return node;
@@ -506,17 +505,11 @@ void assign_sections(
 
     #endif
 
-    srand(time(NULL) + get_pid());
+    srand(time(NULL) + getpid());
 
     for (int i = start_index; i < end_index; i++) {
 
         Dot *dot = &dots[i];
-
-        if (dot->type != 'W') {
-        // Ignore "Water Forced" and "Land Origin"
-            atomic_fetch_add(&section_progress[2], 1);
-            continue;
-        }
 
         int min = INT_MAX; // min and dist are squared, sqrt is not done until later
         int min_index = 0;
@@ -584,7 +577,7 @@ void smooth_coastlines(
             land_dots[num_land_dots * 3 + 1] = dot->y;
             land_dots[num_land_dots * 3 + 2] = i;
             num_land_dots++;
-        } else if (dots[i].type == 'W') {
+        } else {
             const Dot *dot = &dots[i];
             water_dots[num_water_dots * 3] = dot->x;
             water_dots[num_water_dots * 3 + 1] = dot->y;
@@ -598,17 +591,6 @@ void smooth_coastlines(
 
     land_tree_root = build_recursive(num_land_dots, land_dots, 0);
     water_tree_root = build_recursive(num_water_dots, water_dots, 0);
-
-    FILE *z = fopen("production-files/record.txt", "a");
-
-    for (int q = 0; q < num_land_dots; q++) {
-        const int dot_coord[2] = {land_dots[q * 3], land_dots[q * 3 + 1]};
-        int dist = INT_MAX;
-        query_recursive(land_tree_root, dot_coord, 0, NULL, &dist);
-        fprintf(z, "di: %d q: %d dist: %d\n", land_dots[q * 3 + 2], q, dist);
-    }
-
-    fclose(z);
 
     free(land_dots);
     free(water_dots);
@@ -735,8 +717,6 @@ void generate_image(
  * Main Function. argc and argv used for automated inputs mode.
  */
 int main(int argc, char *argv[]) {
-    
-    record_val(0, "clear");
 
     // Setting Main Process Title
 
