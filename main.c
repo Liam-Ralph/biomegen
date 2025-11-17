@@ -170,49 +170,6 @@ int get_depth(struct Node* root) {
     return (lHeight > rHeight ? lHeight : rHeight) + 1;
 }
 
-// void nth_sort_recursive(
-//     int *coords, const int low, const int high, const int axis, const int med_index
-// ) {
-
-//     if (low < high) {
-
-//         const int pivot_index = rand() % high;
-//         int pivot = coords[pivot_index * 3 + axis];
-
-//         int i = low - 1;
-
-//         for (int ii = low; ii <= high - 1; ii++) {
-//             if (coords[ii * 3 + axis] < pivot) {
-//                 i++;
-//                 const int temp[3] = {coords[i * 3], coords[i * 3 + 1], coords[i * 3 + 2]};
-//                 coords[i * 3] = coords[ii * 3];
-//                 coords[i * 3 + 1] = coords[ii * 3 + 1];
-//                 coords[i * 3 + 2] = coords[ii * 3 + 2];
-//                 coords[ii * 3] = temp[0];
-//                 coords[ii * 3 + 1] = temp[1];
-//                 coords[ii * 3 + 2] = temp[2];
-//             }
-//         }
-
-//         i++;
-//         const int temp[3] = {coords[i * 3], coords[i * 3 + 1], coords[i * 3 + 2]};
-//         coords[i * 3] = coords[pivot_index * 3];
-//         coords[i * 3 + 1] = coords[pivot_index * 3 + 1];
-//         coords[i * 3 + 2] = coords[pivot_index * 3 + 2];
-//         coords[high * 3] = temp[0];
-//         coords[high * 3 + 1] = temp[1];
-//         coords[high * 3 + 2] = temp[2];
-
-//         if (pivot_index > med_index) {
-//             nth_sort_recursive(coords, low, i - 1, axis, med_index);
-//         } else if (pivot_index < med_index) {
-//             nth_sort_recursive(coords, i + 1, high, axis, med_index);
-//         }
-
-//     }
-
-// }
-
 void nth_sort_recursive(int coords[], const int low, const int high, const int axis, const int med_index) {
 
     if (low < high) {
@@ -313,7 +270,7 @@ void query_dist_recursive(
     const int diff_y = node->coord[1] - coord[1];
     const int dist = diff_x * diff_x + diff_y * diff_y;
 
-    if (dist < *max_dist_ptr && dist != 0) {
+    if (dist < *max_dist_ptr){// && dist != 0) {
         int pos_max = 0;
         for (int i = 1; i < dists_len; i++) {
             if (dists[i] > dists[pos_max]) {
@@ -639,6 +596,19 @@ void smooth_coastlines(
 
     land_tree_root = build_recursive(num_land_dots, land_dots, 0);
     water_tree_root = build_recursive(num_water_dots, water_dots, 0);
+
+    for (int q = 0; q < num_land_dots; q++) {
+        const int dot_coord[2] = {land_dots[q * 3], land_dots[q * 3 + 1]};
+        int dists[1];
+        dists[1] = INT_MAX;
+        int dist = INT_MAX;
+        query_dist_recursive(land_tree_root, dot_coord, 0, dists, 1, &dist);
+        if (dist != 0){
+            record_val(dot_coord[0], "dot coord x");
+            record_val(dot_coord[1], "dot coord y");
+            record_val(dist, "dot dist");
+        }
+    }
 
     free(land_dots);
     free(water_dots);
