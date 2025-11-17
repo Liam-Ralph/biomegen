@@ -170,7 +170,9 @@ int get_depth(struct Node* root) {
     return (lHeight > rHeight ? lHeight : rHeight) + 1;
 }
 
-void nth_sort_recursive(int coords[], const int low, const int high, const int axis, const int med_index) {
+void nth_sort_recursive(
+    int coords[], const int low, const int high, const int axis, const int med_index
+) {
 
     if (low < high) {
 
@@ -270,7 +272,7 @@ void query_dist_recursive(
     const int diff_y = node->coord[1] - coord[1];
     const int dist = diff_x * diff_x + diff_y * diff_y;
 
-    if (dist < *max_dist_ptr){// && dist != 0) {
+    if (dist < *max_dist_ptr && dist != 0) {
         int pos_max = 0;
         for (int i = 1; i < dists_len; i++) {
             if (dists[i] > dists[pos_max]) {
@@ -599,14 +601,13 @@ void smooth_coastlines(
 
     for (int q = 0; q < num_land_dots; q++) {
         const int dot_coord[2] = {land_dots[q * 3], land_dots[q * 3 + 1]};
-        int dists[1];
-        dists[1] = INT_MAX;
         int dist = INT_MAX;
-        query_dist_recursive(land_tree_root, dot_coord, 0, dists, 1, &dist);
+        query_recursive(land_tree_root, dot_coord, 0, NULL, &dist);
         if (dist != 0){
             record_val(dot_coord[0], "dot coord x");
             record_val(dot_coord[1], "dot coord y");
             record_val(dist, "dot dist");
+            record_val(q, "dot index (self)");
         }
     }
 
@@ -641,10 +642,9 @@ void smooth_coastlines(
                 }
 
                 int max_dist = INT_MAX;
-                int *max_dist_ptr = &max_dist;
 
                 query_dist_recursive(
-                    tree_roots[ii], dot_coord, 0, dists, coastline_smoothing, max_dist_ptr
+                    tree_roots[ii], dot_coord, 0, dists, coastline_smoothing, &max_dist
                 );
 
                 for (int iii = 0; iii < coastline_smoothing; iii++) {
@@ -706,12 +706,10 @@ void generate_image(
         for (int x = 0; x < width; x++) {
 
             int nearest_index = 0;
-            int *nearest_index_ptr = &nearest_index;
             int min_dist = INT_MAX;
-            int *min_dist_ptr = &min_dist;
 
             const int coord[2] = {x, y};
-            query_recursive(tree_root, coord, 0, nearest_index_ptr, min_dist_ptr);
+            query_recursive(tree_root, coord, 0, &nearest_index, &min_dist);
 
             image_indexes[y * width + x] = nearest_index;
             for (int i = 0; i < 11; i++) {
