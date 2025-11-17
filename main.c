@@ -170,45 +170,99 @@ int get_depth(struct Node* root) {
     return (lHeight > rHeight ? lHeight : rHeight) + 1;
 }
 
-void nth_sort_recursive(
-    int *coords, const int low, const int high, const int axis, const int med_index
-) {
+// void nth_sort_recursive(
+//     int *coords, const int low, const int high, const int axis, const int med_index
+// ) {
+
+//     if (low < high) {
+
+//         const int pivot_index = rand() % high;
+//         int pivot = coords[pivot_index * 3 + axis];
+
+//         int i = low - 1;
+
+//         for (int ii = low; ii <= high - 1; ii++) {
+//             if (coords[ii * 3 + axis] < pivot) {
+//                 i++;
+//                 const int temp[3] = {coords[i * 3], coords[i * 3 + 1], coords[i * 3 + 2]};
+//                 coords[i * 3] = coords[ii * 3];
+//                 coords[i * 3 + 1] = coords[ii * 3 + 1];
+//                 coords[i * 3 + 2] = coords[ii * 3 + 2];
+//                 coords[ii * 3] = temp[0];
+//                 coords[ii * 3 + 1] = temp[1];
+//                 coords[ii * 3 + 2] = temp[2];
+//             }
+//         }
+
+//         i++;
+//         const int temp[3] = {coords[i * 3], coords[i * 3 + 1], coords[i * 3 + 2]};
+//         coords[i * 3] = coords[pivot_index * 3];
+//         coords[i * 3 + 1] = coords[pivot_index * 3 + 1];
+//         coords[i * 3 + 2] = coords[pivot_index * 3 + 2];
+//         coords[high * 3] = temp[0];
+//         coords[high * 3 + 1] = temp[1];
+//         coords[high * 3 + 2] = temp[2];
+
+//         if (pivot_index > med_index) {
+//             nth_sort_recursive(coords, low, i - 1, axis, med_index);
+//         } else if (pivot_index < med_index) {
+//             nth_sort_recursive(coords, i + 1, high, axis, med_index);
+//         }
+
+//     }
+
+// }
+
+int partition(int coords[], int low, int high, const int axis) {
+    
+    // Choose the pivot
+    int pivot = coords[high * 3 + axis];
+    
+    // Index of smaller element and indicates 
+    // the right position of pivot found so far
+    int i = low - 1;
+
+    // Traverse arr[low..high] and move all smaller
+    // elements to the left side. Elements from low to 
+    // i are smaller after every iteration
+    for (int ii = low; ii <= high - 1; ii++) {
+        if (coords[ii * 3 + axis] < pivot) {
+            i++;
+            const int temp[3] = {coords[i * 3], coords[i * 3 + 1], coords[i * 3 + 2]};
+            coords[i * 3] = coords[ii * 3];
+            coords[i * 3 + 1] = coords[ii * 3 + 1];
+            coords[i * 3 + 2] = coords[ii * 3 + 2];
+            coords[ii * 3] = temp[0];
+            coords[ii * 3 + 1] = temp[1];
+            coords[ii * 3 + 2] = temp[2];
+        }
+    }
+    
+    // Move pivot after smaller elements and
+    // return its position
+    i++;
+    // swap(&arr[i], &arr[high]);
+    const int temp[3] = {coords[i * 3], coords[i * 3 + 1], coords[i * 3 + 2]};
+    coords[i * 3] = coords[high * 3];
+    coords[i * 3 + 1] = coords[high * 3 + 1];
+    coords[i * 3 + 2] = coords[high * 3 + 2];
+    coords[high * 3] = temp[0];
+    coords[high * 3 + 1] = temp[1];
+    coords[high * 3 + 2] = temp[2]; 
+    return i;
+}
+
+void nth_sort_recursive(int coords[], const int low, const int high, const int axis) {
 
     if (low < high) {
+        
+        // pi is the partition return index of pivot
+        int pi = partition(coords, low, high, axis);
 
-        const int pivot_index = rand() % high;
-        int pivot = coords[pivot_index * 3 + axis];
-
-        int i = low - 1;
-
-        for (int ii = low; ii <= high - 1; ii++) {
-            if (coords[ii * 3 + axis] < pivot) {
-                i++;
-                const int temp[3] = {coords[i * 3], coords[i * 3 + 1], coords[i * 3 + 2]};
-                coords[i * 3] = coords[ii * 3];
-                coords[i * 3 + 1] = coords[ii * 3 + 1];
-                coords[i * 3 + 2] = coords[ii * 3 + 2];
-                coords[ii * 3] = temp[0];
-                coords[ii * 3 + 1] = temp[1];
-                coords[ii * 3 + 2] = temp[2];
-            }
-        }
-
-        i++;
-        const int temp[3] = {coords[i * 3], coords[i * 3 + 1], coords[i * 3 + 2]};
-        coords[i * 3] = coords[pivot_index * 3];
-        coords[i * 3 + 1] = coords[pivot_index * 3 + 1];
-        coords[i * 3 + 2] = coords[pivot_index * 3 + 2];
-        coords[high * 3] = temp[0];
-        coords[high * 3 + 1] = temp[1];
-        coords[high * 3 + 2] = temp[2];
-
-        if (pivot_index > med_index) {
-            nth_sort_recursive(coords, low, i - 1, axis, med_index);
-        } else if (pivot_index < med_index) {
-            nth_sort_recursive(coords, i + 1, high, axis, med_index);
-        }
-
+        // recursion calls for smaller elements
+        // and greater or equals elements
+        nth_sort_recursive(coords, low, pi - 1, axis);
+        nth_sort_recursive(coords, pi + 1, high, axis);
     }
 
 }
@@ -217,7 +271,7 @@ Node *build_recursive(const int num_coords, int coords[num_coords * 3], const in
 
     const int axis = depth % 2;
 
-    nth_sort_recursive(coords, 0, num_coords - 1, axis, num_coords / 2);
+    nth_sort_recursive(coords, 0, num_coords - 1, axis);//, num_coords / 2);
 
     const int med_pos = num_coords / 2;
     Node *node = malloc(sizeof(Node));
@@ -240,7 +294,7 @@ Node *build_recursive(const int num_coords, int coords[num_coords * 3], const in
         node->right = build_recursive(num_coords_right, coords_right, depth + 1);
         free(coords_right);
 
-        const int num_coords_left = num_coords - num_coords_right;
+        const int num_coords_left = med_pos;
         if (num_coords_left > 0) {
             int *coords_left = malloc(num_coords_left * 3 * sizeof(int));
             for (int i = 0; i < med_pos; i++) {
