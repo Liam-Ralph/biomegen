@@ -378,18 +378,6 @@ void track_progress(
     _Atomic int *section_progress, int *section_progress_total, float *section_times
 ) {
 
-    // Setting Tracker Process Title
-
-    #ifdef __linux__
-
-        prctl(PR_SET_NAME, "biomegentracker", 0, 0, 0);
-
-    #elif BSD || __Apple__
-
-        setproctitle("biomegen-tracker");
-
-    #endif
-
     char section_names[7][20] = {
         "Setup", "Section Generation", "Section Assignment", "Coastline Smoothing",
         "Biome Generation", "Image Generation", "Finish"
@@ -498,6 +486,26 @@ void track_progress(
 }
 
 /**
+ * Set the process's title to "biomegen-" + TYPE.
+ */
+void set_process_title(char *type) {
+
+    char string[16] = "biomegen-";
+    strncat(string, type, 7);
+
+    #ifdef __linux__
+
+        prctl(PR_SET_NAME, string, 0, 0, 0);
+
+    #elif BSD || __Apple__
+
+        setproctitle(string);
+
+    #endif
+
+}
+
+/**
  * Assign sections of the map. Land and water are randomly assigned based on a
  * dot's distance from the nearest land origin dot.
  */
@@ -506,18 +514,6 @@ void assign_sections(
     const int num_origin_dots, const int origin_dots[num_origin_dots][2],
     Dot *dots, _Atomic int *section_progress
 ) {
-
-    // Setting Worker Process Title
-
-    #ifdef __linux__
-
-        prctl(PR_SET_NAME, "biomegen-worker", 0, 0, 0);
-
-    #elif BSD || __Apple__
-
-        setproctitle("biomegen-worker");
-
-    #endif
 
     srand(time(NULL) + getpid());
 
@@ -567,32 +563,19 @@ void smooth_coastlines(
     Dot *dots, _Atomic int *section_progress
 ) {
 
-    // Setting Worker Process Title
-
-    #ifdef __linux__
-
-        prctl(PR_SET_NAME, "biomegen-worker", 0, 0, 0);
-
-    #elif BSD || __Apple__
-
-        setproctitle("biomegen-worker");
-
-    #endif
-
     int num_land_dots = 0;
     int num_water_dots = 0;
     int *land_dots = malloc(num_reg_dots * 3 * sizeof(int));
     int *water_dots = malloc(num_reg_dots * 3 * sizeof(int));
 
     for (int i = num_special_dots; i < num_dots; i++) {
-        if (dots[i].type == 'L') {
-            const Dot *dot = &dots[i];
+        const Dot *dot = &dots[i];
+        if (dot->type == 'L') {
             land_dots[num_land_dots * 3] = dot->x;
             land_dots[num_land_dots * 3 + 1] = dot->y;
             land_dots[num_land_dots * 3 + 2] = i;
             num_land_dots++;
         } else {
-            const Dot *dot = &dots[i];
             water_dots[num_water_dots * 3] = dot->x;
             water_dots[num_water_dots * 3 + 1] = dot->y;
             water_dots[num_water_dots * 3 + 2] = i;
@@ -674,6 +657,69 @@ void clean_dots(const int start_index, const int end_index, Dot *dots) {
     }
 }
 
+int get_depth(struct Node* root) {
+    if (root == NULL)
+        return -1;
+
+    // compute the height of left and right subtrees
+    int lHeight = get_depth(root->left);
+    int rHeight = get_depth(root->right);
+
+    return (lHeight > rHeight ? lHeight : rHeight) + 1;
+}
+
+void generate_biomes_water(
+    const int start_index, const int end_index, const int height,
+    const int num_dots, Dot *dots, _Atomic int *section_progress
+) {
+
+    int num_land_dots = 0;
+    int *land_dots = malloc(num_dots * 3 * sizeof(int));
+    for (int i = 0; i < num_dots; i++) {
+        if (dots[i].type == 'L') {
+            const Dot *dot = &dots[i];
+            land_dots[num_land_dots * 3] = dot->x;
+            land_dots[num_land_dots * 3 + 1] = dot->y;
+            land_dots[num_land_dots * 3 + 2] = i;
+            num_land_dots++;
+        }
+    }
+    Node *land_tree_root = NULL;
+    land_tree_root = build_recursive(num_land_dots, land_dots, 0);
+    free(land_dots);
+
+    for (int i = start_index; i < end_index; i++) {
+
+        Dot *dot = &dots[i];
+
+        if (dot->type != 'W') {
+            continue;
+        }
+
+        const float equator_dist = abs(20 * dot->y / height - 10);
+
+        int land_dist_sq = INT_MAX;
+        const int coord[2] = {dot->x, dot->y};
+        query_recursive(land_tree_root, coord, 0, NULL, &land_dist_sq);
+        
+        if ( // Remember: all land distances are squared for efficiency
+            (land_dist_sq < 35 * 35 && equator_dist > 9) ||
+            (land_dist_sq < 25 * 25 && equator_dist > 8) ||
+            (land_dist_sq < 15 * 15 && equator_dist > 7)
+        ) {
+            dot->type = 'I';
+        } else if (land_dist_sq < 18 * 18) {
+            dot->type = 's';
+        } else if (land_dist_sq >= 35 * 35) {
+            dot->type = 'd';
+        }
+
+        atomic_fetch_add(&section_progress[4], 1);
+
+    }
+
+}
+
 /**
  * Generate a section of the IMAGE_INDEXES, which contains the index in DOTS of
  * the nearest dot to each pixel. Also count the number of pixels of each type
@@ -743,15 +789,7 @@ int main(int argc, char *argv[]) {
 
     // Setting Main Process Title
 
-    #ifdef __linux__
-
-        prctl(PR_SET_NAME, "biomegen-main", 0, 0, 0);
-
-    #elif BSD || __Apple__
-
-        setproctitle("biomegen-main");
-
-    #endif
+    set_process_title("main");
 
     // Getting Inputs
 
@@ -922,6 +960,7 @@ int main(int argc, char *argv[]) {
         tracker_process_pid = fork();
 
         if (tracker_process_pid == 0) {
+            set_process_title("trackr"); // "biomegen-tracker" is 16 characters; too long
             track_progress(start_time, section_progress, section_progress_total, section_times);
             exit(0);
         }
@@ -1008,6 +1047,7 @@ int main(int argc, char *argv[]) {
     for (int i = 0; i < processes; i++) {
         fork_pids[i] = fork();
         if (fork_pids[i] == 0) {
+            set_process_title("worker");
             assign_sections(
                 map_resolution, island_size, piece_starts[i], piece_starts[i + 1],
                 num_special_dots / 2, origin_dots, dots, section_progress
@@ -1032,6 +1072,7 @@ int main(int argc, char *argv[]) {
         for (int i = 0; i < processes; i++) {
             fork_pids[i] = fork();
             if (fork_pids[i] == 0) {
+                set_process_title("worker");
                 smooth_coastlines(
                     coastline_smoothing, width, height, piece_starts[i], piece_starts[i + 1],
                     num_dots, num_special_dots, num_reg_dots, dots, section_progress
@@ -1055,6 +1096,8 @@ int main(int argc, char *argv[]) {
 
     // Biome Generation
 
+    atomic_store(&section_progress_total[4], num_dots);
+
     // Removing "Land Origin" and "Water Forced" dots
 
     piece_length = num_dots / processes;
@@ -1067,7 +1110,24 @@ int main(int argc, char *argv[]) {
     for (int i = 0; i < processes; i++) {
         fork_pids[i] = fork();
         if (fork_pids[i] == 0) {
+            set_process_title("worker");
             clean_dots(piece_starts[i], piece_starts[i + 1], dots);
+            exit(0);
+        }
+    }
+    for (int i = 0; i < processes; i++) {
+        waitpid(fork_pids[i], NULL, 0);
+    }
+
+    // Creating water biomes to add depth and ice at poles
+
+    for (int i = 0; i < processes; i++) {
+        fork_pids[i] = fork();
+        if (fork_pids[i] == 0) {
+            set_process_title("worker");
+            generate_biomes_water(
+                piece_starts[i], piece_starts[i + 1], height, num_dots, dots, section_progress
+            );
             exit(0);
         }
     }
@@ -1081,7 +1141,7 @@ int main(int argc, char *argv[]) {
         }
     }
 
-    atomic_store(&section_progress[4], 1);
+    atomic_store(&section_progress[4], num_dots);
 
     clock_gettime(CLOCK_REALTIME, &time_now);
     section_times[4] = (float)(time_now.tv_sec - start_time.tv_sec) +
@@ -1102,6 +1162,7 @@ int main(int argc, char *argv[]) {
     for (int i = 0; i < processes; i++) {
         fork_pids[i] = fork();
         if (fork_pids[i] == 0) {
+            set_process_title("worker");
             generate_image(
                 section_starts[i], section_starts[i + 1], width,
                 num_dots, dots, image_indexes, type_counts, section_progress
