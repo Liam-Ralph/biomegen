@@ -95,11 +95,11 @@ void record_str(const char *str, const char *name) {
 }
 
 
-// Functions
+// General Functions
 // (Alphabetical order)
 
 /**
- * Get a sanitized integer input from the user between min and max,
+ * Get a sanitized integer input from the user between MIN and MAX,
  * both inclusive.
  */
 int get_int(const int min, const int max) {
@@ -159,25 +159,21 @@ float sum_list_float(float *list, int list_len) {
 
 // KDTree Functions
 
-int get_depth(struct Node* root) {
-    if (root == NULL)
-        return -1;
-
-    // compute the height of left and right subtrees
-    int lHeight = get_depth(root->left);
-    int rHeight = get_depth(root->right);
-
-    return (lHeight > rHeight ? lHeight : rHeight) + 1;
-}
-
+/**
+ * Sort the given COORDS until the median index is correctly sorted. In other
+ * words, median index will be correct, everything before median index will be
+ * less than the value at median index, and everything after will be greater.
+ * AXIS determines which value of a coordinate is its value (x or y) to sort
+ * based on. HIGH and LOW determine the sorting bounds for a given level of
+ * recursion.
+ */
 void nth_sort_recursive(
-    int *coords, const int low, const int high, const int axis, const int med_index
+    int coords[], const int low, const int high, const int axis, const int med_index
 ) {
 
     if (low < high) {
 
-        const int pivot_index = rand() % high;
-        int pivot = coords[pivot_index * 3 + axis];
+        int pivot = coords[high * 3 + axis];
 
         int i = low - 1;
 
@@ -196,16 +192,16 @@ void nth_sort_recursive(
 
         i++;
         const int temp[3] = {coords[i * 3], coords[i * 3 + 1], coords[i * 3 + 2]};
-        coords[i * 3] = coords[pivot_index * 3];
-        coords[i * 3 + 1] = coords[pivot_index * 3 + 1];
-        coords[i * 3 + 2] = coords[pivot_index * 3 + 2];
+        coords[i * 3] = coords[high * 3];
+        coords[i * 3 + 1] = coords[high * 3 + 1];
+        coords[i * 3 + 2] = coords[high * 3 + 2];
         coords[high * 3] = temp[0];
         coords[high * 3 + 1] = temp[1];
         coords[high * 3 + 2] = temp[2];
 
-        if (pivot_index > med_index) {
+        if (i > med_index) {
             nth_sort_recursive(coords, low, i - 1, axis, med_index);
-        } else if (pivot_index < med_index) {
+        } else if (i < med_index) {
             nth_sort_recursive(coords, i + 1, high, axis, med_index);
         }
 
@@ -213,13 +209,19 @@ void nth_sort_recursive(
 
 }
 
+/**
+ * Build a KDTree from COORDS, and return the root node. Ensures the KDTree is
+ * built with the lowest possible depth for maximum efficiency when querying the
+ * tree. Every recursion creates one dot and calls this function to insert its
+ * children from an array of possible dots.
+ */
 Node *build_recursive(const int num_coords, int coords[num_coords * 3], const int depth) {
 
     const int axis = depth % 2;
-
-    nth_sort_recursive(coords, 0, num_coords - 1, axis, num_coords / 2);
-
     const int med_pos = num_coords / 2;
+
+    nth_sort_recursive(coords, 0, num_coords - 1, axis, med_pos);
+
     Node *node = malloc(sizeof(Node));
     node->coord[0] = coords[med_pos * 3];
     node->coord[1] = coords[med_pos * 3 + 1];
@@ -227,29 +229,31 @@ Node *build_recursive(const int num_coords, int coords[num_coords * 3], const in
     node->left = NULL;
     node->right = NULL;
 
-    const int num_coords_right = num_coords - med_pos - 1;
-    if (num_coords_right > 0) {
+    const int num_coords_left = med_pos;
 
-        int *coords_right = malloc(num_coords_right * 3 * sizeof(int));
-        for (int i = med_pos + 1; i < num_coords; i++) {
-            const int index = i - med_pos - 1;
-            coords_right[index * 3] = coords[i * 3];
-            coords_right[index * 3 + 1] = coords[i * 3 + 1];
-            coords_right[index * 3 + 2] = coords[i * 3 + 2];
+    if (num_coords_left > 0) {
+
+        int *coords_left = malloc(num_coords_left * 3 * sizeof(int));
+        for (int i = 0; i < med_pos; i++) {
+            coords_left[i * 3] = coords[i * 3];
+            coords_left[i * 3 + 1] = coords[i * 3 + 1];
+            coords_left[i * 3 + 2] = coords[i * 3 + 2];
         }
-        node->right = build_recursive(num_coords_right, coords_right, depth + 1);
-        free(coords_right);
+        node->left = build_recursive(num_coords_left, coords_left, depth + 1);
+        free(coords_left);
 
-        const int num_coords_left = num_coords - num_coords_right;
-        if (num_coords_left > 0) {
-            int *coords_left = malloc(num_coords_left * 3 * sizeof(int));
-            for (int i = 0; i < med_pos; i++) {
-                coords_left[i * 3] = coords[i * 3];
-                coords_left[i * 3 + 1] = coords[i * 3 + 1];
-                coords_left[i * 3 + 2] = coords[i * 3 + 2];
+        const int num_coords_right = num_coords - med_pos - 1;
+
+        if (num_coords_right > 0) {
+            int *coords_right = malloc(num_coords_right * 3 * sizeof(int));
+            for (int i = 0; i < num_coords_right; i++) {
+                const int index = i + med_pos + 1;
+                coords_right[i * 3] = coords[index * 3];
+                coords_right[i * 3 + 1] = coords[index * 3 + 1];
+                coords_right[i * 3 + 2] = coords[index * 3 + 2];
             }
-            node->left = build_recursive(num_coords_left, coords_left, depth + 1);
-            free(coords_left);
+            node->right = build_recursive(num_coords_right, coords_right, depth + 1);
+            free(coords_right);
         }
 
     }
@@ -259,10 +263,48 @@ Node *build_recursive(const int num_coords, int coords[num_coords * 3], const in
 }
 
 /**
- * Query the KDTree to modify dists, the distances of the nearest dists_len
- * points to coord. Recursively navigates down the KDTree, editing dists and
- * the value at max_dist_ptr whenever it finds a node whose distance is less
- * than the value at max_dist_ptr. All distances are squared for efficiency.
+ * Query the KDTree to modify MIN_DIST, the distance to the nearest node. When
+ * INDEX_PTR is not null, it stores the index of the nearest node, which
+ * corresponds to the index of the dot it was created from. Calls itself
+ * recursively to query children of NODE.
+ */
+void query_recursive(
+    Node *node, const int *coord, const int depth, int *index_ptr, int *min_dist_ptr
+) {
+
+    const int diff_x = node->coord[0] - coord[0];
+    const int diff_y = node->coord[1] - coord[1];
+    const int dist = diff_x * diff_x + diff_y * diff_y;
+
+    if (dist < *min_dist_ptr) {
+        if (index_ptr != NULL) {
+            *index_ptr = node->index;
+        }
+        *min_dist_ptr = dist;
+    }
+
+    const int axis = depth % 2;
+
+    const int dist_line = node->coord[axis] - coord[axis];
+    const bool line_close = (dist_line * dist_line < *min_dist_ptr);
+    if (node->left != NULL) {
+        if (line_close || coord[axis] < node->coord[axis]) {
+            query_recursive(node->left, coord, depth + 1, index_ptr, min_dist_ptr);
+        }
+    }
+    if (node->right != NULL) {
+        if (line_close || coord[axis] >= node->coord[axis]) {
+            query_recursive(node->right, coord, depth + 1, index_ptr, min_dist_ptr);
+        }
+    }
+
+}
+
+/**
+ * Query the KDTree to modify DISTS, the distances of the nearest DISTS_LEN
+ * points to COORD. Recursively navigates down the KDTree, editing DISTS and
+ * the value at MAX_DIST_PTR whenever it finds a node whose distance is less
+ * than the value at MAX_DIST_PTR. All distances are squared for efficiency.
  */
 void query_dist_recursive(
     Node *node, const int *coord, const int depth,
@@ -307,38 +349,9 @@ void query_dist_recursive(
 
 }
 
-void query_recursive(
-    Node *node, const int *coord, const int depth, int *index_ptr, int *min_dist_ptr
-) {
-
-    const int diff_x = node->coord[0] - coord[0];
-    const int diff_y = node->coord[1] - coord[1];
-    const int dist = diff_x * diff_x + diff_y * diff_y;
-
-    if (dist < *min_dist_ptr) {
-        if (index_ptr != NULL) {
-            *index_ptr = node->index;
-        }
-        *min_dist_ptr = dist;
-    }
-
-    const int axis = depth % 2;
-
-    const int dist_line = node->coord[axis] - coord[axis];
-    const bool line_close = (dist_line * dist_line < *min_dist_ptr);
-    if (node->left != NULL) {
-        if (line_close || coord[axis] < node->coord[axis]) {
-            query_recursive(node->left, coord, depth + 1, index_ptr, min_dist_ptr);
-        }
-    }
-    if (node->right != NULL) {
-        if (line_close || coord[axis] >= node->coord[axis]) {
-            query_recursive(node->right, coord, depth + 1, index_ptr, min_dist_ptr);
-        }
-    }
-
-}
-
+/**
+ * Recursively free NODE and its children.
+ */
 void free_recursive(Node *node) {
     if (node->left != NULL) {
         free_recursive(node->left);
@@ -356,7 +369,7 @@ void free_recursive(Node *node) {
 
 /**
  * Track the progress of map generation, and show the progress in the terminal.
- * start_time is the time at the start of map generation in main(), and the
+ * START_TIME is the time at the start of map generation in main(), and the
  * other inputs are all shared memory used to track section progress and times.
  * Not used in automated inputs mode.
  */
@@ -486,8 +499,7 @@ void track_progress(
 
 /**
  * Assign sections of the map. Land and water are randomly assigned based on a
- * dot's distance from the nearest land origin dot. Returns the number of land
- * dots assigned for use in later sections.
+ * dot's distance from the nearest land origin dot.
  */
 void assign_sections(
     const int map_resolution, const float island_size, const int start_index, const int end_index,
@@ -512,12 +524,6 @@ void assign_sections(
     for (int i = start_index; i < end_index; i++) {
 
         Dot *dot = &dots[i];
-
-        if (dot->type != 'W') {
-        // Ignore "Water Forced" and "Land Origin"
-            atomic_fetch_add(&section_progress[2], 1);
-            continue;
-        }
 
         int min = INT_MAX; // min and dist are squared, sqrt is not done until later
         int min_index = 0;
@@ -552,7 +558,7 @@ void assign_sections(
 /**
  * Smooth map coastlines for a more realistic, aesthetically pleasing map.
  * Reassigns land and water dots based on the average distance of the nearest
- * coastline_smoothing dots of the same and opposite types.
+ * COASTLINE_SMOOTHING dots of the same and opposite types.
  */
 void smooth_coastlines(
     const int coastline_smoothing, const int width, const int height,
@@ -585,7 +591,7 @@ void smooth_coastlines(
             land_dots[num_land_dots * 3 + 1] = dot->y;
             land_dots[num_land_dots * 3 + 2] = i;
             num_land_dots++;
-        } else if (dots[i].type == 'W') {
+        } else {
             const Dot *dot = &dots[i];
             water_dots[num_water_dots * 3] = dot->x;
             water_dots[num_water_dots * 3 + 1] = dot->y;
@@ -603,54 +609,49 @@ void smooth_coastlines(
     free(land_dots);
     free(water_dots);
 
-    for (int _ = 0; _ < 2; _++) {
+    for (int i = start_index; i < end_index; i++) {
 
-        for (int i = start_index; i < end_index; i++) {
+        Dot *dot = &dots[i];
+        int dot_coord[2] = {dot->x, dot->y};
 
-            Dot *dot = &dots[i];
-            int dot_coord[2] = {dot->x, dot->y};
+        const bool land_dot = (dot->type == 'L');
 
-            const bool land_dot = (dot->type == 'L');
+        long sums[2] = {0, 0}; // same type, opposite
+        Node *tree_roots[2];
 
-            long sums[2] = {0, 0}; // same type, opposite
-            Node *tree_roots[2];
-
-            if (land_dot) {
-                tree_roots[0] = land_tree_root;
-                tree_roots[1] = water_tree_root;
-            } else {
-                tree_roots[0] = water_tree_root;
-                tree_roots[1] = land_tree_root;
-            }
-
-            for (int ii = 0; ii < 2; ii++) {
-
-                int dists[coastline_smoothing];
-                for (int iii = 0; iii < coastline_smoothing; iii++) {
-                    dists[iii] = INT_MAX;
-                }
-
-                int max_dist = INT_MAX;
-                int *max_dist_ptr = &max_dist;
-
-                query_dist_recursive(
-                    tree_roots[ii], dot_coord, 0, dists, coastline_smoothing, max_dist_ptr
-                );
-
-                for (int iii = 0; iii < coastline_smoothing; iii++) {
-                    sums[ii] += dists[iii];
-                }
-
-            }
-
-            if (sums[0] > sums[1]) {
-                dot->type = (land_dot) ? 'W' : 'L';
-            }
-
-            atomic_fetch_add(&section_progress[3], 1);
-            
+        if (land_dot) {
+            tree_roots[0] = land_tree_root;
+            tree_roots[1] = water_tree_root;
+        } else {
+            tree_roots[0] = water_tree_root;
+            tree_roots[1] = land_tree_root;
         }
 
+        for (int ii = 0; ii < 2; ii++) {
+
+            int dists[coastline_smoothing];
+            for (int iii = 0; iii < coastline_smoothing; iii++) {
+                dists[iii] = INT_MAX;
+            }
+
+            int max_dist = INT_MAX;
+
+            query_dist_recursive(
+                tree_roots[ii], dot_coord, 0, dists, coastline_smoothing, &max_dist
+            );
+
+            for (int iii = 0; iii < coastline_smoothing; iii++) {
+                sums[ii] += dists[iii];
+            }
+
+        }
+
+        if (sums[0] > sums[1]) {
+            dot->type = (land_dot) ? 'W' : 'L';
+        }
+
+        atomic_fetch_add(&section_progress[3], 1);
+        
     }
 
     free_recursive(land_tree_root);
@@ -658,6 +659,10 @@ void smooth_coastlines(
 
 }
 
+/**
+ * Remove all "Land Origin" and "Water Forced" dots from DOTS between
+ * START_INDEX and END_INDEX. Replaces them with "Land" and "Water".
+ */
 void clean_dots(const int start_index, const int end_index, Dot *dots) {
     for (int i = start_index; i < end_index; i++) {
         Dot *dot = &dots[i];
@@ -669,6 +674,11 @@ void clean_dots(const int start_index, const int end_index, Dot *dots) {
     }
 }
 
+/**
+ * Generate a section of the IMAGE_INDEXES, which contains the index in DOTS of
+ * the nearest dot to each pixel. Also count the number of pixels of each type
+ * for TYPE_COUNTS, to be used in statistics at the end of the main program.
+ */
 void generate_image(
     const int start_height, const int end_height, const int width, const int num_dots,
     const Dot *dots, int *image_indexes, int *type_counts, _Atomic int *section_progress
@@ -696,12 +706,10 @@ void generate_image(
         for (int x = 0; x < width; x++) {
 
             int nearest_index = 0;
-            int *nearest_index_ptr = &nearest_index;
             int min_dist = INT_MAX;
-            int *min_dist_ptr = &min_dist;
 
             const int coord[2] = {x, y};
-            query_recursive(tree_root, coord, 0, nearest_index_ptr, min_dist_ptr);
+            query_recursive(tree_root, coord, 0, &nearest_index, &min_dist);
 
             image_indexes[y * width + x] = nearest_index;
             for (int i = 0; i < 11; i++) {
@@ -729,11 +737,9 @@ void generate_image(
 // Main Function
 
 /**
- * Main Function. argc and argv used for automated inputs mode.
+ * Main Function. ARGC and ARGV used for automated inputs mode.
  */
 int main(int argc, char *argv[]) {
-    
-    record_val(0, "clear");
 
     // Setting Main Process Title
 
@@ -1021,7 +1027,7 @@ int main(int argc, char *argv[]) {
 
     if (coastline_smoothing != 0) {
 
-        section_progress_total[3] = num_reg_dots * 2;
+        section_progress_total[3] = num_reg_dots;
 
         for (int i = 0; i < processes; i++) {
             fork_pids[i] = fork();

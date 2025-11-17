@@ -91,20 +91,6 @@ def main():
     with multiprocessing.Pool(processes, initializer=initialize_worker,
     initargs=(section_progress, dots, image_sections, lock)) as pool:
         try:
-            if coastline_smoothing != 0:
-                section_progress_total[3] = num_dots * 2
-                local_dots = []
-                results = pool.map(copy_piece, piece_ranges)
-                for result in results:
-                    local_dots.extend(result)
-                results = []
-                for i in range(processes):
-                    results.append(pool.apply_async(smooth_coastlines,
-                        (coastline_smoothing, piece_ranges[i], local_dots)))
-                [result.wait() for result in results]
-            else:
-                section_progress[3] = 1
-            section_times[3] = time.time() - start_time - sum(section_times)
             section_progress_total[4] = num_dots
             local_dots = []
             results = pool.map(copy_piece, piece_ranges)
