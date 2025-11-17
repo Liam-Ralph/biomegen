@@ -13,6 +13,42 @@ import traceback
 def raise_error(location, traceback_output):
     with open("errors.txt", "a") as file:
         file.write("Error at " + location + "\n\n" + traceback_output + "\n\n\n")
+def smooth_coastlines(coastline_smoothing, piece_range, local_dots):
+    try:
+        for i in (1, -1):
+            land_dots = [dot for dot in local_dots if dot.type == "Land"]
+            water_dots = [dot for dot in local_dots if dot.type == "Water"]
+            land_tree = scipy.spatial.KDTree([(dot.x, dot.y) for dot in land_dots])
+            water_tree = scipy.spatial.KDTree([(dot.x, dot.y) for dot in water_dots])
+            list_dots = list(range(piece_range[0], piece_range[1]))
+            if i == -1:
+                list_dots.reverse()
+            for ii in list_dots:
+                dot = dots[ii]
+                types = ["Land", "Water"]
+                if dot.type not in types:
+                    with lock:
+                        section_progress[3] += 1
+                    continue
+                same_dist = 0.0
+                opp_dist = 1.0
+                if dot.type == "Land":
+                    same_dist = land_tree.query((dot.x, dot.y), k=coastline_smoothing)[0]
+                    opp_dist = water_tree.query((dot.x, dot.y), k=coastline_smoothing)[0]
+                elif dot.type == "Water":
+                    same_dist = water_tree.query((dot.x, dot.y), k=coastline_smoothing)[0]
+                    opp_dist = land_tree.query((dot.x, dot.y), k=coastline_smoothing)[0]
+                if type(same_dist) is float:
+                    same_dist = [same_dist]
+                    opp_dist = [opp_dist]
+                if sum(same_dist) > sum(opp_dist):
+                    types.remove(dot.type)
+                    with lock:
+                        dots[ii] = Dot(dot.x, dot.y, types[0])
+                with lock:
+                    section_progress[3] += 1
+    except:
+        raise_error("smooth_coastlines", traceback.format_exc())
 def generate_biomes_water(piece_range, local_dots, height):
     try:
         tree = (
@@ -112,6 +148,5 @@ def main():
                     assign_biomes, (piece_ranges[i], biome_origin_dots, local_dots)))
             [result.wait() for result in results]
             section_times[4] = time.time() - start_time - sum(section_times)
-            section_progress_total[5] = height
         except:
             raise_error("main", traceback.format_exc())
