@@ -13,8 +13,6 @@ import traceback
 def raise_error(location, traceback_output):
     with open("errors.txt", "a") as file:
         file.write("Error at " + location + "\n\n" + traceback_output + "\n\n\n")
-def copy_piece(piece_range):
-    return dots[piece_range[0]:piece_range[1]]
 def smooth_coastlines(coastline_smoothing, piece_range, local_dots):
     try:
         for i in (1, -1):
@@ -51,16 +49,6 @@ def smooth_coastlines(coastline_smoothing, piece_range, local_dots):
                     section_progress[3] += 1
     except:
         raise_error("smooth_coastlines", traceback.format_exc())
-def clean_dots(local_dots_section, start_index):
-    try:
-        for i in range(len(local_dots_section)):
-            dot = local_dots_section[i]
-            if dot.type == "Land Origin":
-                dots[i + start_index] = Dot(dot.x, dot.y, "Land")
-            elif dot.type == "Water Forced":
-                dots[i + start_index] = Dot(dot.x, dot.y, "Water")
-    except:
-        raise_error("clean_dots", traceback.format_exc())
 def generate_biomes_water(piece_range, local_dots, height):
     try:
         tree = (
@@ -99,68 +87,7 @@ def assign_biomes(piece_range, biome_origin_dots, local_dots):
                 section_progress[4] += 1
     except:
         raise_error("assign_biomes", traceback.format_exc())
-def generate_image(start_height, section_height, process_num, local_dots, width):
-    try:
-        type_counts = [0] * 11
-        image_local = (
-            PIL.Image.new("RGB", (width, section_height), (255, 153, 194))
-        )
-        pixels = image_local.load()
-        tree = scipy.spatial.KDTree([(dot.x, dot.y) for dot in local_dots])
-        for y in range(section_height):
-            indexes = tree.query([(x, y + start_height) for x in range(width)])[1]
-            for x in range(width):
-                pixel_type = "Error"
-                pixel_type = local_dots[indexes[x]].type
-                type_counts[(
-                    "Ice", "Shallow Water", "Water", "Deep Water",
-                    "Rock", "Desert", "Jungle", "Forest", "Plains", "Taiga", "Snow"
-                ).index(pixel_type)] += 1
-                match (pixel_type):
-                    case "Ice":
-                        colors = [153, 221, 255]
-                    case "Shallow Water":
-                        colors = [0, 0, 255]
-                    case "Water":
-                        colors = [0, 0, 179]
-                    case "Deep Water":
-                        colors = [0, 0, 128]
-                    case "Rock":
-                        colors = [128, 128, 128]
-                    case "Desert":
-                        colors = [255, 185, 109]
-                    case "Jungle":
-                        colors = [0, 77, 0]
-                    case "Forest":
-                        colors = [0, 128, 0]
-                    case "Plains":
-                        colors = [0, 179, 0]
-                    case "Taiga":
-                        colors = [152, 251, 152]
-                    case "Snow":
-                        colors = [245, 245, 245]
-                    case "Error":
-                        colors = [255, 102, 163]
-                    case _:
-                        colors = [204, 0, 82]
-                for i in range(len(colors)):
-                    colors[i] += indexes[x] % 20 - 10
-                    if colors[i] > 255:
-                        colors[i] = 255
-                    elif colors[i] < 0:
-                        colors[i] = 0
-                pixels[x, y] = tuple(colors)
-            with lock:
-                section_progress[5] += 1
-        image_sections[process_num] = image_local
-        return type_counts
-    except:
-        raise_error("generate_image", traceback.format_exc())
-        return [0] * 11
 def main():
-    manager = multiprocessing.Manager()
-    image_sections = manager.list([PIL.Image.new("RGB", (100, 100), (255, 0, 102))] * processes)
-    lock = multiprocessing.Lock()
     with multiprocessing.Pool(processes, initializer=initialize_worker,
     initargs=(section_progress, dots, image_sections, lock)) as pool:
         try:
@@ -179,15 +106,6 @@ def main():
                 section_progress[3] = 1
             section_times[3] = time.time() - start_time - sum(section_times)
             section_progress_total[4] = num_dots
-            local_dots = []
-            results = pool.map(copy_piece, piece_ranges)
-            for result in results:
-                local_dots.extend(result)
-            results = []
-            for i in range(processes):
-                results.append(pool.apply_async(clean_dots,
-                    (local_dots[piece_ranges[i][0]:piece_ranges[i][1]], piece_ranges[i][0])))
-            [result.wait() for result in results]
             local_dots = []
             results = pool.map(copy_piece, piece_ranges)
             for result in results:
@@ -244,62 +162,5 @@ def main():
                     assign_biomes, (piece_ranges[i], biome_origin_dots, local_dots)))
             [result.wait() for result in results]
             section_times[4] = time.time() - start_time - sum(section_times)
-            section_progress_total[5] = height
-            local_dots = []
-            results = pool.map(copy_piece, piece_ranges)
-            for result in results:
-                local_dots.extend(result)
-            start_heights = list(range(0, height, height // processes))
-            section_heights = [height // processes] * (processes - 1)
-            section_heights.append(height - sum(section_heights))
-            results = []
-            for i in range(processes):
-                results.append(pool.apply_async(generate_image,
-                    (start_heights[i], section_heights[i], i, local_dots, width)))
-            [result.wait() for result in results]
-            type_counts = [0] * 11
-            for result in results:
-                for i in range(11):
-                    type_counts[i] += result.get()[i]
-            section_times[5] = time.time() - start_time - sum(section_times)
-            image = PIL.Image.new("RGB", (width, height), (255, 51, 133))
-            shift = 0
-            for section in image_sections:
-                image.paste(section, (0, shift))
-                shift += section_heights[0]
-            image.save(output_file)
         except:
             raise_error("main", traceback.format_exc())
-    if not auto_mode:
-        print(
-            ANSI_GREEN + "Generation Complete " + ANSI_RESET +
-            format_time(completion_time) + "\n\nStatistics"
-        )
-        types = (
-            "Ice", "Shallow Water", "Water", "Deep Water",
-            "Rock", "Desert", "Jungle", "Forest", "Plains", "Taiga", "Snow"
-        )
-        text_colors = ("117", "21", "19", "17", "243", "229", "22", "28", "40", "48", "255")
-        count_water = sum(type_counts[:4])
-        count_land = sum(type_counts[4:])
-        print(
-            "Water " +
-            "{:.2f}%".format(count_water / (height * width) * 100).rjust(6)
-        )
-        print(
-            "Land  " +
-            "{:.2f}%".format(count_land / (height * width) * 100).rjust(6)
-        )
-        print("     % of Land/Water | % of Total")
-        for i in range(11):
-            if i < 4:
-                count_group = count_water
-            else:
-                count_group = count_land
-            print(
-                "\u001b[48;5;" + text_colors[i] + "m" + types[i].ljust(13) + ANSI_RESET +
-                "{:.2f}%".format(type_counts[i] / count_group * 100).rjust(7) + " | " +
-                "{:.2f}%".format(type_counts[i] / (height * width) * 100).rjust(6)
-            )
-if __name__ == "__main__":
-    main()
