@@ -230,11 +230,11 @@ Node *build_recursive(const int num_coords, int coords[num_coords * 3], const in
     if (num_coords_right > 0) {
 
         int *coords_right = malloc(num_coords_right * 3 * sizeof(int));
-        for (int i = med_pos + 1; i < num_coords; i++) {
-            const int index = i - med_pos - 1;
-            coords_right[index * 3] = coords[i * 3];
-            coords_right[index * 3 + 1] = coords[i * 3 + 1];
-            coords_right[index * 3 + 2] = coords[i * 3 + 2];
+        for (int i = 0; i < num_coords_right; i++) {
+            const int index = i + med_pos + 1;
+            coords_right[i * 3] = coords[index * 3];
+            coords_right[i * 3 + 1] = coords[index * 3 + 1];
+            coords_right[i * 3 + 2] = coords[index * 3 + 2];
         }
         node->right = build_recursive(num_coords_right, coords_right, depth + 1);
         free(coords_right);
@@ -506,7 +506,7 @@ void assign_sections(
 
     #endif
 
-    srand(time(NULL) + getpid());
+    srand(time(NULL) + get_pid());
 
     for (int i = start_index; i < end_index; i++) {
 
@@ -599,68 +599,63 @@ void smooth_coastlines(
     land_tree_root = build_recursive(num_land_dots, land_dots, 0);
     water_tree_root = build_recursive(num_water_dots, water_dots, 0);
 
+    FILE *z = fopen("production-files/record.txt", "a");
+
     for (int q = 0; q < num_land_dots; q++) {
         const int dot_coord[2] = {land_dots[q * 3], land_dots[q * 3 + 1]};
         int dist = INT_MAX;
         query_recursive(land_tree_root, dot_coord, 0, NULL, &dist);
-        if (dist != 0){
-            record_val(dot_coord[0], "dot coord x");
-            record_val(dot_coord[1], "dot coord y");
-            record_val(dist, "dot dist");
-            record_val(q, "dot index (self)");
-        }
+        fprintf(z, "di: %d q: %d dist: %d\n", land_dots[q * 3 + 2], q, dist);
     }
+
+    fclose(z);
 
     free(land_dots);
     free(water_dots);
 
-    for (int _ = 0; _ < 2; _++) {
+    for (int i = start_index; i < end_index; i++) {
 
-        for (int i = start_index; i < end_index; i++) {
+        Dot *dot = &dots[i];
+        int dot_coord[2] = {dot->x, dot->y};
 
-            Dot *dot = &dots[i];
-            int dot_coord[2] = {dot->x, dot->y};
+        const bool land_dot = (dot->type == 'L');
 
-            const bool land_dot = (dot->type == 'L');
+        long sums[2] = {0, 0}; // same type, opposite
+        Node *tree_roots[2];
 
-            long sums[2] = {0, 0}; // same type, opposite
-            Node *tree_roots[2];
-
-            if (land_dot) {
-                tree_roots[0] = land_tree_root;
-                tree_roots[1] = water_tree_root;
-            } else {
-                tree_roots[0] = water_tree_root;
-                tree_roots[1] = land_tree_root;
-            }
-
-            for (int ii = 0; ii < 2; ii++) {
-
-                int dists[coastline_smoothing];
-                for (int iii = 0; iii < coastline_smoothing; iii++) {
-                    dists[iii] = INT_MAX;
-                }
-
-                int max_dist = INT_MAX;
-
-                query_dist_recursive(
-                    tree_roots[ii], dot_coord, 0, dists, coastline_smoothing, &max_dist
-                );
-
-                for (int iii = 0; iii < coastline_smoothing; iii++) {
-                    sums[ii] += dists[iii];
-                }
-
-            }
-
-            if (sums[0] > sums[1]) {
-                dot->type = (land_dot) ? 'W' : 'L';
-            }
-
-            atomic_fetch_add(&section_progress[3], 1);
-            
+        if (land_dot) {
+            tree_roots[0] = land_tree_root;
+            tree_roots[1] = water_tree_root;
+        } else {
+            tree_roots[0] = water_tree_root;
+            tree_roots[1] = land_tree_root;
         }
 
+        for (int ii = 0; ii < 2; ii++) {
+
+            int dists[coastline_smoothing];
+            for (int iii = 0; iii < coastline_smoothing; iii++) {
+                dists[iii] = INT_MAX;
+            }
+
+            int max_dist = INT_MAX;
+
+            query_dist_recursive(
+                tree_roots[ii], dot_coord, 0, dists, coastline_smoothing, &max_dist
+            );
+
+            for (int iii = 0; iii < coastline_smoothing; iii++) {
+                sums[ii] += dists[iii];
+            }
+
+        }
+
+        if (sums[0] > sums[1]) {
+            dot->type = (land_dot) ? 'W' : 'L';
+        }
+
+        atomic_fetch_add(&section_progress[3], 1);
+        
     }
 
     free_recursive(land_tree_root);
