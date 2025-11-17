@@ -1004,7 +1004,7 @@ int main(int argc, char *argv[]) {
 
     if (coastline_smoothing != 0) {
 
-        section_progress_total[3] = num_reg_dots * 2;
+        section_progress_total[3] = num_reg_dots;
 
         for (int i = 0; i < processes; i++) {
             fork_pids[i] = fork();
