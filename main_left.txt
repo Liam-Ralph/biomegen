@@ -13,33 +13,6 @@ import traceback
 def raise_error(location, traceback_output):
     with open("errors.txt", "a") as file:
         file.write("Error at " + location + "\n\n" + traceback_output + "\n\n\n")
-def generate_biomes_water(piece_range, local_dots, height):
-    try:
-        tree = (
-            scipy.spatial.KDTree([(dot.x, dot.y) for dot in local_dots if dot.type == "Land"])
-        )
-        for i in [index for index in range(piece_range[0], piece_range[1])
-        if local_dots[index].type == "Water"]:
-            dot = dots[i]
-            equator_dist = abs(dot.y - height / 2) / height * 20
-            land_dist = tree.query((dot.x, dot.y))[0]
-            if (
-                (land_dist < 35 and equator_dist > 9) or
-                (land_dist < 25 and equator_dist > 8) or
-                (land_dist < 15 and equator_dist > 7)
-            ):
-                dot_type = "Ice"
-            elif land_dist < 18:
-                dot_type = "Shallow Water"
-            elif land_dist < 35:
-                dot_type = "Water"
-            else:
-                dot_type = "Deep Water"
-            dots[i] = Dot(dot.x, dot.y, dot_type)
-            with lock:
-                section_progress[4] += 1
-    except:
-        raise_error("generate_biomes_water", traceback.format_exc())
 def assign_biomes(piece_range, biome_origin_dots, local_dots):
     try:
         tree = scipy.spatial.KDTree([(dot.x, dot.y) for dot in biome_origin_dots])
@@ -55,52 +28,6 @@ def main():
     with multiprocessing.Pool(processes, initializer=initialize_worker,
     initargs=(section_progress, dots, image_sections, lock)) as pool:
         try:
-            section_progress_total[4] = num_dots
-            local_dots = []
-            results = pool.map(copy_piece, piece_ranges)
-            for result in results:
-                local_dots.extend(result)
-            results = []
-            for i in range(processes):
-                results.append(pool.apply_async(
-                    generate_biomes_water, (piece_ranges[i], local_dots, height)))
-            [result.wait() for result in results]
-            local_dots = []
-            results = pool.map(copy_piece, piece_ranges)
-            for result in results:
-                local_dots.extend(result)
-            biome_origin_dot_indexes = [i for i in random.sample(range(0, num_dots), num_dots // 10)
-                if local_dots[i].type == "Land"]
-            for i in biome_origin_dot_indexes:
-                dot = local_dots[i]
-                equator_dist = abs(dot.y - height / 2) / height * 20
-                if equator_dist < 1:
-                    probs = ["Rock"] + ["Desert"] * 3 + ["Jungle"] * 3 + ["Forest"] * 2 + ["Plains"]
-                elif equator_dist < 2:
-                    probs = (
-                        ["Rock"] + ["Desert"] * 3 + ["Jungle"] * 2 + ["Forest"] * 2 + ["Plains"] * 2
-                    )
-                elif equator_dist < 3:
-                    probs = ["Rock"] + ["Desert"] * 2 + ["Jungle"] + ["Forest"] * 3 + ["Plains"] * 3
-                elif equator_dist < 4:
-                    probs = ["Rock"] + ["Desert"] + ["Jungle"] + ["Forest"] * 3 + ["Plains"] * 4
-                elif equator_dist < 5:
-                    probs = ["Rock"] + ["Desert"] + ["Forest"] * 4 + ["Plains"] * 4
-                elif equator_dist < 6:
-                    probs = ["Rock"] +  ["Forest"] * 5 + ["Plains"] * 4
-                elif equator_dist < 7:
-                    probs = ["Rock"] + ["Taiga"] + ["Forest"] * 5 + ["Plains"] * 3
-                elif equator_dist < 8:
-                    probs = (
-                        ["Rock"] +  ["Snow"] * 2 + ["Taiga"] * 2 + ["Forest"] * 3 + ["Plains"] * 2
-                    )
-                elif equator_dist < 9:
-                    probs = ["Snow"] * 4 + ["Taiga"] * 5 + ["Forest"]
-                else:
-                    probs = ["Snow"] * 10
-                dot_type = probs[random.randint(0, 9)]
-                dots[i] = Dot(dot.x, dot.y, dot_type)
-                section_progress[4] += 1
             local_dots = []
             results = pool.map(copy_piece, piece_ranges)
             for result in results:
@@ -111,6 +38,5 @@ def main():
                 results.append(pool.apply_async(
                     assign_biomes, (piece_ranges[i], biome_origin_dots, local_dots)))
             [result.wait() for result in results]
-            section_times[4] = time.time() - start_time - sum(section_times)
         except:
             raise_error("main", traceback.format_exc())
