@@ -389,11 +389,11 @@ void track_progress(
     _Atomic int *section_progress, int *section_progress_total, float *section_times
 ) {
 
-    char section_names[7][20] = {
+    char section_names[6][20] = {
         "Setup", "Section Generation", "Section Assignment", "Coastline Smoothing",
-        "Biome Generation", "Image Generation", "Finish"
+        "Biome Generation", "Image Generation"
     };
-    float section_weights[7] = {0.02f, 0.01f, 0.11f, 0.38f, 0.29f, 0.17f, 0.02f};
+    float section_weights[6] = {0.02, 0.01, 0.11, 0.38, 0.29, 0.19};
     // Used for overall progress bar (e.g. Setup takes ~2% of total time)
 
     while (true) {
@@ -409,7 +409,7 @@ void track_progress(
 
         float total_progress = 0.0;
 
-        for (int i = 0; i < 7; i++) {
+        for (int i = 0; i < 6; i++) {
 
             // Calculating Section Progress
 
@@ -427,7 +427,7 @@ void track_progress(
             } else {
                 color = ANSI_BLUE;
                 if (i == 0 || section_times[i - 1] != 0.0) {
-                    section_time = time_diff - sum_list_float(section_times, 7);
+                    section_time = time_diff - sum_list_float(section_times, 6);
                     // Section in progress
                 } else {
                     section_time = 0.0; // Section hasn't started
@@ -437,9 +437,9 @@ void track_progress(
             // Printing Output for Section Progress
 
             printf(
-                "%s[%d/7] %-20s%8.2f%% %s",
+                "%s[%d/6] %-20s%8.2f%% %s",
                 color, i + 1, section_names[i], progress_section * 100, ANSI_GREEN
-            ); // "[1/7] Setup               100.00% "
+            ); // "[1/6] Setup               100.00% "
             int green_bars = (int)round(20 * progress_section);
             for (int ii = 0; ii < green_bars; ii++) {
                 printf("█");
@@ -459,7 +459,7 @@ void track_progress(
         // Total Progress
 
         char *color;
-        if (sum_list_int_atomic(section_progress, 7) == sum_list_int(section_progress_total, 7)) {
+        if (sum_list_int_atomic(section_progress, 6) == sum_list_int(section_progress_total, 6)) {
             color = ANSI_GREEN;
         } else {
             color = ANSI_BLUE;
@@ -777,10 +777,16 @@ void generate_image(
 
     for (int y = start_height; y < end_height; y++) {
 
+        int min_dist = INT_MAX;
+
         for (int x = 0; x < width; x++) {
 
             int nearest_index = 0;
-            int min_dist = INT_MAX;
+
+            if (min_dist != INT_MAX) {
+                const int min_dist_sq = ceil(sqrt(min_dist)) + 2;
+                min_dist = min_dist_sq * min_dist_sq;
+            }
 
             const int coord[2] = {x, y};
             query_recursive(tree_root, coord, 0, &nearest_index, &min_dist);
@@ -832,7 +838,7 @@ int main(int argc, char *argv[]) {
 
         auto_mode = false;
 
-        output_file = "result.png";
+        output_file = "production-files/result.png";
 
         // Getting Program Version
 
@@ -943,18 +949,18 @@ int main(int argc, char *argv[]) {
     // Shared Memory
 
     _Atomic int *section_progress = mmap(
-        NULL, sizeof(int) * 7, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0
+        NULL, sizeof(int) * 6, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0
     );
 
     int *section_progress_total = mmap(
-        NULL, sizeof(int) * 7, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0
+        NULL, sizeof(int) * 6, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0
     );
 
     float *section_times = mmap(
-        NULL, sizeof(float) * 7, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0
+        NULL, sizeof(float) * 6, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0
     );
 
-    for (int i = 0; i < 7; i++) {
+    for (int i = 0; i < 6; i++) {
         atomic_init(&section_progress[i], 0);
         section_progress_total[i] = 1;
         section_times[i] = 0;
@@ -1045,7 +1051,7 @@ int main(int argc, char *argv[]) {
 
     clock_gettime(CLOCK_REALTIME, &time_now);
     section_times[1] = (float)(time_now.tv_sec - start_time.tv_sec) +
-        (time_now.tv_nsec - start_time.tv_nsec) / 1000000000.0 - sum_list_float(section_times, 7);
+        (time_now.tv_nsec - start_time.tv_nsec) / 1000000000.0 - sum_list_float(section_times, 6);
 
     // Section Assignment
     // Assigning dots as "Land", "Land Origin", "Water", or "Water Forced"
@@ -1089,7 +1095,7 @@ int main(int argc, char *argv[]) {
 
     clock_gettime(CLOCK_REALTIME, &time_now);
     section_times[2] = (float)(time_now.tv_sec - start_time.tv_sec) +
-        (time_now.tv_nsec - start_time.tv_nsec) / 1000000000.0 - sum_list_float(section_times, 7);
+        (time_now.tv_nsec - start_time.tv_nsec) / 1000000000.0 - sum_list_float(section_times, 6);
 
     // Coastline Smoothing
 
@@ -1120,7 +1126,7 @@ int main(int argc, char *argv[]) {
 
     clock_gettime(CLOCK_REALTIME, &time_now);
     section_times[3] = (float)(time_now.tv_sec - start_time.tv_sec) +
-        (time_now.tv_nsec - start_time.tv_nsec) / 1000000000.0 - sum_list_float(section_times, 7);
+        (time_now.tv_nsec - start_time.tv_nsec) / 1000000000.0 - sum_list_float(section_times, 6);
 
     // Biome Generation
 
@@ -1265,7 +1271,7 @@ int main(int argc, char *argv[]) {
 
     clock_gettime(CLOCK_REALTIME, &time_now);
     section_times[4] = (float)(time_now.tv_sec - start_time.tv_sec) +
-        (time_now.tv_nsec - start_time.tv_nsec) / 1000000000.0 - sum_list_float(section_times, 7);
+        (time_now.tv_nsec - start_time.tv_nsec) / 1000000000.0 - sum_list_float(section_times, 6);
 
     // Image Generation
 
@@ -1406,14 +1412,9 @@ int main(int argc, char *argv[]) {
 
     clock_gettime(CLOCK_REALTIME, &time_now);
     section_times[5] = (float)(time_now.tv_sec - start_time.tv_sec) +
-        (time_now.tv_nsec - start_time.tv_nsec) / 1000000000.0 - sum_list_float(section_times, 7);
+        (time_now.tv_nsec - start_time.tv_nsec) / 1000000000.0 - sum_list_float(section_times, 6);
 
-    // Finish
-
-    clock_gettime(CLOCK_REALTIME, &time_now);
-    section_times[6] = (float)(time_now.tv_sec - start_time.tv_sec) +
-        (time_now.tv_nsec - start_time.tv_nsec) / 1000000000.0 - sum_list_float(section_times, 7);
-    atomic_store(&section_progress[6], 1);
+    // Finish (no longer tracked)
 
     if (!auto_mode) {
         // Wait for Tracker Process
@@ -1422,9 +1423,9 @@ int main(int argc, char *argv[]) {
 
     // Shared Memory Cleanup
 
-    munmap(section_progress, sizeof(int) * 7);
-    munmap(section_progress_total, sizeof(int) * 7);
-    munmap(section_times, sizeof(float) * 7);
+    munmap(section_progress, sizeof(int) * 6);
+    munmap(section_progress_total, sizeof(int) * 6);
+    munmap(section_times, sizeof(float) * 6);
     munmap(dots, sizeof(Dot) * num_dots);
     munmap(image_indexes, sizeof(int) * width * height);
 
@@ -1432,15 +1433,19 @@ int main(int argc, char *argv[]) {
 
     struct timespec end_time;
     clock_gettime(CLOCK_REALTIME, &end_time);
+    char formatted_time[32];
     float completion_time = (float)(time_now.tv_sec - start_time.tv_sec) +
         (time_now.tv_nsec - start_time.tv_nsec) / 1000000000.0;
+    snprintf(
+        formatted_time, 32, "%2d:%08.5f", (int)completion_time / 60, fmod(completion_time, 60.0f)
+    );
 
     if (!auto_mode) {
 
         // Print Result Statistics
 
         printf(
-            "%sGeneration Complete%s %.5fs\n\nStatistics\n", ANSI_GREEN, ANSI_RESET, completion_time
+            "%sGeneration Complete%s %s\n\nStatistics\n", ANSI_GREEN, ANSI_RESET, formatted_time
         );
 
         int count_water = 0;
