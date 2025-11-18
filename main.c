@@ -213,7 +213,7 @@ void nth_sort_recursive(
  * Build a KDTree from COORDS, and return the root node. Ensures the KDTree is
  * built with the lowest possible depth for maximum efficiency when querying the
  * tree. Every recursion creates one dot and calls this function to insert its
- * children from an array of possible dots.
+ * children from an array of possible dots. DEPTH should be 0.
  */
 Node *build_recursive(const int num_coords, int coords[num_coords * 3], const int depth) {
 
@@ -266,7 +266,8 @@ Node *build_recursive(const int num_coords, int coords[num_coords * 3], const in
  * Query the KDTree to modify MIN_DIST, the distance to the nearest node. When
  * INDEX_PTR is not null, it stores the index of the nearest node, which
  * corresponds to the index of the dot it was created from. Calls itself
- * recursively to query children of NODE.
+ * recursively to query children of NODE. DEPTH should be 0 when NODE is a root
+ * node.
  */
 void query_recursive(
     Node *node, const int *coord, const int depth, int *index_ptr, int *min_dist_ptr
@@ -306,6 +307,7 @@ void query_recursive(
  * points to COORD. Recursively navigates down the KDTree, editing DISTS and
  * the value at MAX_DIST_PTR whenever it finds a node whose distance is less
  * than the value at MAX_DIST_PTR. All distances are squared for efficiency.
+ * DEPTH should be 0 when NODE is a root node.
  */
 void query_dist_recursive(
     Node *node, const int *coord, const int depth,
@@ -703,6 +705,44 @@ void generate_biomes_water(
         } else if (land_dist_sq >= 35 * 35) {
             dot->type = 'd';
         }
+
+        atomic_fetch_add(&section_progress[4], 1);
+
+    }
+
+}
+
+void generate_biomes_land(
+    const int start_index, const int end_index, const int num_dots,
+    const int *biome_origin_indexes, Dot *dots, _Atomic int *section_progress
+) {
+
+    int num_origin_dots = num_dots / 10;
+    int *biome_origin_dots = malloc(num_origin_dots * 3 * sizeof(int));
+    for (int i = 0; i < num_origin_dots; i++) {
+        const Dot *dot = &dots[biome_origin_indexes[i]];
+        biome_origin_dots[i * 3] = dot->x;
+        biome_origin_dots[i * 3 + 1] = dot->y;
+        biome_origin_dots[i * 3 + 2] = i;
+    }
+    Node *origin_tree_root = NULL;
+    origin_tree_root = build_recursive(num_origin_dots, biome_origin_dots, 0);
+    free(biome_origin_dots);
+
+    for (int i = start_index; i < end_index; i++) {
+
+        Dot *dot = &dots[i];
+
+        if (dot->type != 'L') {
+            continue;
+        }
+
+        int min_dist = INT_MAX;
+        int origin_index = 0;
+        const int coord[2] = {dot->x, dot->y};
+        query_recursive(origin_tree_root, coord, 0, &origin_index, &min_dist);
+
+        dot->type = dots[origin_index].type;
 
         atomic_fetch_add(&section_progress[4], 1);
 
@@ -1210,13 +1250,20 @@ int main(int argc, char *argv[]) {
 
     // Add land biomes, dots are assigned the biome of the nearest biome origin dot
 
-    for (int i = 0; i < num_dots; i++) {
-        if (dots[i].type == 'L') {
-            dots[i].type = 'F';
+    for (int i = 0; i < processes; i++) {
+        fork_pids[i] = fork();
+        if (fork_pids[i] == 0) {
+            set_process_title("worker");
+            generate_biomes_land(
+                piece_starts[i], piece_starts[i + 1], num_dots,
+                biome_origin_indexes, dots, section_progress
+            );
+            exit(0);
         }
     }
-
-    atomic_store(&section_progress[4], num_dots);
+    for (int i = 0; i < processes; i++) {
+        waitpid(fork_pids[i], NULL, 0);
+    }
 
     clock_gettime(CLOCK_REALTIME, &time_now);
     section_times[4] = (float)(time_now.tv_sec - start_time.tv_sec) +
