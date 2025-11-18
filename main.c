@@ -74,27 +74,6 @@ typedef struct Node {
 } Node;
 
 
-// Debugging Functions
-
-void record_val(const long value, const char *name) {
-    if (strcmp(name, "clear") == 0) {
-        FILE *fptr = fopen("production-files/record.txt", "w");
-        fprintf(fptr, "Record Cleared\n");
-        fclose(fptr);
-    } else {
-        FILE *fptr = fopen("production-files/record.txt", "a");
-        fprintf(fptr, "%s | %ld\n", name, value);
-        fclose(fptr);
-    }
-}
-
-void record_str(const char *str, const char *name) {
-    FILE *fptr = fopen("production-files/record.txt", "a");
-    fprintf(fptr, "%s | %s\n", name, str);
-    fclose(fptr);
-}
-
-
 // General Functions
 // (Alphabetical order)
 
@@ -371,6 +350,35 @@ void free_recursive(Node *node) {
 // (Order of use)
 
 /**
+ * Set the process's title to "biogen-" + TYPE. If NUM >= 0, then NUM, padded to
+ * a length of 2 (not including null character) with leading zeros will be added
+ * as well. The length of TYPE + NUM (as a string) must be at max 9 characters
+ * (including null character).
+ */
+void set_process_title(const char *type, const int num) {
+
+    char string[16] = "biogen-";
+    strncat(string, type, 9);
+
+    if (0 <= num && num < 100) {
+        char num_str[3];
+        snprintf(num_str, 3, "%02d", num);
+        strncat(string, num_str, 3);
+    }
+
+    #ifdef __linux__
+
+        prctl(PR_SET_NAME, string, 0, 0, 0);
+
+    #elif BSD || __Apple__
+
+        setproctitle(string);
+
+    #endif
+
+}
+
+/**
  * Track the progress of map generation, and show the progress in the terminal.
  * START_TIME is the time at the start of map generation in main(), and the
  * other inputs are all shared memory used to track section progress and times.
@@ -485,26 +493,6 @@ void track_progress(
         }
 
     }
-
-}
-
-/**
- * Set the process's title to "biomegen-" + TYPE.
- */
-void set_process_title(char *type) {
-
-    char string[16] = "biomegen-";
-    strncat(string, type, 7);
-
-    #ifdef __linux__
-
-        prctl(PR_SET_NAME, string, 0, 0, 0);
-
-    #elif BSD || __Apple__
-
-        setproctitle(string);
-
-    #endif
 
 }
 
@@ -660,6 +648,11 @@ void clean_dots(const int start_index, const int end_index, Dot *dots) {
     }
 }
 
+/**
+ * Generate water biomes for DOTS between START_INDEX and END_INDEX. Water
+ * biomes are generated based on a dot's distance to the equator and the
+ * distance to the nearest land dot.
+ */
 void generate_biomes_water(
     const int start_index, const int end_index, const int height,
     const int num_dots, Dot *dots, _Atomic int *section_progress
@@ -712,6 +705,11 @@ void generate_biomes_water(
 
 }
 
+/**
+ * Generate land biomes for DOTS between START_INDEX and END_INDEX. Land biomes
+ * are generated base on the nearest dot in BIOME_ORIGIN_INDEXES, the list of
+ * dots whose biomes are already before this function.
+ */
 void generate_biomes_land(
     const int start_index, const int end_index, const int num_dots,
     const int *biome_origin_indexes, Dot *dots, _Atomic int *section_progress
@@ -723,7 +721,7 @@ void generate_biomes_land(
         const Dot *dot = &dots[biome_origin_indexes[i]];
         biome_origin_dots[i * 3] = dot->x;
         biome_origin_dots[i * 3 + 1] = dot->y;
-        biome_origin_dots[i * 3 + 2] = i;
+        biome_origin_dots[i * 3 + 2] = biome_origin_indexes[i];
     }
     Node *origin_tree_root = NULL;
     origin_tree_root = build_recursive(num_origin_dots, biome_origin_dots, 0);
@@ -819,7 +817,7 @@ int main(int argc, char *argv[]) {
 
     // Setting Main Process Title
 
-    set_process_title("main");
+    set_process_title("main", -1);
 
     // Getting Inputs
 
@@ -834,7 +832,7 @@ int main(int argc, char *argv[]) {
 
         auto_mode = false;
 
-        output_file = "production-files/result.png";
+        output_file = "result.png";
 
         // Getting Program Version
 
@@ -990,7 +988,7 @@ int main(int argc, char *argv[]) {
         tracker_process_pid = fork();
 
         if (tracker_process_pid == 0) {
-            set_process_title("trackr"); // "biomegen-tracker" is 16 characters; too long
+            set_process_title("tracker", -1);
             track_progress(start_time, section_progress, section_progress_total, section_times);
             exit(0);
         }
@@ -1077,7 +1075,7 @@ int main(int argc, char *argv[]) {
     for (int i = 0; i < processes; i++) {
         fork_pids[i] = fork();
         if (fork_pids[i] == 0) {
-            set_process_title("worker");
+            set_process_title("worker", i);
             assign_sections(
                 map_resolution, island_size, piece_starts[i], piece_starts[i + 1],
                 num_special_dots / 2, origin_dots, dots, section_progress
@@ -1102,7 +1100,7 @@ int main(int argc, char *argv[]) {
         for (int i = 0; i < processes; i++) {
             fork_pids[i] = fork();
             if (fork_pids[i] == 0) {
-                set_process_title("worker");
+                set_process_title("worker", i);
                 smooth_coastlines(
                     coastline_smoothing, width, height, piece_starts[i], piece_starts[i + 1],
                     num_dots, num_special_dots, num_reg_dots, dots, section_progress
@@ -1140,7 +1138,7 @@ int main(int argc, char *argv[]) {
     for (int i = 0; i < processes; i++) {
         fork_pids[i] = fork();
         if (fork_pids[i] == 0) {
-            set_process_title("worker");
+            set_process_title("worker", i);
             clean_dots(piece_starts[i], piece_starts[i + 1], dots);
             exit(0);
         }
@@ -1154,7 +1152,7 @@ int main(int argc, char *argv[]) {
     for (int i = 0; i < processes; i++) {
         fork_pids[i] = fork();
         if (fork_pids[i] == 0) {
-            set_process_title("worker");
+            set_process_title("worker", i);
             generate_biomes_water(
                 piece_starts[i], piece_starts[i + 1], height, num_dots, dots, section_progress
             );
@@ -1253,7 +1251,7 @@ int main(int argc, char *argv[]) {
     for (int i = 0; i < processes; i++) {
         fork_pids[i] = fork();
         if (fork_pids[i] == 0) {
-            set_process_title("worker");
+            set_process_title("worker", i);
             generate_biomes_land(
                 piece_starts[i], piece_starts[i + 1], num_dots,
                 biome_origin_indexes, dots, section_progress
@@ -1284,7 +1282,7 @@ int main(int argc, char *argv[]) {
     for (int i = 0; i < processes; i++) {
         fork_pids[i] = fork();
         if (fork_pids[i] == 0) {
-            set_process_title("worker");
+            set_process_title("worker", i);
             generate_image(
                 section_starts[i], section_starts[i + 1], width,
                 num_dots, dots, image_indexes, type_counts, section_progress
