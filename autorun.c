@@ -17,15 +17,11 @@ int main() {
 
     #ifdef __linux__
 
-        prctl(PR_SET_NAME, "biomegenautorun", 0, 0, 0);
+        prctl(PR_SET_NAME, "biogen-autorun", 0, 0, 0);
 
-    #elif BSD
+    #elif BSD || __Apple__
 
-        setproctitle("biomegen-autorun");
-
-    #elif __Apple__
-
-        setproctitle("biomegen-autorun");
+        setproctitle("biogen-autorun");
     
     #endif
 
