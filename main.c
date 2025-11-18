@@ -299,18 +299,17 @@ void query_dist_recursive(
 
     if (dist < *max_dist_ptr && dist != 0) {
         int pos_max = 0;
+        int pos_max2 = 0;
         for (int i = 1; i < dists_len; i++) {
             if (dists[i] > dists[pos_max]) {
+                pos_max2 = pos_max;
                 pos_max = i;
+            } else if (dists[i] > dists[pos_max2] && i != pos_max) {
+                pos_max2 = i;
             }
         }
         dists[pos_max] = dist;
-        for (int i = 1; i < dists_len; i++) {
-            if (dists[i] > dists[pos_max]) {
-                pos_max = i;
-            }
-        }
-        *max_dist_ptr = dists[pos_max];
+        *max_dist_ptr = (dists[pos_max2] > dist) ? dists[pos_max2] : dist;
     }
 
     const int axis = depth % 2;
