@@ -287,6 +287,7 @@ void query_recursive(
 
     const int dist_line = node->coord[axis] - coord[axis];
     const bool line_close = (dist_line * dist_line < *min_dist_ptr);
+    // whether distance to splitting line is less than max_dist
     if (node->left != NULL) {
         if (line_close || coord[axis] < node->coord[axis]) {
             query_recursive(node->left, coord, depth + 1, index_ptr, min_dist_ptr);
@@ -657,17 +658,6 @@ void clean_dots(const int start_index, const int end_index, Dot *dots) {
     }
 }
 
-int get_depth(struct Node* root) {
-    if (root == NULL)
-        return -1;
-
-    // compute the height of left and right subtrees
-    int lHeight = get_depth(root->left);
-    int rHeight = get_depth(root->right);
-
-    return (lHeight > rHeight ? lHeight : rHeight) + 1;
-}
-
 void generate_biomes_water(
     const int start_index, const int end_index, const int height,
     const int num_dots, Dot *dots, _Atomic int *section_progress
@@ -696,7 +686,7 @@ void generate_biomes_water(
             continue;
         }
 
-        const float equator_dist = abs(20 * dot->y / height - 10);
+        const float equator_dist = fabs((float)dot->y - height / 2.0) / height * 20.0;
 
         int land_dist_sq = INT_MAX;
         const int coord[2] = {dot->x, dot->y};
@@ -1134,6 +1124,91 @@ int main(int argc, char *argv[]) {
     for (int i = 0; i < processes; i++) {
         waitpid(fork_pids[i], NULL, 0);
     }
+
+    // Adding biome origin dots, which decide what biome an area will be
+
+    int biome_origin_indexes[num_dots / 10];
+
+    int ii = 0;
+    for (int i = 0; i < num_dots / 10; i++) {
+
+        while (dots[ii].type != 'L') {
+            ii++;
+        }
+        biome_origin_indexes[i] = ii;
+
+        Dot *dot = &dots[ii];
+
+        const float equator_dist = fabs((float)dot->y - height / 2.0) / height * 20.0;
+
+        char probs[10];
+        if (equator_dist < 1) {
+            memcpy(
+                probs, (char[]){'R', 'D', 'D', 'D', 'J', 'J', 'J', 'F', 'F', 'P'}, sizeof(probs)
+            );
+        } else if (equator_dist < 2) {
+            memcpy(
+                probs, (char[]){'R', 'D', 'D', 'D', 'J', 'J', 'F', 'F', 'P', 'P'}, sizeof(probs)
+            );
+        } else if (equator_dist < 3) {
+            memcpy(
+                probs, (char[]){'R', 'D', 'D', 'J', 'F', 'F', 'F', 'P', 'P', 'P'}, sizeof(probs)
+            );
+        } else if (equator_dist < 4) {
+            memcpy(
+                probs, (char[]){'R', 'D', 'J', 'F', 'F', 'F', 'P', 'P', 'P', 'P'}, sizeof(probs)
+            );
+        } else if (equator_dist < 5) {
+            memcpy(
+                probs, (char[]){'R', 'D', 'F', 'F', 'F', 'F', 'P', 'P', 'P', 'P'}, sizeof(probs)
+            );
+        } else if (equator_dist < 6) {
+            memcpy(
+                probs, (char[]){'R', 'F', 'F', 'F', 'F', 'F', 'P', 'P', 'P', 'P'}, sizeof(probs)
+            );
+        } else if (equator_dist < 7) {
+            memcpy(
+                probs, (char[]){'R', 'T', 'F', 'F', 'F', 'F', 'F', 'P', 'P', 'P'}, sizeof(probs)
+            );
+        } else if (equator_dist < 8) {
+            memcpy(
+                probs, (char[]){'R', 'S', 'S', 'T', 'T', 'F', 'F', 'F', 'P', 'P'}, sizeof(probs)
+            );
+        } else if (equator_dist < 9) {
+            memcpy(
+                probs, (char[]){'S', 'S', 'S', 'S', 'T', 'T', 'T', 'T', 'T', 'F'}, sizeof(probs)
+            );
+        } else {
+            for (int ii = 0; ii < 10; ii++) {
+                probs[ii] = 'S';
+            }
+        }
+
+        /*
+        Probability Chart, 1 box = 10% Chance
+        Uppercase/lowercase are an attempt to make it easier to read, they mean nothing
+        This also means s represents snow, not shallow water
+        0-1 | r D D D J J J f f P
+        1-2 | r D D D J J f f P P
+        2-3 | r D D J f f f P P P
+        3-4 | r D J f f f P P P P
+        4-5 | r D f f f f P P P P
+        5-6 | r f f f f f P P P P
+        6-7 | r T f f f f f P P P
+        7-8 | r s s T T f f f P P
+        8-9 | s s s s T T T T f f
+        9-10| s s s s s s s s s s
+        */
+
+        dot->type = probs[rand() % 10];
+
+        ii++;
+
+        atomic_fetch_add(&section_progress[4], 1);
+
+    }
+
+    // Add land biomes, dots are assigned the biome of the nearest biome origin dot
 
     for (int i = 0; i < num_dots; i++) {
         if (dots[i].type == 'L') {
