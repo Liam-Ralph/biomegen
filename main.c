@@ -547,8 +547,7 @@ void assign_sections(
  * COASTLINE_SMOOTHING dots of the same and opposite types.
  */
 void smooth_coastlines(
-    const int coastline_smoothing, const int width, const int height,
-    const int start_index, const int end_index,
+    const int coastline_smoothing, const int start_index, const int end_index,
     const int num_dots, const int num_special_dots, const int num_reg_dots,
     Dot *dots, _Atomic int *section_progress
 ) {
@@ -1107,7 +1106,7 @@ int main(int argc, char *argv[]) {
             if (fork_pids[i] == 0) {
                 set_process_title("worker", i);
                 smooth_coastlines(
-                    coastline_smoothing, width, height, piece_starts[i], piece_starts[i + 1],
+                    coastline_smoothing, piece_starts[i], piece_starts[i + 1],
                     num_dots, num_special_dots, num_reg_dots, dots, section_progress
                 );
                 exit(0);
