@@ -1,3 +1,7 @@
+## Version 2.1.6 (November 2025)
+
+ - Removed useless loop in coastline smoothing.
+
 ## Version 2.1.5 (October 2025)
 
  - Added documentation comments to function.
