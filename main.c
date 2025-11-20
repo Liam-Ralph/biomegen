@@ -59,7 +59,7 @@ typedef struct {
     P = Plains
     T = Taiga
     S = Snow
-    
+
     w = Water Forced
     L = Land
     l = Land Origin
@@ -455,7 +455,7 @@ void track_progress(
             color = ANSI_BLUE;
         }
 
-        printf("%s      TOTAL PROGRESS      %8.2f%% %s", color, total_progress * 100, ANSI_GREEN);
+        printf("%s      Total Progress      %8.2f%% %s", color, total_progress * 100, ANSI_GREEN);
         int green_bars = (int)round(20 * total_progress);
         for (int i = 0; i < green_bars; i++) {
             printf("█");
@@ -583,37 +583,42 @@ void smooth_coastlines(
         int dists_opp[coastline_smoothing];
         for (int i = 0; i < coastline_smoothing; i++) {
             dists_same[i] = INT_MAX;
-            dists_opp[i] = INT_MAX;
         }
         int max_dist = INT_MAX;
-        
+        long sum_same = 0;
+        long sum_opp = 0;
+        Node *root_same;
+        Node *root_opp;
+
         if (land_dot) {
-            query_dist_recursive(
-                land_tree_root, dot_coord, 0, dists_same, coastline_smoothing, &max_dist
-            );
-            max_dist = INT_MAX;
-            query_dist_recursive(
-                water_tree_root, dot_coord, 0, dists_opp, coastline_smoothing, &max_dist
-            );
+            root_same = land_tree_root;
+            root_opp = water_tree_root;
         } else {
-            query_dist_recursive(
-                water_tree_root, dot_coord, 0, dists_same, coastline_smoothing, &max_dist
-            );
-            max_dist = INT_MAX;
-            query_dist_recursive(
-                land_tree_root, dot_coord, 0, dists_opp, coastline_smoothing, &max_dist
-            );
+            root_same = water_tree_root;
+            root_opp = land_tree_root;
         }
 
-        if (
-            sum_list_int(dists_same, coastline_smoothing) >
-            sum_list_int(dists_opp, coastline_smoothing)
-        ) {
+        query_dist_recursive(root_same, dot_coord, 0, dists_same, coastline_smoothing, &max_dist);
+        for (int i = 0; i < coastline_smoothing; i++) {
+            sum_same += dists_same[i];
+        }
+        int max_val = (sum_same > INT_MAX) ?
+            INT_MAX : sum_same;
+        for (int i = 0; i < coastline_smoothing; i++) {
+            dists_opp[i] = max_val;
+        }
+        max_dist = max_val;
+        query_dist_recursive(root_opp, dot_coord, 0, dists_opp, coastline_smoothing, &max_dist);
+
+        for (int i = 0; i < coastline_smoothing; i++) {
+            sum_opp += dists_opp[i];
+        }
+        if (sum_same > sum_opp) {
             dot->type = (land_dot) ? 'W' : 'L';
         }
 
         atomic_fetch_add(&section_progress[3], 1);
-        
+
     }
 
     free_recursive(land_tree_root);
@@ -674,7 +679,7 @@ void generate_biomes_water(
         int land_dist_sq = INT_MAX;
         const int coord[2] = {dot->x, dot->y};
         query_recursive(land_tree_root, coord, 0, NULL, &land_dist_sq);
-        
+
         if ( // Remember: all land distances are squared for efficiency
             (land_dist_sq < 35 * 35 && equator_dist > 9) ||
             (land_dist_sq < 25 * 25 && equator_dist > 8) ||
