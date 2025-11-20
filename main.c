@@ -581,6 +581,10 @@ void smooth_coastlines(
 
         int dists_same[coastline_smoothing];
         int dists_opp[coastline_smoothing];
+        for (int i = 0; i < coastline_smoothing; i++) {
+            dists_same[i] = INT_MAX;
+            dists_opp[i] = INT_MAX;
+        }
         int max_dist = INT_MAX;
         
         if (land_dot) {
@@ -593,11 +597,11 @@ void smooth_coastlines(
             );
         } else {
             query_dist_recursive(
-                land_tree_root, dot_coord, 0, dists_same, coastline_smoothing, &max_dist
+                water_tree_root, dot_coord, 0, dists_same, coastline_smoothing, &max_dist
             );
             max_dist = INT_MAX;
             query_dist_recursive(
-                water_tree_root, dot_coord, 0, dists_opp, coastline_smoothing, &max_dist
+                land_tree_root, dot_coord, 0, dists_opp, coastline_smoothing, &max_dist
             );
         }
 
