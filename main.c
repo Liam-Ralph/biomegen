@@ -73,7 +73,6 @@ typedef struct Node {
     struct Node *right;
 } Node;
 
-
 // General Functions
 // (Alphabetical order)
 
@@ -267,14 +266,16 @@ void query_recursive(
 
     const int dist_line = node->coord[axis] - coord[axis];
     const int dist_sq = dist_line * dist_line;
-    bool line_close = (dist_sq < *min_dist_ptr);
     // whether distance to splitting line is less than max_dist
-    if (node->left != NULL && (line_close || coord[axis] < node->coord[axis])) {
-        query_recursive(node->left, coord, depth + 1, index_ptr, min_dist_ptr);
+    if (node->left != NULL) {
+        if (dist_sq < *min_dist_ptr || coord[axis] < node->coord[axis]) {
+            query_recursive(node->left, coord, depth + 1, index_ptr, min_dist_ptr);
+        }
     }
-    line_close = (dist_sq < *min_dist_ptr);
-    if (node->right != NULL && (line_close || coord[axis] >= node->coord[axis])) {
-        query_recursive(node->right, coord, depth + 1, index_ptr, min_dist_ptr);
+    if (node->right != NULL) {
+        if (dist_sq < *min_dist_ptr || coord[axis] >= node->coord[axis]) {
+            query_recursive(node->right, coord, depth + 1, index_ptr, min_dist_ptr);
+        }
     }
 
 }
@@ -325,14 +326,16 @@ void query_dist_recursive(
 
     const int dist_line = node->coord[axis] - coord[axis];
     const int dist_sq = dist_line * dist_line;
-    bool line_close = (dist_sq < *max_dist_ptr);
-    // whether distance to splitting line is less than max_dist
-    if (node->left != NULL && (line_close || coord[axis] < node->coord[axis])) {
-        query_dist_recursive(node->left, coord, depth + 1, dists, dists_len, max_dist_ptr);
+    if (node->left != NULL) {
+        // whether distance to splitting line is less than max_dist
+        if (dist_sq < *max_dist_ptr || coord[axis] < node->coord[axis]) {
+            query_dist_recursive(node->left, coord, depth + 1, dists, dists_len, max_dist_ptr);
+        }
     }
-    line_close = (dist_sq < *max_dist_ptr);
-    if (node->right != NULL && (line_close || coord[axis] >= node->coord[axis])) {
-        query_dist_recursive(node->right, coord, depth + 1, dists, dists_len, max_dist_ptr);
+    if (node->right != NULL) {
+        if (dist_sq < *max_dist_ptr || coord[axis] >= node->coord[axis]) {
+            query_dist_recursive(node->right, coord, depth + 1, dists, dists_len, max_dist_ptr);
+        }
     }
 
 }
@@ -595,37 +598,32 @@ void smooth_coastlines(
 
         const bool land_dot = (dot->type == 'L');
 
-        long sums[2] = {0, 0}; // same type, opposite
-        Node *tree_roots[2];
-
+        int dists_same[coastline_smoothing];
+        int dists_opp[coastline_smoothing];
+        int max_dist = INT_MAX;
+        
         if (land_dot) {
-            tree_roots[0] = land_tree_root;
-            tree_roots[1] = water_tree_root;
-        } else {
-            tree_roots[0] = water_tree_root;
-            tree_roots[1] = land_tree_root;
-        }
-
-        for (int ii = 0; ii < 2; ii++) {
-
-            int dists[coastline_smoothing];
-            for (int iii = 0; iii < coastline_smoothing; iii++) {
-                dists[iii] = INT_MAX;
-            }
-
-            int max_dist = INT_MAX;
-
             query_dist_recursive(
-                tree_roots[ii], dot_coord, 0, dists, coastline_smoothing, &max_dist
+                land_tree_root, dot_coord, 0, dists_same, coastline_smoothing, &max_dist
             );
-
-            for (int iii = 0; iii < coastline_smoothing; iii++) {
-                sums[ii] += dists[iii];
-            }
-
+            max_dist = INT_MAX;
+            query_dist_recursive(
+                water_tree_root, dot_coord, 0, dists_opp, coastline_smoothing, &max_dist
+            );
+        } else {
+            query_dist_recursive(
+                land_tree_root, dot_coord, 0, dists_same, coastline_smoothing, &max_dist
+            );
+            max_dist = INT_MAX;
+            query_dist_recursive(
+                water_tree_root, dot_coord, 0, dists_opp, coastline_smoothing, &max_dist
+            );
         }
 
-        if (sums[0] > sums[1]) {
+        if (
+            sum_list_int(dists_same, coastline_smoothing) >
+            sum_list_int(dists_opp, coastline_smoothing)
+        ) {
             dot->type = (land_dot) ? 'W' : 'L';
         }
 
