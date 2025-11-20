@@ -259,61 +259,54 @@ def smooth_coastlines(coastline_smoothing, piece_range, local_dots):
 
     try:
 
-        for i in (1, -1):
-        # Smooths starting with first and last dot
-        # (shouldn't make a difference, more of a just in case)
+        land_dots = [dot for dot in local_dots if dot.type == "Land"]
+        water_dots = [dot for dot in local_dots if dot.type == "Water"]
 
-            land_dots = [dot for dot in local_dots if dot.type == "Land"]
-            water_dots = [dot for dot in local_dots if dot.type == "Water"]
+        land_tree = scipy.spatial.KDTree([(dot.x, dot.y) for dot in land_dots])
+        # Measures distance to nearest land dot
+        water_tree = scipy.spatial.KDTree([(dot.x, dot.y) for dot in water_dots])
+        # Measures distance to nearest water dot
 
-            land_tree = scipy.spatial.KDTree([(dot.x, dot.y) for dot in land_dots])
-            # Measures distance to nearest land dot
-            water_tree = scipy.spatial.KDTree([(dot.x, dot.y) for dot in water_dots])
-            # Measures distance to nearest water dot
+        list_dots = list(range(piece_range[0], piece_range[1]))
 
-            list_dots = list(range(piece_range[0], piece_range[1]))
+        for ii in list_dots:
 
-            if i == -1:
-                list_dots.reverse()
+            dot = dots[ii]
 
-            for ii in list_dots:
+            types = ["Land", "Water"]
 
-                dot = dots[ii]
-
-                types = ["Land", "Water"]
-
-                if dot.type not in types: # "Water Forced" and "Land Origin"
-                    with lock:
-                        section_progress[3] += 1
-                    continue
-
-                same_dist = 0.0 # Distance to nearest dot of same type
-                opp_dist = 1.0
-
-                if dot.type == "Land":
-
-                    same_dist = land_tree.query((dot.x, dot.y), k=coastline_smoothing)[0]
-                    # Includes the nearest k dots
-                    # Larger number of dots creates more clumping and smoother coastlines
-                    opp_dist = water_tree.query((dot.x, dot.y), k=coastline_smoothing)[0]
-
-                elif dot.type == "Water":
-
-                    same_dist = water_tree.query((dot.x, dot.y), k=coastline_smoothing)[0]
-                    opp_dist = land_tree.query((dot.x, dot.y), k=coastline_smoothing)[0]
-
-                if type(same_dist) is float: # If coastline_smoothing == 1
-                    same_dist = [same_dist]
-                    opp_dist = [opp_dist]
-                if sum(same_dist) > sum(opp_dist):
-                # If average distance to the same type of dot is greater
-                # than average distance to opposite type dot for the nearest k dots
-                    types.remove(dot.type)
-                    with lock:
-                        dots[ii] = Dot(dot.x, dot.y, types[0])
-
+            if dot.type not in types: # "Water Forced" and "Land Origin"
                 with lock:
                     section_progress[3] += 1
+                continue
+
+            same_dist = 0.0 # Distance to nearest dot of same type
+            opp_dist = 1.0
+
+            if dot.type == "Land":
+
+                same_dist = land_tree.query((dot.x, dot.y), k=coastline_smoothing)[0]
+                # Includes the nearest k dots
+                # Larger number of dots creates more clumping and smoother coastlines
+                opp_dist = water_tree.query((dot.x, dot.y), k=coastline_smoothing)[0]
+
+            elif dot.type == "Water":
+
+                same_dist = water_tree.query((dot.x, dot.y), k=coastline_smoothing)[0]
+                opp_dist = land_tree.query((dot.x, dot.y), k=coastline_smoothing)[0]
+
+            if type(same_dist) is float: # If coastline_smoothing == 1
+                same_dist = [same_dist]
+                opp_dist = [opp_dist]
+            if sum(same_dist) > sum(opp_dist):
+            # If average distance to the same type of dot is greater
+            # than average distance to opposite type dot for the nearest k dots
+                types.remove(dot.type)
+                with lock:
+                    dots[ii] = Dot(dot.x, dot.y, types[0])
+
+            with lock:
+                section_progress[3] += 1
 
     except:
         raise_error("smooth_coastlines", traceback.format_exc())
@@ -702,7 +695,7 @@ def main():
 
             if coastline_smoothing != 0:
 
-                section_progress_total[3] = num_dots * 2
+                section_progress_total[3] = num_dots
 
                 local_dots = []
                 results = pool.map(copy_piece, piece_ranges)

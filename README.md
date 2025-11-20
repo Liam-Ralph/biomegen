@@ -1,7 +1,7 @@
 # BiomeGen
 ### Released July 2025
 ### Version 3.0.0
-### Updated October 2025
+### Updated November 2025
 
 # Note: this branch is in development. It is an attempt to rewrite the project in C.
 
