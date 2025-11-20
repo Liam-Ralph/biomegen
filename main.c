@@ -583,6 +583,7 @@ void smooth_coastlines(
         int dists_opp[coastline_smoothing];
         for (int i = 0; i < coastline_smoothing; i++) {
             dists_same[i] = INT_MAX;
+            dists_opp[i] = INT_MAX;
         }
         int max_dist = INT_MAX;
         long sum_same = 0;
@@ -602,12 +603,7 @@ void smooth_coastlines(
         for (int i = 0; i < coastline_smoothing; i++) {
             sum_same += dists_same[i];
         }
-        int max_val = (sum_same > INT_MAX) ?
-            INT_MAX : sum_same;
-        for (int i = 0; i < coastline_smoothing; i++) {
-            dists_opp[i] = max_val;
-        }
-        max_dist = max_val;
+        max_dist = INT_MAX;
         query_dist_recursive(root_opp, dot_coord, 0, dists_opp, coastline_smoothing, &max_dist);
 
         for (int i = 0; i < coastline_smoothing; i++) {
@@ -1468,7 +1464,7 @@ int main(int argc, char *argv[]) {
             "Rock", "Desert", "Jungle", "Forest", "Plains", "Taiga", "Snow"
         };
 
-        printf("     %% of Land/Water | %% of Total\n");
+        printf("       %% of Land/Water | %% of Total\n");
         for (int i = 0; i < 11; i++) {
 
             float group_pct_fact = 100.0;
