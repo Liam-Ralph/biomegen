@@ -267,15 +267,11 @@ void query_recursive(
     const int dist_line = node->coord[axis] - coord[axis];
     const int dist_sq = dist_line * dist_line;
     // whether distance to splitting line is less than max_dist
-    if (node->left != NULL) {
-        if (dist_sq < *min_dist_ptr || coord[axis] < node->coord[axis]) {
-            query_recursive(node->left, coord, depth + 1, index_ptr, min_dist_ptr);
-        }
+    if (node->left != NULL && (dist_sq < *min_dist_ptr || coord[axis] < node->coord[axis])) {
+        query_recursive(node->left, coord, depth + 1, index_ptr, min_dist_ptr);
     }
-    if (node->right != NULL) {
-        if (dist_sq < *min_dist_ptr || coord[axis] >= node->coord[axis]) {
-            query_recursive(node->right, coord, depth + 1, index_ptr, min_dist_ptr);
-        }
+    if (node->right != NULL && (dist_sq < *min_dist_ptr || coord[axis] >= node->coord[axis])) {
+        query_recursive(node->right, coord, depth + 1, index_ptr, min_dist_ptr);
     }
 
 }
@@ -309,33 +305,18 @@ void query_dist_recursive(
         }
         dists[pos_max] = dist;
         *max_dist_ptr = (dists[pos_max2] > dist) ? dists[pos_max2] : dist;
-
-        // for (int i = 0; i < dists_len; i++) {
-        //     if (dist < dists[i]) {
-        //         for (int ii = dists_len; ii > i; ii--) {
-        //             dists[ii] = dists[ii - 1];
-        //         }
-        //         dists[i] = dist;
-        //         *max_dist_ptr = dists[dists_len];
-        //         break;
-        //     }
-        // }
     }
 
     const int axis = depth % 2;
 
     const int dist_line = node->coord[axis] - coord[axis];
     const int dist_sq = dist_line * dist_line;
-    if (node->left != NULL) {
-        // whether distance to splitting line is less than max_dist
-        if (dist_sq < *max_dist_ptr || coord[axis] < node->coord[axis]) {
-            query_dist_recursive(node->left, coord, depth + 1, dists, dists_len, max_dist_ptr);
-        }
+    // whether distance to splitting line is less than max_dist
+    if (node->left != NULL && (dist_sq < *max_dist_ptr || coord[axis] < node->coord[axis])) {
+        query_dist_recursive(node->left, coord, depth + 1, dists, dists_len, max_dist_ptr);
     }
-    if (node->right != NULL) {
-        if (dist_sq < *max_dist_ptr || coord[axis] >= node->coord[axis]) {
-            query_dist_recursive(node->right, coord, depth + 1, dists, dists_len, max_dist_ptr);
-        }
+    if (node->right != NULL && (dist_sq < *max_dist_ptr || coord[axis] >= node->coord[axis])) {
+        query_dist_recursive(node->right, coord, depth + 1, dists, dists_len, max_dist_ptr);
     }
 
 }
