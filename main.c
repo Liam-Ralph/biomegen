@@ -294,17 +294,25 @@ void query_dist_recursive(
 
     if (dist < *max_dist_ptr && dist != 0) {
         int pos_max = 0;
-        int pos_max2 = 0;
         for (int i = 1; i < dists_len; i++) {
             if (dists[i] > dists[pos_max]) {
-                pos_max2 = pos_max;
                 pos_max = i;
-            } else if (dists[i] > dists[pos_max2]) {
-                pos_max2 = i;
+                if (dists[pos_max] == *max_dist_ptr) {
+                    break;
+                }
             }
         }
         dists[pos_max] = dist;
-        *max_dist_ptr = (dists[pos_max2] > dist) ? dists[pos_max2] : dist;
+        pos_max = 0;
+        for (int i = 1; i < dists_len; i++) {
+            if (dists[i] > dists[pos_max]) {
+                pos_max = i;
+                if (dists[pos_max] == *max_dist_ptr) {
+                    break;
+                }
+            }
+        }
+        *max_dist_ptr = dists[pos_max];
     }
 
     const int axis = depth % 2;
@@ -496,7 +504,7 @@ void assign_sections(
     Dot *dots, _Atomic int *section_progress
 ) {
 
-    srand(time(NULL) + getpid());
+    srand(0);
 
     for (int i = start_index; i < end_index; i++) {
 
@@ -1001,7 +1009,7 @@ int main(int argc, char *argv[]) {
 
     section_progress_total[1] = num_dots;
 
-    srand(time(NULL));
+    srand(0);
 
     const int num_special_dots = num_dots / island_abundance * 2;
     const int num_reg_dots = num_dots - num_special_dots;
