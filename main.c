@@ -610,7 +610,7 @@ void smooth_coastlines(
         int dists_opp[coastline_smoothing];
         for (int i = 0; i < coastline_smoothing; i++) {
             dists_same[i] = INT_MAX;
-            dists_opp[i] = INT_MAX;
+            // dists_opp[i] = INT_MAX;
         }
         //int max_dist = INT_MAX;
         long sum_same = 0;
@@ -630,7 +630,11 @@ void smooth_coastlines(
         for (int i = 0; i < coastline_smoothing; i++) {
             sum_same += dists_same[i];
         }
-        //max_dist = INT_MAX;
+        const int max = (sum_same < INT_MAX) ? sum_same : INT_MAX;
+        for (int i = 0; i < coastline_smoothing; i++) {
+            dists_opp[i] = max;
+        }
+        // max_dist = INT_MAX;
         query_dist_recursive(root_opp, dot_coord, 0, dists_opp, coastline_smoothing);//, &max_dist);
 
         for (int i = 0; i < coastline_smoothing; i++) {
@@ -854,7 +858,7 @@ int main(int argc, char *argv[]) {
 
         auto_mode = false;
 
-        output_file = "production-files/result2.png";
+        output_file = "production-files/result3.png";
 
         // Getting Program Version
 
