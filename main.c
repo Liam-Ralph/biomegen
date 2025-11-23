@@ -314,24 +314,31 @@ void query_dist_recursive(
         // }
         // *max_dist_ptr = dists[pos_max];
 
-        int low = 0;
-        int high = dists_len - 1;
-        int pos = high;
-        while (low <= high) {
-            int mid = low + (high - low) / 2;
-            if ((mid == 0 || dists[mid - 1] <= dist) && (mid == dists_len - 1 || dists[mid] >= dist)) {
-                pos = mid;
+        // int low = 0;
+        // int high = dists_len - 1;
+        // int pos = high;
+        // while (low <= high) {
+        //     int mid = low + (high - low) / 2;
+        //     if ((mid == 0 || dists[mid - 1] <= dist) && (mid == dists_len - 1 || dists[mid] >= dist)) {
+        //         pos = mid;
+        //         break;
+        //     } else if (dists[mid] > dist) {
+        //         high = mid - 1;
+        //     } else {
+        //         low = mid + 1;
+        //     }
+        // }
+        // for (int i = dists_len - 1; i > pos; i--) {
+        //     dists[i] = dists[i - 1];
+        // }
+        // dists[pos] = dist;
+        for (int i = dists_len - 1; i >= 0; i--) {
+            if (i == 0 || dist >= dists[i - 1]) {
+                dists[i] = dist;
                 break;
-            } else if (dists[mid] > dist) {
-                high = mid - 1;
-            } else {
-                low = mid + 1;
             }
-        }
-        for (int i = dists_len - 1; i > pos; i--) {
             dists[i] = dists[i - 1];
         }
-        dists[pos] = dist;
     }
 
     const int axis = depth % 2;
