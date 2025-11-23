@@ -285,34 +285,53 @@ void query_recursive(
  */
 void query_dist_recursive(
     Node *node, const int *coord, const int depth,
-    int *dists, const int dists_len, int *max_dist_ptr
+    int *dists, const int dists_len//, int *max_dist_ptr
 ) {
 
     const int diff_x = node->coord[0] - coord[0];
     const int diff_y = node->coord[1] - coord[1];
     const int dist = diff_x * diff_x + diff_y * diff_y;
 
-    if (dist < *max_dist_ptr && dist != 0) {
-        int pos_max = 0;
-        for (int i = 1; i < dists_len; i++) {
-            if (dists[i] > dists[pos_max]) {
-                pos_max = i;
-                if (dists[pos_max] == *max_dist_ptr) {
-                    break;
-                }
+    if (dist < dists[dists_len - 1] && dist != 0) {
+        // int pos_max = 0;
+        // for (int i = 1; i < dists_len; i++) {
+        //     if (dists[i] > dists[pos_max]) {
+        //         pos_max = i;
+        //         if (dists[pos_max] == *max_dist_ptr) {
+        //             break;
+        //         }
+        //     }
+        // }
+        // dists[pos_max] = dist;
+        // pos_max = 0;
+        // for (int i = 1; i < dists_len; i++) {
+        //     if (dists[i] > dists[pos_max]) {
+        //         pos_max = i;
+        //         if (dists[pos_max] == *max_dist_ptr) {
+        //             break;
+        //         }
+        //     }
+        // }
+        // *max_dist_ptr = dists[pos_max];
+
+        int low = 0;
+        int high = dists_len - 1;
+        int pos = high;
+        while (low <= high) {
+            int mid = low + (high - low) / 2;
+            if ((mid == 0 || dists[mid - 1] <= dist) && (mid == dists_len - 1 || dists[mid] >= dist)) {
+                pos = mid;
+                break;
+            } else if (dists[mid] > dist) {
+                high = mid - 1;
+            } else {
+                low = mid + 1;
             }
         }
-        dists[pos_max] = dist;
-        pos_max = 0;
-        for (int i = 1; i < dists_len; i++) {
-            if (dists[i] > dists[pos_max]) {
-                pos_max = i;
-                if (dists[pos_max] == *max_dist_ptr) {
-                    break;
-                }
-            }
+        for (int i = dists_len - 1; i > pos; i--) {
+            dists[i] = dists[i - 1];
         }
-        *max_dist_ptr = dists[pos_max];
+        dists[pos] = dist;
     }
 
     const int axis = depth % 2;
@@ -320,11 +339,11 @@ void query_dist_recursive(
     const int dist_line = node->coord[axis] - coord[axis];
     const int dist_sq = dist_line * dist_line;
     // whether distance to splitting line is less than max_dist
-    if (node->left != NULL && (dist_sq < *max_dist_ptr || coord[axis] < node->coord[axis])) {
-        query_dist_recursive(node->left, coord, depth + 1, dists, dists_len, max_dist_ptr);
+    if (node->left != NULL && (dist_sq < dists[dists_len - 1] || coord[axis] < node->coord[axis])) {
+        query_dist_recursive(node->left, coord, depth + 1, dists, dists_len);//, max_dist_ptr);
     }
-    if (node->right != NULL && (dist_sq < *max_dist_ptr || coord[axis] >= node->coord[axis])) {
-        query_dist_recursive(node->right, coord, depth + 1, dists, dists_len, max_dist_ptr);
+    if (node->right != NULL && (dist_sq < dists[dists_len - 1] || coord[axis] >= node->coord[axis])) {
+        query_dist_recursive(node->right, coord, depth + 1, dists, dists_len);//, max_dist_ptr);
     }
 
 }
@@ -593,7 +612,7 @@ void smooth_coastlines(
             dists_same[i] = INT_MAX;
             dists_opp[i] = INT_MAX;
         }
-        int max_dist = INT_MAX;
+        //int max_dist = INT_MAX;
         long sum_same = 0;
         long sum_opp = 0;
         Node *root_same;
@@ -607,12 +626,12 @@ void smooth_coastlines(
             root_opp = land_tree_root;
         }
 
-        query_dist_recursive(root_same, dot_coord, 0, dists_same, coastline_smoothing, &max_dist);
+        query_dist_recursive(root_same, dot_coord, 0, dists_same, coastline_smoothing);//, &max_dist);
         for (int i = 0; i < coastline_smoothing; i++) {
             sum_same += dists_same[i];
         }
-        max_dist = INT_MAX;
-        query_dist_recursive(root_opp, dot_coord, 0, dists_opp, coastline_smoothing, &max_dist);
+        //max_dist = INT_MAX;
+        query_dist_recursive(root_opp, dot_coord, 0, dists_opp, coastline_smoothing);//, &max_dist);
 
         for (int i = 0; i < coastline_smoothing; i++) {
             sum_opp += dists_opp[i];
@@ -835,7 +854,7 @@ int main(int argc, char *argv[]) {
 
         auto_mode = false;
 
-        output_file = "production-files/result.png";
+        output_file = "production-files/result2.png";
 
         // Getting Program Version
 
