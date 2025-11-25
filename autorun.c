@@ -49,7 +49,7 @@ int main() {
     #endif
 
     if (!access(exec, F_OK) == 0) {
-        system("gcc main.c -o main -lm");
+        system("gcc -D_GNU_SOURCE main.c -o main -lm -lpng");
     } 
 
     // Opening Autorun Tasks
