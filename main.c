@@ -808,6 +808,8 @@ void generate_biomes_land(
     origin_tree_root = build_recursive(num_origin_dots, biome_origin_dots, 0);
     free(biome_origin_dots);
 
+    // Generate Land Biomes
+
     for (int i = start_index; i < end_index; i++) {
 
         Dot *dot = &dots[i];
@@ -816,10 +818,14 @@ void generate_biomes_land(
             continue;
         }
 
+        // Find Nearest Biome Origin Dot
+
         int min_dist = INT_MAX;
         int origin_index = 0;
         const int coord[2] = {dot->x, dot->y};
         query_recursive(origin_tree_root, coord, 0, &origin_index, &min_dist);
+
+        // Set Dot Type
 
         dot->type = dots[origin_index].type;
 
@@ -839,8 +845,11 @@ void generate_image(
     const Dot *dots, int *image_indexes, int *type_counts, _Atomic int *section_progress
 ) {
 
+    // Dot type counts for statistics, not used in image generation
     int local_type_counts[11] = {0};
     const char types[11] = {'I', 's', 'W', 'd', 'R', 'D', 'J', 'F', 'P', 'T', 'S'};
+
+    // Create Dots KDTree
 
     int *dot_coords = malloc(num_dots * 3 * sizeof(int));
 
@@ -856,6 +865,8 @@ void generate_image(
 
     free(dot_coords);
 
+    // Generate Image
+
     for (int y = start_height; y < end_height; y++) {
 
         int min_dist = INT_MAX;
@@ -865,12 +876,21 @@ void generate_image(
             int nearest_index = 0;
 
             if (min_dist != INT_MAX) {
-                const int min_dist_sq = ceil(sqrt(min_dist)) + 2;
+                const int min_dist_sq = (int)sqrt(min_dist) + 2;
+                /*
+                max_dist = dist(previous x, previous nearest dot) + dist(previous x, current x)
+                         = previous max_dist + 1
+                +1 for floating point errors (ceil didn't work)
+                */
                 min_dist = min_dist_sq * min_dist_sq;
             }
 
+            // Find Nearest Dot
+
             const int coord[2] = {x, y};
             query_recursive(tree_root, coord, 0, &nearest_index, &min_dist);
+
+            // Add to Image Indexes and Local Type Counts
 
             image_indexes[y * width + x] = nearest_index;
             for (int i = 0; i < 11; i++) {
@@ -882,11 +902,14 @@ void generate_image(
 
         }
 
+        // Only update for each row of pixels
         atomic_fetch_add(&section_progress[5], 1);
 
     }
 
     free_recursive(tree_root);
+
+    // Update Shared Type Counts
 
     for (int i = 0; i < 11; i++) {
         type_counts[i] += local_type_counts[i];
@@ -948,7 +971,8 @@ int main(int argc, char *argv[]) {
         );
         /*
         I do not know if the flashing lights this program sometimes makes could reasonably cause
-        epilepsy or not, but I put this just in case
+        epilepsy or not, but I put this just in case. You can increase sleep_time.tv_nsec to help
+        with this.
         */
         getchar();
         system("clear");
@@ -966,7 +990,7 @@ int main(int argc, char *argv[]) {
             "while lower numbers take longer to generate.\n"
             "Map Resolution:\n"
         );
-        map_resolution = get_int(50, 500);
+        map_resolution = get_int(50, 500); // controls the number of dots
 
         printf(
             "\nIsland abundance control how many islands there are,\n"
@@ -976,6 +1000,7 @@ int main(int argc, char *argv[]) {
             "Island Abundance:\n"
         );
         island_abundance = get_int(10, 1000);
+        // controls the number of "Land Origin" and "Water Forced" dots
 
         printf(
             "\nIsland size controls average island size.\n"
