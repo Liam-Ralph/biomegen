@@ -113,17 +113,6 @@ int sum_list_int(int *list, int list_len) {
 }
 
 /**
- * Return the sum of a list of _Atomic int.
- */
-int sum_list_int_atomic(_Atomic int *list, int list_len) {
-    int sum = 0;
-    for (int i = 0; i < list_len; i++) {
-        sum += atomic_load(&list[i]);
-    }
-    return sum;
-}
-
-/**
  * Return the sum of a list of floats.
  */
 float sum_list_float(float *list, int list_len) {
@@ -380,8 +369,8 @@ void track_progress(
         "Setup", "Section Generation", "Section Assignment", "Coastline Smoothing",
         "Biome Generation", "Image Generation", "Finish"
     };
-    float section_weights[7] = {0.02, 0.01, 0.11, 0.38, 0.29, 0.17, 0.02};
-    // Used for overall progress bar (e.g. Setup takes ~2% of total time)
+    float section_weights[7] = {0.01, 0.01, 0.02, 0.60, 0.06, 0.10, 0.20};
+    // Used for overall progress bar (e.g. Setup takes ~1% of total time)
 
     while (true) {
 
@@ -408,7 +397,7 @@ void track_progress(
 
             char *color;
             float section_time;
-            if (atomic_load(&section_progress[i]) == section_progress_total[i]) {
+            if (section_times[i] != 0.0) {//atomic_load(&section_progress[i]) == section_progress_total[i]) {
                 color = ANSI_GREEN;
                 section_time = section_times[i]; // Section complete
             } else {
@@ -446,7 +435,7 @@ void track_progress(
         // Total Progress
 
         char *color;
-        if (sum_list_int_atomic(section_progress, 7) == sum_list_int(section_progress_total, 7)) {
+        if (section_times[6] != 0.0) {
             color = ANSI_GREEN;
         } else {
             color = ANSI_BLUE;
@@ -1293,6 +1282,8 @@ int main(int argc, char *argv[]) {
 
     // Finish
 
+    atomic_store(&section_progress_total[6], height);
+
     FILE *fptr = fopen(output_file, "w");
     png_structp png_ptr = png_create_write_struct(PNG_LIBPNG_VER_STRING, NULL, NULL, NULL);
     png_infop info_ptr = png_create_info_struct(png_ptr);
@@ -1390,6 +1381,7 @@ int main(int argc, char *argv[]) {
             *row++ = rgb[1];
             *row++ = rgb[2];
         }
+        atomic_fetch_add(&section_progress[6], 1);
     }
 
     png_init_io(png_ptr, fptr);
@@ -1402,8 +1394,6 @@ int main(int argc, char *argv[]) {
     png_free(png_ptr, row_pointers);
 
     fclose(fptr);
-
-    atomic_store(&section_progress[6], 1);
 
     clock_gettime(CLOCK_REALTIME, &time_now);
     section_times[6] = (float)(time_now.tv_sec - start_time.tv_sec) +
