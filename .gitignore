@@ -1,11 +1,6 @@
 .vscode
-autorun_results.csv
-result.png
-
 main
 autorun
-main.exe
-autorun.exe
-a.exe
-a.out
+*.exe
+*.out
 production-files
