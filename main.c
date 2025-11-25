@@ -16,7 +16,7 @@ BiomeGen, a terminal application for generating png maps.
 
 // Includes
 
-#define _POSIX_C_SOURCE 199309L
+#define _POSIX_C_SOURCE 199309L // Needed for CLOCK_REALTIME
 
 #include <limits.h>
 #include <math.h>
@@ -140,7 +140,15 @@ void nth_sort_recursive(
 
     if (low < high) {
 
+        /*
+        Pivot value is the value at coords[high]. Every value less than pivot
+        will be to the left of wherever pivot ends up. Remember: a coord is
+        {x, y, index (of equivalent dot in dots)}. The array isn't 2D as it
+        requires malloc.
+        */
         int pivot = coords[high * 3 + axis];
+
+        // Move Smaller Elements to the Left
 
         int i = low - 1;
 
@@ -157,6 +165,8 @@ void nth_sort_recursive(
             }
         }
 
+        // Move Pivot to After Smaller Elements
+
         i++;
         const int temp[3] = {coords[i * 3], coords[i * 3 + 1], coords[i * 3 + 2]};
         coords[i * 3] = coords[high * 3];
@@ -165,6 +175,14 @@ void nth_sort_recursive(
         coords[high * 3] = temp[0];
         coords[high * 3 + 1] = temp[1];
         coords[high * 3 + 2] = temp[2];
+
+        // Decide Whether Recursion is Needed
+        /*
+        Cases:
+        i == med_index, the median is in the correct spot, no more sorting
+        i > med_index, median is in left section, left section needs sorting
+        i < med_index, median in right section, sort right section
+        */
 
         if (i > med_index) {
             nth_sort_recursive(coords, low, i - 1, axis, med_index);
@@ -184,10 +202,18 @@ void nth_sort_recursive(
  */
 Node *build_recursive(const int num_coords, int coords[num_coords * 3], const int depth) {
 
-    const int axis = depth % 2;
     const int med_pos = num_coords / 2;
 
-    nth_sort_recursive(coords, 0, num_coords - 1, axis, med_pos);
+    // Sort Coords Around Median Position
+    /*
+    Median coord will be in correct place, everything less will be to the left,
+    everything else to the right.
+    */
+
+    nth_sort_recursive(coords, 0, num_coords - 1, depth % 2, med_pos);
+
+    // Add Median Node to Tree
+    // Every recursion adds one node
 
     Node *node = malloc(sizeof(Node));
     node->coord[0] = coords[med_pos * 3];
@@ -195,6 +221,8 @@ Node *build_recursive(const int num_coords, int coords[num_coords * 3], const in
     node->index = coords[med_pos * 3 + 2];
     node->left = NULL;
     node->right = NULL;
+
+    // Decide whether node will have a left child
 
     const int num_coords_left = med_pos;
 
@@ -208,6 +236,8 @@ Node *build_recursive(const int num_coords, int coords[num_coords * 3], const in
         }
         node->left = build_recursive(num_coords_left, coords_left, depth + 1);
         free(coords_left);
+
+        // Decide whether node will have a right child
 
         const int num_coords_right = num_coords - med_pos - 1;
 
@@ -225,6 +255,7 @@ Node *build_recursive(const int num_coords, int coords[num_coords * 3], const in
 
     }
 
+    // Return node to place it within the tree
     return node;
 
 }
@@ -240,9 +271,14 @@ void query_recursive(
     Node *node, const int *coord, const int depth, int *index_ptr, int *min_dist_ptr
 ) {
 
+    // Calculate Distance
+
     const int diff_x = node->coord[0] - coord[0];
     const int diff_y = node->coord[1] - coord[1];
+    // Distance is squared for efficiency
     const int dist = diff_x * diff_x + diff_y * diff_y;
+
+    // Update Minimum Distance and Index Pointers
 
     if (dist < *min_dist_ptr) {
         if (index_ptr != NULL) {
@@ -251,12 +287,18 @@ void query_recursive(
         *min_dist_ptr = dist;
     }
 
+    // Decide Whether Recursion is Needed
+
     const int axis = depth % 2;
 
     const int dist_line = node->coord[axis] - coord[axis];
     const int dist_sq = dist_line * dist_line;
-    // whether distance to splitting line is less than max_dist
+    // Whether distance to splitting line is less than max_dist
     if (node->left != NULL && (dist_sq < *min_dist_ptr || coord[axis] < node->coord[axis])) {
+        /*
+        Recursion only if coord is close enough to dividing line, or coord would
+        be inside bounds of left child
+        */
         query_recursive(node->left, coord, depth + 1, index_ptr, min_dist_ptr);
     }
     if (node->right != NULL && (dist_sq < *min_dist_ptr || coord[axis] >= node->coord[axis])) {
@@ -277,26 +319,38 @@ void query_dist_recursive(
     int *dists, const int dists_len
 ) {
 
+    // Calculate Distance
+
     const int diff_x = node->coord[0] - coord[0];
     const int diff_y = node->coord[1] - coord[1];
-    const int dist = diff_x * diff_x + diff_y * diff_y;
+    const int dist = diff_x * diff_x + diff_y * diff_y; // Squared distance
+
+    // Update Distances List
 
     if (dist < dists[dists_len - 1] && dist != 0) {
         for (int i = dists_len - 1; i >= 0; i--) {
             if (i == 0 || dist >= dists[i - 1]) {
+                // Found insertion position, insert and break
                 dists[i] = dist;
                 break;
             }
+            // After insertion position, shift element
             dists[i] = dists[i - 1];
         }
     }
+
+    // Decide Whether Recursion is Needed
 
     const int axis = depth % 2;
 
     const int dist_line = node->coord[axis] - coord[axis];
     const int dist_sq = dist_line * dist_line;
-    // whether distance to splitting line is less than max_dist
+    // Whether distance to splitting line is less than max_dist
     if (node->left != NULL && (dist_sq < dists[dists_len - 1] || coord[axis] < node->coord[axis])) {
+        /*
+        Recursion only if coord is close enough to dividing line, or coord would
+        be inside bounds of left child
+        */
         query_dist_recursive(node->left, coord, depth + 1, dists, dists_len);
     }
     if (
@@ -333,14 +387,22 @@ void free_recursive(Node *node) {
  */
 void set_process_title(const char *type, const int num) {
 
+    // Example: type is "worker", num is 6: "biogen-worker6"
+
+    // Concatenate Type
+
     char string[16] = "biogen-";
     strncat(string, type, 9);
+
+    // Concatenate Num
 
     if (0 <= num && num < 100) {
         char num_str[3];
         snprintf(num_str, 3, "%02d", num);
         strncat(string, num_str, 3);
     }
+
+    // Set Process Title
 
     #ifdef __linux__
 
@@ -374,6 +436,8 @@ void track_progress(
 
     while (true) {
 
+        // Clear Screen
+
         system("clear");
 
         // Section Progress
@@ -397,7 +461,7 @@ void track_progress(
 
             char *color;
             float section_time;
-            if (section_times[i] != 0.0) {//atomic_load(&section_progress[i]) == section_progress_total[i]) {
+            if (section_times[i] != 0.0) {
                 color = ANSI_GREEN;
                 section_time = section_times[i]; // Section complete
             } else {
@@ -462,7 +526,8 @@ void track_progress(
             break; // All sections done, exit tracking process
         }
 
-        // Sleep 0.1 seconds
+        // Sleep 0.1 Seconds
+    
         struct timespec sleep_time;
         sleep_time.tv_sec = 0;
         sleep_time.tv_nsec = 100000000;
@@ -482,13 +547,14 @@ void assign_sections(
     Dot *dots, _Atomic int *section_progress
 ) {
 
-    srand(0);
+    srand(time(NULL) + getpid());
 
     for (int i = start_index; i < end_index; i++) {
 
         Dot *dot = &dots[i];
 
-        int min = INT_MAX; // min and dist are squared, sqrt is not done until later
+        int min = INT_MAX;
+        // min and dist are squared, sqrt is not done until later
         int min_index = 0;
         for (int ii = 0; ii < num_origin_dots; ii++) {
 
@@ -988,7 +1054,7 @@ int main(int argc, char *argv[]) {
 
     section_progress_total[1] = num_dots;
 
-    srand(0);
+    srand(time(NULL));
 
     const int num_special_dots = num_dots / island_abundance * 2;
     const int num_reg_dots = num_dots - num_special_dots;
