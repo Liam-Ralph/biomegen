@@ -550,12 +550,16 @@ void assign_sections(
     srand(time(NULL) + getpid());
 
     for (int i = start_index; i < end_index; i++) {
+    // Non-water dots are not included
 
         Dot *dot = &dots[i];
+
+        // Find Distance to Nearest Origin Dot
 
         int min = INT_MAX;
         // min and dist are squared, sqrt is not done until later
         int min_index = 0;
+
         for (int ii = 0; ii < num_origin_dots; ii++) {
 
             const int diff_x = origin_dots[ii][0] - dot->x;
@@ -568,6 +572,8 @@ void assign_sections(
             }
 
         }
+
+        // Calculate Chance
 
         float dist = sqrt(min) / sqrt(map_resolution);
         float threshold = ((float)(min_index % 20) / 19.0f * 1.5f + 0.25f) * island_size;
@@ -595,12 +601,16 @@ void smooth_coastlines(
     Dot *dots, _Atomic int *section_progress
 ) {
 
+    // Create Land and Water Dots
+
     int num_land_dots = 0;
     int num_water_dots = 0;
     int *land_dots = malloc(num_reg_dots * 3 * sizeof(int));
     int *water_dots = malloc(num_reg_dots * 3 * sizeof(int));
+    // num_land_dots + num_water_dots == num_reg_dots, so this is the max
 
     for (int i = num_special_dots; i < num_dots; i++) {
+    // Only includes "Land" and "Water" dots
         const Dot *dot = &dots[i];
         if (dot->type == 'L') {
             land_dots[num_land_dots * 3] = dot->x;
@@ -615,6 +625,8 @@ void smooth_coastlines(
         }
     }
 
+    // Create Land and Water KDTrees
+
     Node *land_tree_root = NULL;
     Node *water_tree_root = NULL;
 
@@ -624,12 +636,19 @@ void smooth_coastlines(
     free(land_dots);
     free(water_dots);
 
+    // Smooth Coastlines
+
     for (int i = start_index; i < end_index; i++) {
+    // Only includes "Land" and "Water" dots
+
+        // Get Dot Information
 
         Dot *dot = &dots[i];
         int dot_coord[2] = {dot->x, dot->y};
 
         const bool land_dot = (dot->type == 'L');
+
+        // Get Nearest Coastline_Smoothing Dots of Each Type
 
         int dists_same[coastline_smoothing];
         int dists_opp[coastline_smoothing];
@@ -662,13 +681,19 @@ void smooth_coastlines(
         for (int i = 0; i < coastline_smoothing; i++) {
             sum_opp += dists_opp[i];
         }
+
+        // Change Dot Type if Closer to Opposite Type
+
         if (sum_same > sum_opp) {
+            // If the sum of the nearest coastline_smoothing 
             dot->type = (land_dot) ? 'W' : 'L';
         }
 
         atomic_fetch_add(&section_progress[3], 1);
 
     }
+
+    // Free Trees
 
     free_recursive(land_tree_root);
     free_recursive(water_tree_root);
@@ -700,6 +725,8 @@ void generate_biomes_water(
     const int num_dots, Dot *dots, _Atomic int *section_progress
 ) {
 
+    // Build Land Dots KDTree
+
     int num_land_dots = 0;
     int *land_dots = malloc(num_dots * 3 * sizeof(int));
     for (int i = 0; i < num_dots; i++) {
@@ -715,7 +742,11 @@ void generate_biomes_water(
     land_tree_root = build_recursive(num_land_dots, land_dots, 0);
     free(land_dots);
 
+    // Generate Water Biomes
+
     for (int i = start_index; i < end_index; i++) {
+
+        // Get Dot Info
 
         Dot *dot = &dots[i];
 
@@ -723,11 +754,17 @@ void generate_biomes_water(
             continue;
         }
 
+        // Calculate Distance to Equator
+
         const float equator_dist = fabs((float)dot->y - height / 2.0) / height * 20.0;
+
+        // Calculate Distance to Land
 
         int land_dist_sq = INT_MAX;
         const int coord[2] = {dot->x, dot->y};
         query_recursive(land_tree_root, coord, 0, NULL, &land_dist_sq);
+
+        // Set Water Biome
 
         if ( // Remember: all land distances are squared for efficiency
             (land_dist_sq < 35 * 35 && equator_dist > 9) ||
@@ -756,6 +793,8 @@ void generate_biomes_land(
     const int start_index, const int end_index, const int num_dots,
     const int *biome_origin_indexes, Dot *dots, _Atomic int *section_progress
 ) {
+
+    // Create Biome Origin Dot KDTree
 
     int num_origin_dots = num_dots / 10;
     int *biome_origin_dots = malloc(num_origin_dots * 3 * sizeof(int));
