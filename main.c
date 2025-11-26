@@ -527,7 +527,7 @@ void track_progress(
         }
 
         // Sleep 0.1 Seconds
-    
+
         struct timespec sleep_time;
         sleep_time.tv_sec = 0;
         sleep_time.tv_nsec = 100000000;
@@ -685,7 +685,6 @@ void smooth_coastlines(
         // Change Dot Type if Closer to Opposite Type
 
         if (sum_same > sum_opp) {
-            // If the sum of the nearest coastline_smoothing 
             dot->type = (land_dot) ? 'W' : 'L';
         }
 
