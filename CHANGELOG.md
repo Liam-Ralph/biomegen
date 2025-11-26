@@ -22,7 +22,7 @@
 
  - Added version to autorun results.
  - Added autorun results for website.
- 
+
 ## Version 2.1.2 (September 2025)
 
  - Autorun stats are now saved to a csv file.

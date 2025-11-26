@@ -22,7 +22,7 @@ int main() {
     #elif BSD || __Apple__
 
         setproctitle("biogen-autorun");
-    
+
     #endif
 
     printf("\n");
@@ -50,7 +50,7 @@ int main() {
 
     if (!access(exec, F_OK) == 0) {
         system("gcc -D_GNU_SOURCE main.c -o main -lm -lpng");
-    } 
+    }
 
     // Opening Autorun Tasks
 
