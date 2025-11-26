@@ -3,18 +3,12 @@
 ### Version 3.0.0
 ### Updated November 2025
 
-# Note: this branch is in development. It is an attempt to rewrite the project in C.
-
 <br/>
 
 ## Description
 BiomeGen is a C map generation tool that provides output in a png format.
 Customization options include map dimensions, island abundance, island size, and
 island abundance relative to water. Generates water, land, and various biomes.
-<<<<<<< HEAD
-Uses Python's multiprocessing library for improved efficiency. Includes automated
-runs and a C program to create multiple images or test generation speed.
-=======
 Uses multiprocessing in C for increased efficiency. Includes automated
 runs and another C program to create multiple images or test generation speed.
 
@@ -29,7 +23,6 @@ Version 3.0.0
 
 Python Versions (v2.1.6 and below)
  - Any OS with Python 3.10+ should work (Linux Mint, antiX, and Windows tested)
->>>>>>> c-rewrite
 
 <br/>
 
@@ -72,11 +65,7 @@ to do this:
    generation time for the C program.
 
 2. Use the `autorun.c` program and `autorun_tasks.txt`. The C program runs
-<<<<<<< HEAD
-   the Python program and handles passing arguments. It gets its instructions
-=======
    the main C program and handles passing arguments. It gets its instructions
->>>>>>> c-rewrite
    from `autorun_tasks.txt`. Each line represents one task, empty lines and comments
    will cause errors. Currently, it contains the example task
    `2:n:n:1920 1080 100 120 50 5 8 file_path.png`. The C program will also add
@@ -99,17 +88,10 @@ to do this:
        previous, and `file_path.png` will be deleted at the end of the program.
        Must be "y" or "n".
      - `1920 1080 100 120 50 5 8 file_path.png` is simply the arguments to be passed
-<<<<<<< HEAD
-       to the Python program. The only one that may be edited by the C program
-       is `file_path.png`, which will be edited if "y" in the second C program
-       argument. Must follow the rules for Python arguments in 1. Max 255 characters.
-    
-=======
        to the main C program. The only one that may be edited by the C program
        is `file_path.png`, which will be edited if "y" in the second C program
        argument. Must follow the rules for C arguments in 1. Max 255 characters.
 
->>>>>>> c-rewrite
     With this option, you can generated multiple different png files from the same
     inputs, or test the generation speed of the main C program. This option will
     also tell you the generation times for each repetition, and the average
@@ -121,10 +103,6 @@ to do this:
 ## Other Files
  - `sample_inputs.txt`
    Includes a number of inputs that can pasted into your terminal
-<<<<<<< HEAD
-
-   (Ctrl + Shift + V usually works for this).
-=======
    (Ctrl + Shift + V usually works for this).
 
 <br/>
@@ -146,4 +124,3 @@ to do this:
      - Calculate based on prevailing wind direction, rainfall, moutain effects
  - Rewrite coastline smoothing algorithm
      - Achieve something similar in a more efficient manner
->>>>>>> c-rewrite
