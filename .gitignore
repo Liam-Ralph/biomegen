@@ -1,3 +1,6 @@
 .vscode
+main
 autorun
-autorun.exe
+*.exe
+*.out
+production-files
