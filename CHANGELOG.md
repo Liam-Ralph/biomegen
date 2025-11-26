@@ -1,3 +1,11 @@
+## Version 3.0.0 (November 2025)
+
+ - Rewrite main program in C for efficiency improvements.
+ - Fix invalid sample input.
+ - Edit autorun program to run new main program.
+ - Modify licensing for program outputs.
+ - Generate new example result.
+
 ## Version 2.1.6 (November 2025)
 
  - Removed useless loop in coastline smoothing.

@@ -5,18 +5,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/prctl.h>
 #include <unistd.h>
-
-// OS Specific Includes
-
-#ifdef __linux__
-    #include <sys/prctl.h>
-#elif _WIN32
-    #include <windows.h>
-    #include <io.h>
-    #define F_OK 0
-    #define access _access
-#endif
 
 
 // Main Function
@@ -27,20 +17,16 @@ int main() {
 
     #ifdef __linux__
 
-        prctl(PR_SET_NAME, "BiomeGenAutorun", 0, 0, 0);
+        prctl(PR_SET_NAME, "biogen-autorun", 0, 0, 0);
 
-    #elif BSD
+    #elif BSD || __Apple__
 
-        setproctitle("BiomeGen Autorun");
+        setproctitle("biogen-autorun");
 
-    #elif __Apple__
-
-        setproctitle("BiomeGen Autorun");
-    
     #endif
 
     printf("\n");
-    
+
     // Getting Program Version
 
     char file_line[29];
@@ -53,6 +39,18 @@ int main() {
     char version[12];
     strncpy(version, file_line + 12, 12);
     version[strlen(version) - 2] = '\0';
+
+    // Compiling Main Program
+
+    #ifdef _WIN32
+        char exec[9] = "main.exe";
+    #else
+        char exec[5] = "main";
+    #endif
+
+    if (!access(exec, F_OK) == 0) {
+        system("gcc -D_GNU_SOURCE main.c -o main -lm -lpng");
+    }
 
     // Opening Autorun Tasks
 
@@ -113,22 +111,20 @@ int main() {
 
             }
 
-            // Choosing Python Command
-
-            char python_command[272] = "python3 main.py "; // Command for running python program
-
-            #ifdef _WIN32
-                python_command = "py main.py ";
-            #endif
-
             // Running Program and Collecting Output
 
             FILE *fp;
             char output[13] = {0};
             char buffer[13]; // max time 99999.999999 seconds (> 27 hours)
 
-            strcat(python_command, inputs);
-            fp = popen(python_command, "r");
+            #ifdef _WIN32
+                char command[265] = "main.exe ";
+            #else
+                char command[263] = "./main ";
+            #endif
+
+            strcat(command, inputs);
+            fp = popen(command, "r");
             while (fgets(buffer, 13, fp) != NULL) {
                 strcat(output, buffer);
             }
