@@ -701,21 +701,6 @@ void smooth_coastlines(
 }
 
 /**
- * Remove all "Land Origin" and "Water Forced" dots from DOTS between
- * START_INDEX and END_INDEX. Replaces them with "Land" and "Water".
- */
-void clean_dots(const int start_index, const int end_index, Dot *dots) {
-    for (int i = start_index; i < end_index; i++) {
-        Dot *dot = &dots[i];
-        if (dot->type == 'l') {
-            dot->type = 'L';
-        } else if (dot->type == 'w') {
-            dot->type = 'W';
-        }
-    }
-}
-
-/**
  * Generate water biomes for DOTS between START_INDEX and END_INDEX. Water
  * biomes are generated based on a dot's distance to the equator and the
  * distance to the nearest land dot.
@@ -1127,14 +1112,14 @@ int main(int argc, char *argv[]) {
 
     for (int i = 0; i < num_dots; i++) {
 
-        // Find unused coordinate
+        // Find Unused Coordinate
 
         int ii;
         do {
             ii = rand() % (width * height);
         } while (used_coords[ii]);
 
-        // Create dot at rand_index[x, y]
+        // Create Dot
 
         used_coords[ii] = true;
 
@@ -1164,12 +1149,16 @@ int main(int argc, char *argv[]) {
 
     section_progress_total[2] = num_reg_dots;
 
+    // Create Origin Dots Array
+
     int origin_dots[num_special_dots / 2][2];
     for (int ii = 0; ii < num_special_dots / 2; ii++) {
         Dot *dot = &dots[ii];
         origin_dots[ii][0] = dot->x;
         origin_dots[ii][1] = dot->y;
     }
+
+    // Create Piece Starts
 
     int piece_length = num_reg_dots / processes;
 
@@ -1183,22 +1172,26 @@ int main(int argc, char *argv[]) {
     last piece may be larger, special dots are skipped
     */
 
-    int fork_pids[processes];
+    // Run Workers
+
+    int fork_pids[processes]; // Create forks list
     for (int i = 0; i < processes; i++) {
-        fork_pids[i] = fork();
+        fork_pids[i] = fork(); // Create fork
         if (fork_pids[i] == 0) {
+            // e.g. biogen-worker00
             set_process_title("worker", i);
-            assign_sections(
+            assign_sections( // Run worker
                 map_resolution, island_size, piece_starts[i], piece_starts[i + 1],
                 num_special_dots / 2, origin_dots, dots, section_progress
             );
-            exit(0);
+            exit(0); // Kill worker
         }
     }
     for (int i = 0; i < processes; i++) {
-        waitpid(fork_pids[i], NULL, 0);
+        waitpid(fork_pids[i], NULL, 0); // Wait for workers
     }
 
+    // Sets section time for section assignment
     clock_gettime(CLOCK_REALTIME, &time_now);
     section_times[2] = (float)(time_now.tv_sec - start_time.tv_sec) +
         (time_now.tv_nsec - start_time.tv_nsec) / 1000000000.0 - sum_list_float(section_times, 7);
@@ -1226,6 +1219,7 @@ int main(int argc, char *argv[]) {
 
     } else {
 
+        // Coastline smoothing would have no effect
         atomic_store(&section_progress[3], 1);
 
     }
@@ -1238,28 +1232,27 @@ int main(int argc, char *argv[]) {
 
     atomic_store(&section_progress_total[4], num_dots);
 
-    // Removing "Land Origin" and "Water Forced" dots
+    // Removing "Land Origin" and "Water Forced" Dots
+
+    for (int i = 0; i < num_special_dots; i++) {
+        Dot *dot = &dots[i];
+        if (dot->type == 'l') {
+            dot->type = 'L';
+        } else if (dot->type == 'w') {
+            dot->type = 'W';
+        }
+    }
+
+    // Create Piece Starts for All Dots
 
     piece_length = num_dots / processes;
-
     for (int i = 0; i < processes; i++) {
         piece_starts[i] = i * piece_length;
     }
     piece_starts[processes] = num_dots;
 
-    for (int i = 0; i < processes; i++) {
-        fork_pids[i] = fork();
-        if (fork_pids[i] == 0) {
-            set_process_title("worker", i);
-            clean_dots(piece_starts[i], piece_starts[i + 1], dots);
-            exit(0);
-        }
-    }
-    for (int i = 0; i < processes; i++) {
-        waitpid(fork_pids[i], NULL, 0);
-    }
-
-    // Creating water biomes to add depth and ice at poles
+    // Creating Water Biomes
+    // Adds ice, depth
 
     for (int i = 0; i < processes; i++) {
         fork_pids[i] = fork();
@@ -1275,13 +1268,15 @@ int main(int argc, char *argv[]) {
         waitpid(fork_pids[i], NULL, 0);
     }
 
-    // Adding biome origin dots, which decide what biome an area will be
+    // Adding Biome Origin Dots
+    // The area around a biome origin dot will have the same biome
 
     int biome_origin_indexes[num_dots / 10];
 
     int ii = 0;
     for (int i = 0; i < num_dots / 10; i++) {
 
+        // Biome origin dot must be land
         while (dots[ii].type != 'L') {
             ii++;
         }
@@ -1358,7 +1353,8 @@ int main(int argc, char *argv[]) {
 
     }
 
-    // Add land biomes, dots are assigned the biome of the nearest biome origin dot
+    // Create Land Biomes
+    // Land dots are assigned the biome of the nearest biome origin dot
 
     for (int i = 0; i < processes; i++) {
         fork_pids[i] = fork();
@@ -1383,6 +1379,8 @@ int main(int argc, char *argv[]) {
 
     atomic_store(&section_progress_total[5], height);
 
+    // Create Section Starts
+
     const int section_height = height / processes;
 
     int section_starts[processes + 1];
@@ -1390,6 +1388,8 @@ int main(int argc, char *argv[]) {
         section_starts[i] = i * section_height;
     }
     section_starts[processes] = height;
+
+    // Run Workers
 
     for (int i = 0; i < processes; i++) {
         fork_pids[i] = fork();
@@ -1414,6 +1414,8 @@ int main(int argc, char *argv[]) {
 
     atomic_store(&section_progress_total[6], height);
 
+    // Create Image
+
     FILE *fptr = fopen(output_file, "w");
     png_structp png_ptr = png_create_write_struct(PNG_LIBPNG_VER_STRING, NULL, NULL, NULL);
     png_infop info_ptr = png_create_info_struct(png_ptr);
@@ -1423,6 +1425,8 @@ int main(int argc, char *argv[]) {
         8, PNG_COLOR_TYPE_RGB, PNG_INTERLACE_NONE,
         PNG_COMPRESSION_TYPE_DEFAULT, PNG_FILTER_TYPE_DEFAULT
     );
+
+    // Assign Image Pixels
 
     png_byte **row_pointers = png_malloc(png_ptr, height * sizeof(png_byte *));
     for (int y = 0; y < height; y++) {
@@ -1513,6 +1517,8 @@ int main(int argc, char *argv[]) {
         }
         atomic_fetch_add(&section_progress[6], 1);
     }
+
+    // Write Image to File
 
     png_init_io(png_ptr, fptr);
     png_set_rows(png_ptr, info_ptr, row_pointers);
