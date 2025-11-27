@@ -499,10 +499,14 @@ void track_progress(
         // Total Progress
 
         char *color;
-        if (section_times[6] != 0.0) {
+        float total_time;
+        if (section_times[7] != 0.0) {
             color = ANSI_GREEN;
+            total_time = section_times[7];
         } else {
             color = ANSI_BLUE;
+            total_time = (float)(time_now.tv_sec - start_time.tv_sec) +
+                (time_now.tv_nsec - start_time.tv_nsec) / 1000000000.0;
         }
 
         printf("%s      Total Progress      %8.2f%% %s", color, total_progress * 100, ANSI_GREEN);
@@ -515,8 +519,6 @@ void track_progress(
             printf("█");
         }
         char formatted_time[32];
-        float total_time = (float)(time_now.tv_sec - start_time.tv_sec) +
-            (time_now.tv_nsec - start_time.tv_nsec) / 1000000000.0;
         snprintf(formatted_time, 32, "%2d:%08.5f", (int)total_time / 60, fmod(total_time, 60.0f));
         printf("%s%s\n", ANSI_RESET, formatted_time);
 
@@ -1047,10 +1049,10 @@ int main(int argc, char *argv[]) {
     );
 
     float *section_times = mmap(
-        NULL, sizeof(float) * 7, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0
+        NULL, sizeof(float) * 8, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0
     );
 
-    for (int i = 0; i < 7; i++) {
+    for (int i = 0; i < 8; i++) {
         atomic_init(&section_progress[i], 0);
         section_progress_total[i] = 1;
         section_times[i] = 0;
@@ -1534,6 +1536,11 @@ int main(int argc, char *argv[]) {
     section_times[6] = (float)(time_now.tv_sec - start_time.tv_sec) +
         (time_now.tv_nsec - start_time.tv_nsec) / 1000000000.0 - sum_list_float(section_times, 7);
 
+    // Setting Completion Time
+
+    section_times[7] = (float)(time_now.tv_sec - start_time.tv_sec) +
+        (time_now.tv_nsec - start_time.tv_nsec) / 1000000000.0;
+
     // Wait for Tracker Process
 
     if (!auto_mode) {
@@ -1544,7 +1551,7 @@ int main(int argc, char *argv[]) {
 
     munmap(section_progress, sizeof(int) * 7);
     munmap(section_progress_total, sizeof(int) * 7);
-    munmap(section_times, sizeof(float) * 7);
+    munmap(section_times, sizeof(float) * 8);
     munmap(dots, sizeof(Dot) * num_dots);
     munmap(image_indexes, sizeof(int) * width * height);
 
