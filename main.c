@@ -720,23 +720,9 @@ void generate_biomes_water(
  * dots whose biomes are already before this function.
  */
 void generate_biomes_land(
-    const int start_index, const int end_index, const int num_dots,
+    const int start_index, const int end_index, Node *origin_tree_root, const int num_dots,
     const int *biome_origin_indexes, Dot *dots, _Atomic int *section_progress
 ) {
-
-    // Create Biome Origin Dot KDTree
-
-    int num_origin_dots = num_dots / 10;
-    int *biome_origin_dots = malloc(num_origin_dots * 3 * sizeof(int));
-    for (int i = 0; i < num_origin_dots; i++) {
-        const Dot *dot = &dots[biome_origin_indexes[i]];
-        biome_origin_dots[i * 3] = dot->x;
-        biome_origin_dots[i * 3 + 1] = dot->y;
-        biome_origin_dots[i * 3 + 2] = biome_origin_indexes[i];
-    }
-    Node *origin_tree_root = NULL;
-    origin_tree_root = build_recursive(num_origin_dots, biome_origin_dots, 0);
-    free(biome_origin_dots);
 
     // Generate Land Biomes
 
@@ -771,29 +757,14 @@ void generate_biomes_land(
  * for TYPE_COUNTS, to be used in statistics at the end of the main program.
  */
 void generate_image(
-    const int start_height, const int end_height, const int width, const int num_dots,
-    const Dot *dots, int *image_indexes, int *type_counts, _Atomic int *section_progress
+    const int start_height, const int end_height, const int width, Node *tree_root,
+    const int num_dots, const Dot *dots,
+    int *image_indexes, int *type_counts, _Atomic int *section_progress
 ) {
 
     // Dot type counts for statistics, not used in image generation
     int local_type_counts[11] = {0};
     const char types[11] = {'I', 's', 'W', 'd', 'R', 'D', 'J', 'F', 'P', 'T', 'S'};
-
-    // Create Dots KDTree
-
-    int *dot_coords = malloc(num_dots * 3 * sizeof(int));
-
-    for (int i = 0; i < num_dots; i++) {
-        const Dot *dot = &dots[i];
-        dot_coords[i * 3] = dot->x;
-        dot_coords[i * 3 + 1] = dot->y;
-        dot_coords[i * 3 + 2] = i;
-    }
-
-    Node *tree_root = NULL;
-    tree_root = build_recursive(num_dots, dot_coords, 0);
-
-    free(dot_coords);
 
     // Generate Image
 
@@ -836,8 +807,6 @@ void generate_image(
         atomic_fetch_add(&section_progress[5], 1);
 
     }
-
-    free_recursive(tree_root);
 
     // Update Shared Type Counts
 
@@ -1368,12 +1337,28 @@ int main(int argc, char *argv[]) {
     // Create Land Biomes
     // Land dots are assigned the biome of the nearest biome origin dot
 
+    // Create Biome Origin Dot KDTree
+
+    int num_origin_dots = num_dots / 10;
+    int *biome_origin_dots = malloc(num_origin_dots * 3 * sizeof(int));
+    for (int i = 0; i < num_origin_dots; i++) {
+        const Dot *dot = &dots[biome_origin_indexes[i]];
+        biome_origin_dots[i * 3] = dot->x;
+        biome_origin_dots[i * 3 + 1] = dot->y;
+        biome_origin_dots[i * 3 + 2] = biome_origin_indexes[i];
+    }
+    Node *origin_tree_root = NULL;
+    origin_tree_root = build_recursive(num_origin_dots, biome_origin_dots, 0);
+    free(biome_origin_dots);
+
+    // Run Workers
+
     for (int i = 0; i < processes; i++) {
         fork_pids[i] = fork();
         if (fork_pids[i] == 0) {
             set_process_title("worker", i);
             generate_biomes_land(
-                piece_starts[i], piece_starts[i + 1], num_dots,
+                piece_starts[i], piece_starts[i + 1], origin_tree_root, num_dots,
                 biome_origin_indexes, dots, section_progress
             );
             exit(0);
@@ -1382,6 +1367,10 @@ int main(int argc, char *argv[]) {
     for (int i = 0; i < processes; i++) {
         waitpid(fork_pids[i], NULL, 0);
     }
+
+    // Free Tree
+
+    free_recursive(origin_tree_root);
 
     clock_gettime(CLOCK_REALTIME, &time_now);
     section_times[4] = (float)(time_now.tv_sec - start_time.tv_sec) +
@@ -1401,6 +1390,19 @@ int main(int argc, char *argv[]) {
     }
     section_starts[processes] = height;
 
+    // Create Dots KDTree
+
+    int *dot_coords = malloc(num_dots * 3 * sizeof(int));
+    for (int i = 0; i < num_dots; i++) {
+        const Dot *dot = &dots[i];
+        dot_coords[i * 3] = dot->x;
+        dot_coords[i * 3 + 1] = dot->y;
+        dot_coords[i * 3 + 2] = i;
+    }
+    Node *tree_root = NULL;
+    tree_root = build_recursive(num_dots, dot_coords, 0);
+    free(dot_coords);
+
     // Run Workers
 
     for (int i = 0; i < processes; i++) {
@@ -1408,7 +1410,7 @@ int main(int argc, char *argv[]) {
         if (fork_pids[i] == 0) {
             set_process_title("worker", i);
             generate_image(
-                section_starts[i], section_starts[i + 1], width,
+                section_starts[i], section_starts[i + 1], width, tree_root,
                 num_dots, dots, image_indexes, type_counts, section_progress
             );
             exit(0);
@@ -1417,6 +1419,10 @@ int main(int argc, char *argv[]) {
     for (int i = 0; i < processes; i++) {
         waitpid(fork_pids[i], NULL, 0);
     }
+
+    // Free Tree
+
+    free_recursive(tree_root);
 
     clock_gettime(CLOCK_REALTIME, &time_now);
     section_times[5] = (float)(time_now.tv_sec - start_time.tv_sec) +
