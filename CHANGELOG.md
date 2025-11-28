@@ -1,3 +1,8 @@
+## Version 3.0.1 (November 2025)
+
+ - Fix total progress time.
+ - Move KDTree building outside forks for efficiency.
+
 ## Version 3.0.0 (November 2025)
 
  - Rewrite main program in C for efficiency improvements.
