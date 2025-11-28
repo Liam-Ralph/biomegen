@@ -599,44 +599,10 @@ void assign_sections(
  */
 void smooth_coastlines(
     const int coastline_smoothing, const int start_index, const int end_index,
+    Node *land_tree_root, Node *water_tree_root,
     const int num_dots, const int num_special_dots, const int num_reg_dots,
     Dot *dots, _Atomic int *section_progress
 ) {
-
-    // Create Land and Water Dots
-
-    int num_land_dots = 0;
-    int num_water_dots = 0;
-    int *land_dots = malloc(num_reg_dots * 3 * sizeof(int));
-    int *water_dots = malloc(num_reg_dots * 3 * sizeof(int));
-    // num_land_dots + num_water_dots == num_reg_dots, so this is the max
-
-    for (int i = num_special_dots; i < num_dots; i++) {
-    // Only includes "Land" and "Water" dots
-        const Dot *dot = &dots[i];
-        if (dot->type == 'L') {
-            land_dots[num_land_dots * 3] = dot->x;
-            land_dots[num_land_dots * 3 + 1] = dot->y;
-            land_dots[num_land_dots * 3 + 2] = i;
-            num_land_dots++;
-        } else {
-            water_dots[num_water_dots * 3] = dot->x;
-            water_dots[num_water_dots * 3 + 1] = dot->y;
-            water_dots[num_water_dots * 3 + 2] = i;
-            num_water_dots++;
-        }
-    }
-
-    // Create Land and Water KDTrees
-
-    Node *land_tree_root = NULL;
-    Node *water_tree_root = NULL;
-
-    land_tree_root = build_recursive(num_land_dots, land_dots, 0);
-    water_tree_root = build_recursive(num_water_dots, water_dots, 0);
-
-    free(land_dots);
-    free(water_dots);
 
     // Smooth Coastlines
 
@@ -694,11 +660,6 @@ void smooth_coastlines(
 
     }
 
-    // Free Trees
-
-    free_recursive(land_tree_root);
-    free_recursive(water_tree_root);
-
 }
 
 /**
@@ -707,26 +668,9 @@ void smooth_coastlines(
  * distance to the nearest land dot.
  */
 void generate_biomes_water(
-    const int start_index, const int end_index, const int height,
+    const int start_index, const int end_index, const int height, Node *land_tree_root,
     const int num_dots, Dot *dots, _Atomic int *section_progress
 ) {
-
-    // Build Land Dots KDTree
-
-    int num_land_dots = 0;
-    int *land_dots = malloc(num_dots * 3 * sizeof(int));
-    for (int i = 0; i < num_dots; i++) {
-        if (dots[i].type == 'L') {
-            const Dot *dot = &dots[i];
-            land_dots[num_land_dots * 3] = dot->x;
-            land_dots[num_land_dots * 3 + 1] = dot->y;
-            land_dots[num_land_dots * 3 + 2] = i;
-            num_land_dots++;
-        }
-    }
-    Node *land_tree_root = NULL;
-    land_tree_root = build_recursive(num_land_dots, land_dots, 0);
-    free(land_dots);
 
     // Generate Water Biomes
 
@@ -1203,12 +1147,50 @@ int main(int argc, char *argv[]) {
 
         section_progress_total[3] = num_reg_dots;
 
+        // Create Land and Water Dots
+
+        int num_land_dots = 0;
+        int num_water_dots = 0;
+        int *land_dots = malloc(num_reg_dots * 3 * sizeof(int));
+        int *water_dots = malloc(num_reg_dots * 3 * sizeof(int));
+        // num_land_dots + num_water_dots == num_reg_dots, so this is the max
+
+        for (int i = num_special_dots; i < num_dots; i++) {
+        // Only includes "Land" and "Water" dots
+            const Dot *dot = &dots[i];
+            if (dot->type == 'L') {
+                land_dots[num_land_dots * 3] = dot->x;
+                land_dots[num_land_dots * 3 + 1] = dot->y;
+                land_dots[num_land_dots * 3 + 2] = i;
+                num_land_dots++;
+            } else {
+                water_dots[num_water_dots * 3] = dot->x;
+                water_dots[num_water_dots * 3 + 1] = dot->y;
+                water_dots[num_water_dots * 3 + 2] = i;
+                num_water_dots++;
+            }
+        }
+
+        // Create Land and Water KDTrees
+
+        Node *land_tree_root = NULL;
+        Node *water_tree_root = NULL;
+
+        land_tree_root = build_recursive(num_land_dots, land_dots, 0);
+        water_tree_root = build_recursive(num_water_dots, water_dots, 0);
+
+        free(land_dots);
+        free(water_dots);
+
+        // Run Workers
+
         for (int i = 0; i < processes; i++) {
             fork_pids[i] = fork();
             if (fork_pids[i] == 0) {
                 set_process_title("worker", i);
                 smooth_coastlines(
                     coastline_smoothing, piece_starts[i], piece_starts[i + 1],
+                    land_tree_root, water_tree_root,
                     num_dots, num_special_dots, num_reg_dots, dots, section_progress
                 );
                 exit(0);
@@ -1217,6 +1199,11 @@ int main(int argc, char *argv[]) {
         for (int i = 0; i < processes; i++) {
             waitpid(fork_pids[i], NULL, 0);
         }
+
+        // Free Trees
+
+        free_recursive(land_tree_root);
+        free_recursive(water_tree_root);
 
     } else {
 
@@ -1255,12 +1242,32 @@ int main(int argc, char *argv[]) {
     // Creating Water Biomes
     // Adds ice, depth
 
+    // Build Land Dots KDTree
+
+    int num_land_dots = 0;
+    int *land_dots = malloc(num_dots * 3 * sizeof(int));
+    for (int i = 0; i < num_dots; i++) {
+        if (dots[i].type == 'L') {
+            const Dot *dot = &dots[i];
+            land_dots[num_land_dots * 3] = dot->x;
+            land_dots[num_land_dots * 3 + 1] = dot->y;
+            land_dots[num_land_dots * 3 + 2] = i;
+            num_land_dots++;
+        }
+    }
+    Node *land_tree_root = NULL;
+    land_tree_root = build_recursive(num_land_dots, land_dots, 0);
+    free(land_dots);
+
+    // Run Workers
+
     for (int i = 0; i < processes; i++) {
         fork_pids[i] = fork();
         if (fork_pids[i] == 0) {
             set_process_title("worker", i);
             generate_biomes_water(
-                piece_starts[i], piece_starts[i + 1], height, num_dots, dots, section_progress
+                piece_starts[i], piece_starts[i + 1], height, land_tree_root,
+                num_dots, dots, section_progress
             );
             exit(0);
         }
@@ -1268,6 +1275,10 @@ int main(int argc, char *argv[]) {
     for (int i = 0; i < processes; i++) {
         waitpid(fork_pids[i], NULL, 0);
     }
+
+    // Free Land Tree
+
+    free_recursive(land_tree_root);
 
     // Adding Biome Origin Dots
     // The area around a biome origin dot will have the same biome
