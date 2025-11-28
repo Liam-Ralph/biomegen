@@ -451,13 +451,13 @@ void track_progress(
 
         for (int i = 0; i < 7; i++) {
 
-            // Calculating Section Progress
+            // Calculate Section Progress
 
             float progress_section =
                 atomic_load(&section_progress[i]) / (float)section_progress_total[i];
             total_progress += progress_section * section_weights[i];
 
-            // Checking if Section Complete
+            // Check if Section Complete
 
             char *color;
             float section_time;
@@ -474,7 +474,7 @@ void track_progress(
                 }
             }
 
-            // Printing Output for Section Progress
+            // Print Output for Section Progress
 
             printf(
                 "%s[%d/7] %-20s%8.2f%% %s",
@@ -522,7 +522,7 @@ void track_progress(
         snprintf(formatted_time, 32, "%2d:%08.5f", (int)total_time / 60, fmod(total_time, 60.0f));
         printf("%s%s\n", ANSI_RESET, formatted_time);
 
-        // Checking Exit Status
+        // Check Exit Status
 
         if (strcmp(color, ANSI_GREEN) == 0) {
             break; // All sections done, exit tracking process
@@ -824,11 +824,11 @@ void generate_image(
  */
 int main(int argc, char *argv[]) {
 
-    // Setting Main Process Title
+    // Set Main Process Title
 
     set_process_title("main", -1);
 
-    // Getting Inputs
+    // Get Inputs
 
     bool auto_mode;
     char *output_file;
@@ -843,7 +843,7 @@ int main(int argc, char *argv[]) {
 
         output_file = "result.png";
 
-        // Getting Program Version
+        // Get Program Version
 
         char file_line[29];
         FILE *fptr = fopen("README.md", "r");
@@ -951,6 +951,8 @@ int main(int argc, char *argv[]) {
     struct timespec start_time;
     clock_gettime(CLOCK_REALTIME, &start_time);
 
+    // --Setup--
+
     // Shared Memory
 
     _Atomic int *section_progress = mmap(
@@ -1006,14 +1008,16 @@ int main(int argc, char *argv[]) {
 
     }
 
+    // Set Section Completion Time
+
     struct timespec time_now;
     clock_gettime(CLOCK_REALTIME, &time_now);
     section_times[0] = (float)(time_now.tv_sec - start_time.tv_sec) +
         (time_now.tv_nsec - start_time.tv_nsec) / 1000000000.0;
     atomic_store(&section_progress[0], 1);
 
-    // Section Generation
-    // Creating the initial list of dots
+    // --Section Generation--
+    // Create the initial list of dots
 
     section_progress_total[1] = num_dots;
 
@@ -1054,12 +1058,14 @@ int main(int argc, char *argv[]) {
 
     free(used_coords);
 
+    // Set Section Completion Time
+
     clock_gettime(CLOCK_REALTIME, &time_now);
     section_times[1] = (float)(time_now.tv_sec - start_time.tv_sec) +
         (time_now.tv_nsec - start_time.tv_nsec) / 1000000000.0 - sum_list_float(section_times, 7);
 
-    // Section Assignment
-    // Assigning dots as "Land", "Land Origin", "Water", or "Water Forced"
+    // --Section Assignment--
+    // Assign dots as "Land", "Land Origin", "Water", or "Water Forced"
 
     section_progress_total[2] = num_reg_dots;
 
@@ -1105,12 +1111,13 @@ int main(int argc, char *argv[]) {
         waitpid(fork_pids[i], NULL, 0); // Wait for workers
     }
 
-    // Sets section time for section assignment
+    // Set Section Completion Time
+
     clock_gettime(CLOCK_REALTIME, &time_now);
     section_times[2] = (float)(time_now.tv_sec - start_time.tv_sec) +
         (time_now.tv_nsec - start_time.tv_nsec) / 1000000000.0 - sum_list_float(section_times, 7);
 
-    // Coastline Smoothing
+    // --Coastline Smoothing--
 
     if (coastline_smoothing != 0) {
 
@@ -1181,15 +1188,17 @@ int main(int argc, char *argv[]) {
 
     }
 
+    // Set Section Completion Time
+
     clock_gettime(CLOCK_REALTIME, &time_now);
     section_times[3] = (float)(time_now.tv_sec - start_time.tv_sec) +
         (time_now.tv_nsec - start_time.tv_nsec) / 1000000000.0 - sum_list_float(section_times, 7);
 
-    // Biome Generation
+    // --Biome Generation--
 
     atomic_store(&section_progress_total[4], num_dots);
 
-    // Removing "Land Origin" and "Water Forced" Dots
+    // Remove "Land Origin" and "Water Forced" Dots
 
     for (int i = 0; i < num_special_dots; i++) {
         Dot *dot = &dots[i];
@@ -1208,7 +1217,7 @@ int main(int argc, char *argv[]) {
     }
     piece_starts[processes] = num_dots;
 
-    // Creating Water Biomes
+    // Create Water Biomes
     // Adds ice, depth
 
     // Build Land Dots KDTree
@@ -1249,7 +1258,7 @@ int main(int argc, char *argv[]) {
 
     free_recursive(land_tree_root);
 
-    // Adding Biome Origin Dots
+    // Add Biome Origin Dots
     // The area around a biome origin dot will have the same biome
 
     int biome_origin_indexes[num_dots / 10];
@@ -1372,11 +1381,13 @@ int main(int argc, char *argv[]) {
 
     free_recursive(origin_tree_root);
 
+    // Set Section Completion Time
+
     clock_gettime(CLOCK_REALTIME, &time_now);
     section_times[4] = (float)(time_now.tv_sec - start_time.tv_sec) +
         (time_now.tv_nsec - start_time.tv_nsec) / 1000000000.0 - sum_list_float(section_times, 7);
 
-    // Image Generation
+    // --Image Generation--
 
     atomic_store(&section_progress_total[5], height);
 
@@ -1424,11 +1435,13 @@ int main(int argc, char *argv[]) {
 
     free_recursive(tree_root);
 
+    // Set Section Completion Time
+
     clock_gettime(CLOCK_REALTIME, &time_now);
     section_times[5] = (float)(time_now.tv_sec - start_time.tv_sec) +
         (time_now.tv_nsec - start_time.tv_nsec) / 1000000000.0 - sum_list_float(section_times, 7);
 
-    // Finish
+    // --Finish--
 
     atomic_store(&section_progress_total[6], height);
 
@@ -1553,7 +1566,7 @@ int main(int argc, char *argv[]) {
     section_times[6] = (float)(time_now.tv_sec - start_time.tv_sec) +
         (time_now.tv_nsec - start_time.tv_nsec) / 1000000000.0 - sum_list_float(section_times, 7);
 
-    // Setting Completion Time
+    // Set Section Completion Time
 
     section_times[7] = (float)(time_now.tv_sec - start_time.tv_sec) +
         (time_now.tv_nsec - start_time.tv_nsec) / 1000000000.0;
