@@ -545,8 +545,7 @@ void track_progress(
  */
 void assign_sections(
     const int map_resolution, const float island_size, const int start_index, const int end_index,
-    const int num_origin_dots, const int origin_dots[num_origin_dots][2],
-    Dot *dots, _Atomic int *section_progress
+    Node *origin_tree_root, Dot *dots, _Atomic int *section_progress
 ) {
 
     srand(time(NULL) + getpid());
@@ -558,26 +557,15 @@ void assign_sections(
 
         // Find Distance to Nearest Origin Dot
 
-        int min = INT_MAX;
+        int min_dist = INT_MAX;
         // min and dist are squared, sqrt is not done until later
         int min_index = 0;
-
-        for (int ii = 0; ii < num_origin_dots; ii++) {
-
-            const int diff_x = origin_dots[ii][0] - dot->x;
-            const int diff_y = origin_dots[ii][1] - dot->y;
-            const int dist = diff_x * diff_x + diff_y * diff_y;
-
-            if (dist < min) {
-                min = dist;
-                min_index = ii;
-            }
-
-        }
+        int coord[2] = {dot->x, dot->y};
+        query_recursive(origin_tree_root, coord, 0, &min_index, &min_dist);
 
         // Calculate Chance
 
-        float dist = sqrt(min) / sqrt(map_resolution);
+        float dist = sqrt(min_dist) / sqrt(map_resolution);
         float threshold = ((float)(min_index % 20) / 19.0f * 1.5f + 0.25f) * island_size;
 
         int chance = (dist <= threshold) ? 9 : 1;
@@ -1071,12 +1059,7 @@ int main(int argc, char *argv[]) {
 
     // Create Origin Dots Array
 
-    int origin_dots[num_special_dots / 2][2];
-    for (int ii = 0; ii < num_special_dots / 2; ii++) {
-        Dot *dot = &dots[ii];
-        origin_dots[ii][0] = dot->x;
-        origin_dots[ii][1] = dot->y;
-    }
+
 
     // Create Piece Starts
 
@@ -1092,6 +1075,19 @@ int main(int argc, char *argv[]) {
     last piece may be larger, special dots are skipped
     */
 
+    // Create Land Origin KDTree
+
+    const int num_origin_dots = num_special_dots / 2;
+    int land_origin_dots[num_origin_dots * 3 * sizeof(int)];
+    for (int i = 0; i < num_origin_dots; i++) {
+        Dot *dot = &dots[i];
+        land_origin_dots[i * 3] = dot->x;
+        land_origin_dots[i * 3 + 1] = dot->y;
+        land_origin_dots[i * 3 + 2] = i;
+    }
+    Node *origin_tree_root = NULL;
+    origin_tree_root = build_recursive(num_origin_dots, land_origin_dots, 0);
+
     // Run Workers
 
     int fork_pids[processes]; // Create forks list
@@ -1102,7 +1098,7 @@ int main(int argc, char *argv[]) {
             set_process_title("worker", i);
             assign_sections( // Run worker
                 map_resolution, island_size, piece_starts[i], piece_starts[i + 1],
-                num_special_dots / 2, origin_dots, dots, section_progress
+                origin_tree_root, dots, section_progress
             );
             exit(0); // Kill worker
         }
@@ -1110,6 +1106,10 @@ int main(int argc, char *argv[]) {
     for (int i = 0; i < processes; i++) {
         waitpid(fork_pids[i], NULL, 0); // Wait for workers
     }
+
+    // Free Land Origin Tree
+
+    free_recursive(origin_tree_root);
 
     // Set Section Completion Time
 
@@ -1346,19 +1346,19 @@ int main(int argc, char *argv[]) {
     // Create Land Biomes
     // Land dots are assigned the biome of the nearest biome origin dot
 
-    // Create Biome Origin Dot KDTree
+    // Create Biome Origin KDTree
 
-    int num_origin_dots = num_dots / 10;
-    int *biome_origin_dots = malloc(num_origin_dots * 3 * sizeof(int));
-    for (int i = 0; i < num_origin_dots; i++) {
+    int num_biome_dots = num_dots / 10;
+    int *biome_dots = malloc(num_biome_dots * 3 * sizeof(int));
+    for (int i = 0; i < num_biome_dots; i++) {
         const Dot *dot = &dots[biome_origin_indexes[i]];
-        biome_origin_dots[i * 3] = dot->x;
-        biome_origin_dots[i * 3 + 1] = dot->y;
-        biome_origin_dots[i * 3 + 2] = biome_origin_indexes[i];
+        biome_dots[i * 3] = dot->x;
+        biome_dots[i * 3 + 1] = dot->y;
+        biome_dots[i * 3 + 2] = biome_origin_indexes[i];
     }
-    Node *origin_tree_root = NULL;
-    origin_tree_root = build_recursive(num_origin_dots, biome_origin_dots, 0);
-    free(biome_origin_dots);
+    Node *biome_tree_root = NULL;
+    biome_tree_root = build_recursive(num_biome_dots, biome_dots, 0);
+    free(biome_dots);
 
     // Run Workers
 
@@ -1367,7 +1367,7 @@ int main(int argc, char *argv[]) {
         if (fork_pids[i] == 0) {
             set_process_title("worker", i);
             generate_biomes_land(
-                piece_starts[i], piece_starts[i + 1], origin_tree_root, num_dots,
+                piece_starts[i], piece_starts[i + 1], biome_tree_root, num_dots,
                 biome_origin_indexes, dots, section_progress
             );
             exit(0);
@@ -1379,7 +1379,7 @@ int main(int argc, char *argv[]) {
 
     // Free Tree
 
-    free_recursive(origin_tree_root);
+    free_recursive(biome_tree_root);
 
     // Set Section Completion Time
 
