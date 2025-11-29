@@ -1,10 +1,16 @@
+## Version 3.0.1 (November 2025)
+
+ - Fixed total progress time.
+ - Moved KDTree building outside forks for efficiency.
+ - Added KDTree for section assignment.
+
 ## Version 3.0.0 (November 2025)
 
- - Rewrite main program in C for efficiency improvements.
- - Fix invalid sample input.
- - Edit autorun program to run new main program.
- - Modify licensing for program outputs.
- - Generate new example result.
+ - Rewrote main program in C for efficiency improvements.
+ - Fixed invalid sample input.
+ - Edited autorun program to run new main program.
+ - Modified licensing for program outputs.
+ - Generated new example result.
 
 ## Version 2.1.6 (November 2025)
 
@@ -16,7 +22,7 @@
 
 ## Version 2.1.4 (September 2025)
 
- - Modify autorun program for better memory management.
+ - Modified autorun program for better memory management.
 
 ## Version 2.1.3 (September 2025)
 

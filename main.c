@@ -451,13 +451,13 @@ void track_progress(
 
         for (int i = 0; i < 7; i++) {
 
-            // Calculating Section Progress
+            // Calculate Section Progress
 
             float progress_section =
                 atomic_load(&section_progress[i]) / (float)section_progress_total[i];
             total_progress += progress_section * section_weights[i];
 
-            // Checking if Section Complete
+            // Check if Section Complete
 
             char *color;
             float section_time;
@@ -474,7 +474,7 @@ void track_progress(
                 }
             }
 
-            // Printing Output for Section Progress
+            // Print Output for Section Progress
 
             printf(
                 "%s[%d/7] %-20s%8.2f%% %s",
@@ -522,7 +522,7 @@ void track_progress(
         snprintf(formatted_time, 32, "%2d:%08.5f", (int)total_time / 60, fmod(total_time, 60.0f));
         printf("%s%s\n", ANSI_RESET, formatted_time);
 
-        // Checking Exit Status
+        // Check Exit Status
 
         if (strcmp(color, ANSI_GREEN) == 0) {
             break; // All sections done, exit tracking process
@@ -545,8 +545,7 @@ void track_progress(
  */
 void assign_sections(
     const int map_resolution, const float island_size, const int start_index, const int end_index,
-    const int num_origin_dots, const int origin_dots[num_origin_dots][2],
-    Dot *dots, _Atomic int *section_progress
+    Node *origin_tree_root, Dot *dots, _Atomic int *section_progress
 ) {
 
     srand(time(NULL) + getpid());
@@ -558,26 +557,15 @@ void assign_sections(
 
         // Find Distance to Nearest Origin Dot
 
-        int min = INT_MAX;
+        int min_dist = INT_MAX;
         // min and dist are squared, sqrt is not done until later
         int min_index = 0;
-
-        for (int ii = 0; ii < num_origin_dots; ii++) {
-
-            const int diff_x = origin_dots[ii][0] - dot->x;
-            const int diff_y = origin_dots[ii][1] - dot->y;
-            const int dist = diff_x * diff_x + diff_y * diff_y;
-
-            if (dist < min) {
-                min = dist;
-                min_index = ii;
-            }
-
-        }
+        int coord[2] = {dot->x, dot->y};
+        query_recursive(origin_tree_root, coord, 0, &min_index, &min_dist);
 
         // Calculate Chance
 
-        float dist = sqrt(min) / sqrt(map_resolution);
+        float dist = sqrt(min_dist) / sqrt(map_resolution);
         float threshold = ((float)(min_index % 20) / 19.0f * 1.5f + 0.25f) * island_size;
 
         int chance = (dist <= threshold) ? 9 : 1;
@@ -599,44 +587,10 @@ void assign_sections(
  */
 void smooth_coastlines(
     const int coastline_smoothing, const int start_index, const int end_index,
+    Node *land_tree_root, Node *water_tree_root,
     const int num_dots, const int num_special_dots, const int num_reg_dots,
     Dot *dots, _Atomic int *section_progress
 ) {
-
-    // Create Land and Water Dots
-
-    int num_land_dots = 0;
-    int num_water_dots = 0;
-    int *land_dots = malloc(num_reg_dots * 3 * sizeof(int));
-    int *water_dots = malloc(num_reg_dots * 3 * sizeof(int));
-    // num_land_dots + num_water_dots == num_reg_dots, so this is the max
-
-    for (int i = num_special_dots; i < num_dots; i++) {
-    // Only includes "Land" and "Water" dots
-        const Dot *dot = &dots[i];
-        if (dot->type == 'L') {
-            land_dots[num_land_dots * 3] = dot->x;
-            land_dots[num_land_dots * 3 + 1] = dot->y;
-            land_dots[num_land_dots * 3 + 2] = i;
-            num_land_dots++;
-        } else {
-            water_dots[num_water_dots * 3] = dot->x;
-            water_dots[num_water_dots * 3 + 1] = dot->y;
-            water_dots[num_water_dots * 3 + 2] = i;
-            num_water_dots++;
-        }
-    }
-
-    // Create Land and Water KDTrees
-
-    Node *land_tree_root = NULL;
-    Node *water_tree_root = NULL;
-
-    land_tree_root = build_recursive(num_land_dots, land_dots, 0);
-    water_tree_root = build_recursive(num_water_dots, water_dots, 0);
-
-    free(land_dots);
-    free(water_dots);
 
     // Smooth Coastlines
 
@@ -694,11 +648,6 @@ void smooth_coastlines(
 
     }
 
-    // Free Trees
-
-    free_recursive(land_tree_root);
-    free_recursive(water_tree_root);
-
 }
 
 /**
@@ -707,26 +656,9 @@ void smooth_coastlines(
  * distance to the nearest land dot.
  */
 void generate_biomes_water(
-    const int start_index, const int end_index, const int height,
+    const int start_index, const int end_index, const int height, Node *land_tree_root,
     const int num_dots, Dot *dots, _Atomic int *section_progress
 ) {
-
-    // Build Land Dots KDTree
-
-    int num_land_dots = 0;
-    int *land_dots = malloc(num_dots * 3 * sizeof(int));
-    for (int i = 0; i < num_dots; i++) {
-        if (dots[i].type == 'L') {
-            const Dot *dot = &dots[i];
-            land_dots[num_land_dots * 3] = dot->x;
-            land_dots[num_land_dots * 3 + 1] = dot->y;
-            land_dots[num_land_dots * 3 + 2] = i;
-            num_land_dots++;
-        }
-    }
-    Node *land_tree_root = NULL;
-    land_tree_root = build_recursive(num_land_dots, land_dots, 0);
-    free(land_dots);
 
     // Generate Water Biomes
 
@@ -776,23 +708,9 @@ void generate_biomes_water(
  * dots whose biomes are already before this function.
  */
 void generate_biomes_land(
-    const int start_index, const int end_index, const int num_dots,
+    const int start_index, const int end_index, Node *origin_tree_root, const int num_dots,
     const int *biome_origin_indexes, Dot *dots, _Atomic int *section_progress
 ) {
-
-    // Create Biome Origin Dot KDTree
-
-    int num_origin_dots = num_dots / 10;
-    int *biome_origin_dots = malloc(num_origin_dots * 3 * sizeof(int));
-    for (int i = 0; i < num_origin_dots; i++) {
-        const Dot *dot = &dots[biome_origin_indexes[i]];
-        biome_origin_dots[i * 3] = dot->x;
-        biome_origin_dots[i * 3 + 1] = dot->y;
-        biome_origin_dots[i * 3 + 2] = biome_origin_indexes[i];
-    }
-    Node *origin_tree_root = NULL;
-    origin_tree_root = build_recursive(num_origin_dots, biome_origin_dots, 0);
-    free(biome_origin_dots);
 
     // Generate Land Biomes
 
@@ -827,29 +745,14 @@ void generate_biomes_land(
  * for TYPE_COUNTS, to be used in statistics at the end of the main program.
  */
 void generate_image(
-    const int start_height, const int end_height, const int width, const int num_dots,
-    const Dot *dots, int *image_indexes, int *type_counts, _Atomic int *section_progress
+    const int start_height, const int end_height, const int width, Node *tree_root,
+    const int num_dots, const Dot *dots,
+    int *image_indexes, int *type_counts, _Atomic int *section_progress
 ) {
 
     // Dot type counts for statistics, not used in image generation
     int local_type_counts[11] = {0};
     const char types[11] = {'I', 's', 'W', 'd', 'R', 'D', 'J', 'F', 'P', 'T', 'S'};
-
-    // Create Dots KDTree
-
-    int *dot_coords = malloc(num_dots * 3 * sizeof(int));
-
-    for (int i = 0; i < num_dots; i++) {
-        const Dot *dot = &dots[i];
-        dot_coords[i * 3] = dot->x;
-        dot_coords[i * 3 + 1] = dot->y;
-        dot_coords[i * 3 + 2] = i;
-    }
-
-    Node *tree_root = NULL;
-    tree_root = build_recursive(num_dots, dot_coords, 0);
-
-    free(dot_coords);
 
     // Generate Image
 
@@ -893,8 +796,6 @@ void generate_image(
 
     }
 
-    free_recursive(tree_root);
-
     // Update Shared Type Counts
 
     for (int i = 0; i < 11; i++) {
@@ -911,11 +812,11 @@ void generate_image(
  */
 int main(int argc, char *argv[]) {
 
-    // Setting Main Process Title
+    // Set Main Process Title
 
     set_process_title("main", -1);
 
-    // Getting Inputs
+    // Get Inputs
 
     bool auto_mode;
     char *output_file;
@@ -930,7 +831,7 @@ int main(int argc, char *argv[]) {
 
         output_file = "result.png";
 
-        // Getting Program Version
+        // Get Program Version
 
         char file_line[29];
         FILE *fptr = fopen("README.md", "r");
@@ -1038,6 +939,8 @@ int main(int argc, char *argv[]) {
     struct timespec start_time;
     clock_gettime(CLOCK_REALTIME, &start_time);
 
+    // --Setup--
+
     // Shared Memory
 
     _Atomic int *section_progress = mmap(
@@ -1093,14 +996,16 @@ int main(int argc, char *argv[]) {
 
     }
 
+    // Set Section Completion Time
+
     struct timespec time_now;
     clock_gettime(CLOCK_REALTIME, &time_now);
     section_times[0] = (float)(time_now.tv_sec - start_time.tv_sec) +
         (time_now.tv_nsec - start_time.tv_nsec) / 1000000000.0;
     atomic_store(&section_progress[0], 1);
 
-    // Section Generation
-    // Creating the initial list of dots
+    // --Section Generation--
+    // Create the initial list of dots
 
     section_progress_total[1] = num_dots;
 
@@ -1141,23 +1046,20 @@ int main(int argc, char *argv[]) {
 
     free(used_coords);
 
+    // Set Section Completion Time
+
     clock_gettime(CLOCK_REALTIME, &time_now);
     section_times[1] = (float)(time_now.tv_sec - start_time.tv_sec) +
         (time_now.tv_nsec - start_time.tv_nsec) / 1000000000.0 - sum_list_float(section_times, 7);
 
-    // Section Assignment
-    // Assigning dots as "Land", "Land Origin", "Water", or "Water Forced"
+    // --Section Assignment--
+    // Assign dots as "Land", "Land Origin", "Water", or "Water Forced"
 
     section_progress_total[2] = num_reg_dots;
 
     // Create Origin Dots Array
 
-    int origin_dots[num_special_dots / 2][2];
-    for (int ii = 0; ii < num_special_dots / 2; ii++) {
-        Dot *dot = &dots[ii];
-        origin_dots[ii][0] = dot->x;
-        origin_dots[ii][1] = dot->y;
-    }
+
 
     // Create Piece Starts
 
@@ -1173,6 +1075,19 @@ int main(int argc, char *argv[]) {
     last piece may be larger, special dots are skipped
     */
 
+    // Create Land Origin KDTree
+
+    const int num_origin_dots = num_special_dots / 2;
+    int land_origin_dots[num_origin_dots * 3 * sizeof(int)];
+    for (int i = 0; i < num_origin_dots; i++) {
+        Dot *dot = &dots[i];
+        land_origin_dots[i * 3] = dot->x;
+        land_origin_dots[i * 3 + 1] = dot->y;
+        land_origin_dots[i * 3 + 2] = i;
+    }
+    Node *origin_tree_root = NULL;
+    origin_tree_root = build_recursive(num_origin_dots, land_origin_dots, 0);
+
     // Run Workers
 
     int fork_pids[processes]; // Create forks list
@@ -1183,7 +1098,7 @@ int main(int argc, char *argv[]) {
             set_process_title("worker", i);
             assign_sections( // Run worker
                 map_resolution, island_size, piece_starts[i], piece_starts[i + 1],
-                num_special_dots / 2, origin_dots, dots, section_progress
+                origin_tree_root, dots, section_progress
             );
             exit(0); // Kill worker
         }
@@ -1192,16 +1107,58 @@ int main(int argc, char *argv[]) {
         waitpid(fork_pids[i], NULL, 0); // Wait for workers
     }
 
-    // Sets section time for section assignment
+    // Free Land Origin Tree
+
+    free_recursive(origin_tree_root);
+
+    // Set Section Completion Time
+
     clock_gettime(CLOCK_REALTIME, &time_now);
     section_times[2] = (float)(time_now.tv_sec - start_time.tv_sec) +
         (time_now.tv_nsec - start_time.tv_nsec) / 1000000000.0 - sum_list_float(section_times, 7);
 
-    // Coastline Smoothing
+    // --Coastline Smoothing--
 
     if (coastline_smoothing != 0) {
 
         section_progress_total[3] = num_reg_dots;
+
+        // Create Land and Water Dots
+
+        int num_land_dots = 0;
+        int num_water_dots = 0;
+        int *land_dots = malloc(num_reg_dots * 3 * sizeof(int));
+        int *water_dots = malloc(num_reg_dots * 3 * sizeof(int));
+        // num_land_dots + num_water_dots == num_reg_dots, so this is the max
+
+        for (int i = num_special_dots; i < num_dots; i++) {
+        // Only includes "Land" and "Water" dots
+            const Dot *dot = &dots[i];
+            if (dot->type == 'L') {
+                land_dots[num_land_dots * 3] = dot->x;
+                land_dots[num_land_dots * 3 + 1] = dot->y;
+                land_dots[num_land_dots * 3 + 2] = i;
+                num_land_dots++;
+            } else {
+                water_dots[num_water_dots * 3] = dot->x;
+                water_dots[num_water_dots * 3 + 1] = dot->y;
+                water_dots[num_water_dots * 3 + 2] = i;
+                num_water_dots++;
+            }
+        }
+
+        // Create Land and Water KDTrees
+
+        Node *land_tree_root = NULL;
+        Node *water_tree_root = NULL;
+
+        land_tree_root = build_recursive(num_land_dots, land_dots, 0);
+        water_tree_root = build_recursive(num_water_dots, water_dots, 0);
+
+        free(land_dots);
+        free(water_dots);
+
+        // Run Workers
 
         for (int i = 0; i < processes; i++) {
             fork_pids[i] = fork();
@@ -1209,6 +1166,7 @@ int main(int argc, char *argv[]) {
                 set_process_title("worker", i);
                 smooth_coastlines(
                     coastline_smoothing, piece_starts[i], piece_starts[i + 1],
+                    land_tree_root, water_tree_root,
                     num_dots, num_special_dots, num_reg_dots, dots, section_progress
                 );
                 exit(0);
@@ -1218,6 +1176,11 @@ int main(int argc, char *argv[]) {
             waitpid(fork_pids[i], NULL, 0);
         }
 
+        // Free Trees
+
+        free_recursive(land_tree_root);
+        free_recursive(water_tree_root);
+
     } else {
 
         // Coastline smoothing would have no effect
@@ -1225,15 +1188,17 @@ int main(int argc, char *argv[]) {
 
     }
 
+    // Set Section Completion Time
+
     clock_gettime(CLOCK_REALTIME, &time_now);
     section_times[3] = (float)(time_now.tv_sec - start_time.tv_sec) +
         (time_now.tv_nsec - start_time.tv_nsec) / 1000000000.0 - sum_list_float(section_times, 7);
 
-    // Biome Generation
+    // --Biome Generation--
 
     atomic_store(&section_progress_total[4], num_dots);
 
-    // Removing "Land Origin" and "Water Forced" Dots
+    // Remove "Land Origin" and "Water Forced" Dots
 
     for (int i = 0; i < num_special_dots; i++) {
         Dot *dot = &dots[i];
@@ -1252,15 +1217,35 @@ int main(int argc, char *argv[]) {
     }
     piece_starts[processes] = num_dots;
 
-    // Creating Water Biomes
+    // Create Water Biomes
     // Adds ice, depth
+
+    // Build Land Dots KDTree
+
+    int num_land_dots = 0;
+    int *land_dots = malloc(num_dots * 3 * sizeof(int));
+    for (int i = 0; i < num_dots; i++) {
+        if (dots[i].type == 'L') {
+            const Dot *dot = &dots[i];
+            land_dots[num_land_dots * 3] = dot->x;
+            land_dots[num_land_dots * 3 + 1] = dot->y;
+            land_dots[num_land_dots * 3 + 2] = i;
+            num_land_dots++;
+        }
+    }
+    Node *land_tree_root = NULL;
+    land_tree_root = build_recursive(num_land_dots, land_dots, 0);
+    free(land_dots);
+
+    // Run Workers
 
     for (int i = 0; i < processes; i++) {
         fork_pids[i] = fork();
         if (fork_pids[i] == 0) {
             set_process_title("worker", i);
             generate_biomes_water(
-                piece_starts[i], piece_starts[i + 1], height, num_dots, dots, section_progress
+                piece_starts[i], piece_starts[i + 1], height, land_tree_root,
+                num_dots, dots, section_progress
             );
             exit(0);
         }
@@ -1269,7 +1254,11 @@ int main(int argc, char *argv[]) {
         waitpid(fork_pids[i], NULL, 0);
     }
 
-    // Adding Biome Origin Dots
+    // Free Land Tree
+
+    free_recursive(land_tree_root);
+
+    // Add Biome Origin Dots
     // The area around a biome origin dot will have the same biome
 
     int biome_origin_indexes[num_dots / 10];
@@ -1357,12 +1346,28 @@ int main(int argc, char *argv[]) {
     // Create Land Biomes
     // Land dots are assigned the biome of the nearest biome origin dot
 
+    // Create Biome Origin KDTree
+
+    int num_biome_dots = num_dots / 10;
+    int *biome_dots = malloc(num_biome_dots * 3 * sizeof(int));
+    for (int i = 0; i < num_biome_dots; i++) {
+        const Dot *dot = &dots[biome_origin_indexes[i]];
+        biome_dots[i * 3] = dot->x;
+        biome_dots[i * 3 + 1] = dot->y;
+        biome_dots[i * 3 + 2] = biome_origin_indexes[i];
+    }
+    Node *biome_tree_root = NULL;
+    biome_tree_root = build_recursive(num_biome_dots, biome_dots, 0);
+    free(biome_dots);
+
+    // Run Workers
+
     for (int i = 0; i < processes; i++) {
         fork_pids[i] = fork();
         if (fork_pids[i] == 0) {
             set_process_title("worker", i);
             generate_biomes_land(
-                piece_starts[i], piece_starts[i + 1], num_dots,
+                piece_starts[i], piece_starts[i + 1], biome_tree_root, num_dots,
                 biome_origin_indexes, dots, section_progress
             );
             exit(0);
@@ -1372,11 +1377,17 @@ int main(int argc, char *argv[]) {
         waitpid(fork_pids[i], NULL, 0);
     }
 
+    // Free Tree
+
+    free_recursive(biome_tree_root);
+
+    // Set Section Completion Time
+
     clock_gettime(CLOCK_REALTIME, &time_now);
     section_times[4] = (float)(time_now.tv_sec - start_time.tv_sec) +
         (time_now.tv_nsec - start_time.tv_nsec) / 1000000000.0 - sum_list_float(section_times, 7);
 
-    // Image Generation
+    // --Image Generation--
 
     atomic_store(&section_progress_total[5], height);
 
@@ -1390,6 +1401,19 @@ int main(int argc, char *argv[]) {
     }
     section_starts[processes] = height;
 
+    // Create Dots KDTree
+
+    int *dot_coords = malloc(num_dots * 3 * sizeof(int));
+    for (int i = 0; i < num_dots; i++) {
+        const Dot *dot = &dots[i];
+        dot_coords[i * 3] = dot->x;
+        dot_coords[i * 3 + 1] = dot->y;
+        dot_coords[i * 3 + 2] = i;
+    }
+    Node *tree_root = NULL;
+    tree_root = build_recursive(num_dots, dot_coords, 0);
+    free(dot_coords);
+
     // Run Workers
 
     for (int i = 0; i < processes; i++) {
@@ -1397,7 +1421,7 @@ int main(int argc, char *argv[]) {
         if (fork_pids[i] == 0) {
             set_process_title("worker", i);
             generate_image(
-                section_starts[i], section_starts[i + 1], width,
+                section_starts[i], section_starts[i + 1], width, tree_root,
                 num_dots, dots, image_indexes, type_counts, section_progress
             );
             exit(0);
@@ -1407,11 +1431,17 @@ int main(int argc, char *argv[]) {
         waitpid(fork_pids[i], NULL, 0);
     }
 
+    // Free Tree
+
+    free_recursive(tree_root);
+
+    // Set Section Completion Time
+
     clock_gettime(CLOCK_REALTIME, &time_now);
     section_times[5] = (float)(time_now.tv_sec - start_time.tv_sec) +
         (time_now.tv_nsec - start_time.tv_nsec) / 1000000000.0 - sum_list_float(section_times, 7);
 
-    // Finish
+    // --Finish--
 
     atomic_store(&section_progress_total[6], height);
 
@@ -1536,7 +1566,7 @@ int main(int argc, char *argv[]) {
     section_times[6] = (float)(time_now.tv_sec - start_time.tv_sec) +
         (time_now.tv_nsec - start_time.tv_nsec) / 1000000000.0 - sum_list_float(section_times, 7);
 
-    // Setting Completion Time
+    // Set Section Completion Time
 
     section_times[7] = (float)(time_now.tv_sec - start_time.tv_sec) +
         (time_now.tv_nsec - start_time.tv_nsec) / 1000000000.0;
