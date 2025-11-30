@@ -5,8 +5,11 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/prctl.h>
 #include <unistd.h>
+
+#ifdef __linux__ || BSD || __Apple__
+    #include <sys/prctl.h>
+#endif
 
 
 // Main Function
@@ -42,10 +45,11 @@ int main() {
 
     // Compiling Main Program
 
+    char exec[9];
     #ifdef _WIN32
-        char exec[9] = "main.exe";
+        snprintf(exec, 9, "main.exe");
     #else
-        char exec[5] = "main";
+        snprintf(exec, 5, "main");
     #endif
 
     if (!access(exec, F_OK) == 0) {
@@ -113,20 +117,20 @@ int main() {
 
             // Running Program and Collecting Output
 
-            FILE *fp;
-            char output[13] = {0};
+            char output[13] = "0";
             char buffer[13]; // max time 99999.999999 seconds (> 27 hours)
 
+            char command[266];
             #ifdef _WIN32
-                char command[265] = "main.exe ";
+                strncat(command, "main.exe ", 10);
             #else
-                char command[263] = "./main ";
+                strncat(command, "./main ", 8);
             #endif
+            strncat(command, inputs, 256);
 
-            strcat(command, inputs);
-            fp = popen(command, "r");
+            FILE *fp = popen(command, "r");
             while (fgets(buffer, 13, fp) != NULL) {
-                strcat(output, buffer);
+                snprintf(output, 13, buffer);
             }
             pclose(fp);
 
