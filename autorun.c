@@ -100,6 +100,14 @@ int main() {
 
         // Running Repetitions
 
+        printf("\r\033[K\033[48;5;2m");
+        printf("\033[48;5;1m");
+        for (int ii = 0; ii < 100; ii++) {
+            printf(" ");
+        }
+        printf("\033[0m %3d%%", 0);
+        fflush(stdout);
+
         float rep_times[reps];
         for (int i = 0; i < reps; i++) {
 
@@ -117,21 +125,20 @@ int main() {
 
             // Running Program and Collecting Output
 
-            char output[13] = "0";
+            char output[13];
             char buffer[13]; // max time 99999.999999 seconds (> 27 hours)
 
             char command[266];
             #ifdef _WIN32
-                strncat(command, "main.exe ", 10);
+                snprintf(command, 10, "main.exe ");
             #else
-                strncat(command, "./main ", 8);
+                snprintf(command, 8, "./main ");
             #endif
             strncat(command, inputs, 256);
 
             FILE *fp = popen(command, "r");
-            while (fgets(buffer, 13, fp) != NULL) {
-                snprintf(output, 13, buffer);
-            }
+            fgets(buffer, 13, fp);
+            snprintf(output, 13, "%s", buffer);
             pclose(fp);
 
             float time = atof(output);
@@ -153,12 +160,10 @@ int main() {
                 printf("\r\033[K\033[48;5;2m");
                 for (int ii = 0; ii < bars; ii++) {
                     printf(" ");
-                    fflush(stdout);
                 }
                 printf("\033[48;5;1m");
                 for (int ii = 0; ii < 100 - bars; ii++) {
                     printf(" ");
-                    fflush(stdout);
                 }
                 printf("\033[0m %3d%%", bars);
                 fflush(stdout);
