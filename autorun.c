@@ -7,7 +7,7 @@
 #include <string.h>
 #include <unistd.h>
 
-#ifdef __linux__ || BSD || __Apple__
+#if defined(__linux__) || defined(BSD) || defined(__Apple__)
     #include <sys/prctl.h>
 #endif
 
