@@ -16,13 +16,9 @@ int main() {
     // Setting Process Title
 
     #ifdef __linux__
-
         prctl(PR_SET_NAME, "biogen-autorun", 0, 0, 0);
-
     #elif BSD || __Apple__
-
         setproctitle("biogen-autorun");
-
     #endif
 
     printf("\n");
@@ -42,13 +38,7 @@ int main() {
 
     // Compiling Main Program
 
-    #ifdef _WIN32
-        char exec[9] = "main.exe";
-    #else
-        char exec[5] = "main";
-    #endif
-
-    if (!access(exec, F_OK) == 0) {
+    if (!access("main", F_OK) == 0) {
         system("gcc -D_GNU_SOURCE main.c -o main -lm -lpng");
     }
 
@@ -96,6 +86,14 @@ int main() {
 
         // Running Repetitions
 
+        printf("\r\033[K\033[48;5;2m");
+        printf("\033[48;5;1m");
+        for (int ii = 0; ii < 100; ii++) {
+            printf(" ");
+        }
+        printf("\033[0m %3d%%", 0);
+        fflush(stdout);
+
         float rep_times[reps];
         for (int i = 0; i < reps; i++) {
 
@@ -113,21 +111,15 @@ int main() {
 
             // Running Program and Collecting Output
 
-            FILE *fp;
-            char output[13] = {0};
+            char output[13];
             char buffer[13]; // max time 99999.999999 seconds (> 27 hours)
 
-            #ifdef _WIN32
-                char command[265] = "main.exe ";
-            #else
-                char command[263] = "./main ";
-            #endif
+            char command[266] = "./main ";
+            strncat(command, inputs, 256);
 
-            strcat(command, inputs);
-            fp = popen(command, "r");
-            while (fgets(buffer, 13, fp) != NULL) {
-                strcat(output, buffer);
-            }
+            FILE *fp = popen(command, "r");
+            fgets(buffer, 13, fp);
+            snprintf(output, 13, "%s", buffer);
             pclose(fp);
 
             float time = atof(output);
@@ -149,12 +141,10 @@ int main() {
                 printf("\r\033[K\033[48;5;2m");
                 for (int ii = 0; ii < bars; ii++) {
                     printf(" ");
-                    fflush(stdout);
                 }
                 printf("\033[48;5;1m");
                 for (int ii = 0; ii < 100 - bars; ii++) {
                     printf(" ");
-                    fflush(stdout);
                 }
                 printf("\033[0m %3d%%", bars);
                 fflush(stdout);

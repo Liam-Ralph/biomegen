@@ -405,13 +405,9 @@ void set_process_title(const char *type, const int num) {
     // Set Process Title
 
     #ifdef __linux__
-
         prctl(PR_SET_NAME, string, 0, 0, 0);
-
     #elif BSD || __Apple__
-
         setproctitle(string);
-
     #endif
 
 }
