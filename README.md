@@ -1,6 +1,6 @@
 # BiomeGen
 ### Released July 2025
-### Version 3.0.1
+### Version 3.0.2
 ### Updated November 2025
 
 <br/>
@@ -19,7 +19,7 @@ runs and another C program to create multiple images or test generation speed.
 Version 3.0.0
  - Linux supported, tested with Linux Mint 22.2 and antiX 23.2
  - MacOS and BSD OSs should be supported, but haven't been tested
- - Windows is not currently supported
+ - Windows is not currently supported, but WSL should work
 
 Python Versions (v2.1.6 and below)
  - Any OS with Python 3.10+ should work (Linux Mint, antiX, and Windows tested)
@@ -45,7 +45,8 @@ If the `gcc` command is available on your system, autorun should be able to prop
 compile main.c. It uses the command `gcc -D_GNU_SOURCE main.c -o main -lm -lpng -Wall`.
 The main executable must be named "main" or "main.exe" on Windows. The `-D_GNU_SOURCE`
 flag shouldn't be required on most Linux distros. Installing the png library may
-be required. On Debian-based systems, I used `sudo apt install libpng-dev`.
+be required. On Debian-based systems, I used `sudo apt install libpng-dev`. On Windows
+with MinGW, I used `pacman -S mingw-w64-ucrt-x86_64-libpng mingw-w64-ucrt-x86_64-zlib`.
 
 <br/>
 
@@ -97,7 +98,6 @@ to do this:
     also tell you the generation times for each repetition, and the average
     generation time.
 
-
 <br/>
 
 ## Other Files
@@ -110,14 +110,9 @@ to do this:
 ## Planned Updates
 
 3.1.0
- - Add Windows support
- - Test with MacOS and/or FreeBSD if possible
-
-3.2.0
  - Test more efficiency improvements
      - Fixing coastline smoothing
      - Only creating one set of worker processes
-     - Adding KDTrees to section assignment
 
 4.0.0
  - Rewrite land biome generation algorithm

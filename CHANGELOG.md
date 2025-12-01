@@ -1,3 +1,7 @@
+## Version 3.0.2 (December 2025)
+
+ - Refactored autorun.c, removing Windows support.
+
 ## Version 3.0.1 (November 2025)
 
  - Fixed total progress time.
