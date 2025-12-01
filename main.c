@@ -2,7 +2,7 @@
 Version 3.1.0 TODOs
  - autorun.c - completed
  - sys/prctl.h - completed (ignored)
- - png.h
+ - png.h - completed
  - sys/wait.h
  - sys/mman.h
 */

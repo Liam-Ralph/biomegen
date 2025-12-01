@@ -45,8 +45,8 @@ If the `gcc` command is available on your system, autorun should be able to prop
 compile main.c. It uses the command `gcc -D_GNU_SOURCE main.c -o main -lm -lpng -Wall`.
 The main executable must be named "main" or "main.exe" on Windows. The `-D_GNU_SOURCE`
 flag shouldn't be required on most Linux distros. Installing the png library may
-be required. On Debian-based systems, I used `sudo apt install libpng-dev`. On Windows,
-I used this [GnuWin32 link](https://gnuwin32.sourceforge.net/packages/libpng.htm).
+be required. On Debian-based systems, I used `sudo apt install libpng-dev`. On Windows
+with MinGW, I used `pacman -S mingw-w64-ucrt-x86_64-libpng mingw-w64-ucrt-x86_64-zlib`.
 
 <br/>
 
