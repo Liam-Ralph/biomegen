@@ -1,13 +1,4 @@
 /*
-Version 3.1.0 TODOs
- - autorun.c - completed
- - sys/prctl.h - completed (ignored)
- - png.h - completed
- - sys/wait.h
- - sys/mman.h
-*/
-
-/*
 Copyright (C) 2025 Liam Ralph
 https://github.com/liam-ralph
 
@@ -35,14 +26,11 @@ BiomeGen, a terminal application for generating png maps.
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/mman.h>
+#include <sys/prctl.h>
+#include <sys/wait.h>
 #include <time.h>
 #include <unistd.h>
-
-#if defined(__linux__) || defined(__Apple__) || defined(BSD)
-    #include <sys/mman.h>
-    #include <sys/prctl.h>
-    #include <sys/wait.h>
-#endif
 
 
 // Definitions
@@ -417,13 +405,9 @@ void set_process_title(const char *type, const int num) {
     // Set Process Title
 
     #ifdef __linux__
-
         prctl(PR_SET_NAME, string, 0, 0, 0);
-
     #elif BSD || __Apple__
-
         setproctitle(string);
-
     #endif
 
 }

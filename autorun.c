@@ -5,11 +5,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/prctl.h>
 #include <unistd.h>
-
-#if defined(__linux__) || defined(BSD) || defined(__Apple__)
-    #include <sys/prctl.h>
-#endif
 
 
 // Main Function
@@ -19,13 +16,9 @@ int main() {
     // Setting Process Title
 
     #ifdef __linux__
-
         prctl(PR_SET_NAME, "biogen-autorun", 0, 0, 0);
-
     #elif BSD || __Apple__
-
         setproctitle("biogen-autorun");
-
     #endif
 
     printf("\n");
@@ -45,14 +38,7 @@ int main() {
 
     // Compiling Main Program
 
-    char exec[9];
-    #ifdef _WIN32
-        snprintf(exec, 9, "main.exe");
-    #else
-        snprintf(exec, 5, "main");
-    #endif
-
-    if (!access(exec, F_OK) == 0) {
+    if (!access("main", F_OK) == 0) {
         system("gcc -D_GNU_SOURCE main.c -o main -lm -lpng");
     }
 
@@ -128,12 +114,7 @@ int main() {
             char output[13];
             char buffer[13]; // max time 99999.999999 seconds (> 27 hours)
 
-            char command[266];
-            #ifdef _WIN32
-                snprintf(command, 10, "main.exe ");
-            #else
-                snprintf(command, 8, "./main ");
-            #endif
+            char command[266] = "./main ";
             strncat(command, inputs, 256);
 
             FILE *fp = popen(command, "r");
