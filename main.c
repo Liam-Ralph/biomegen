@@ -600,7 +600,7 @@ void assign_sections(
     Node *origin_tree_root, Dot *dots, _Atomic int *section_progress
 ) {
 
-    srand(time(NULL) + getpid());
+    srand(0);
 
     for (int i = start_index; i < end_index; i++) {
     // Non-water dots are not included
@@ -1122,7 +1122,7 @@ int main(int argc, char *argv[]) {
 
     section_progress_total[1] = num_dots;
 
-    srand(time(NULL));
+    srand(0);
 
     const int num_special_dots = num_dots / island_abundance * 2;
     const int num_reg_dots = num_dots - num_special_dots;
@@ -1280,7 +1280,7 @@ int main(int argc, char *argv[]) {
         for (int i = 0; i < processes; i++) {
             land_piece_starts[i] = i * land_piece_length;
         }
-        piece_starts[processes] = num_land_dots;
+        land_piece_starts[processes] = num_land_dots;
 
         int water_piece_length = num_water_dots / processes;
         int water_piece_starts[processes + 1];
