@@ -123,6 +123,61 @@ float sum_list_float(const float list[], const int list_len) {
     return sum;
 }
 
+void quicksort_recursive(int *coords, const int low, const int high, const int width) {
+
+    if (low < high) {
+
+        /*
+        Pivot value is the value at coords[high]. Every value less than pivot
+        will be to the left of wherever pivot ends up. Remember: a coord is
+        {x, y, index (of equivalent dot in dots)}. The array isn't 2D as it
+        requires malloc.
+        */
+        int pivot = coords[high * 3 + 1] * width + coords[high * 3];
+
+        // Move Smaller Elements to the Left
+
+        int i = low - 1;
+
+        for (int ii = low; ii <= high - 1; ii++) {
+            if (coords[ii * 3 + 1] * width + coords[ii * 3] < pivot) {
+                i++;
+                const int temp[3] = {coords[i * 3], coords[i * 3 + 1], coords[i * 3 + 2]};
+                coords[i * 3] = coords[ii * 3];
+                coords[i * 3 + 1] = coords[ii * 3 + 1];
+                coords[i * 3 + 2] = coords[ii * 3 + 2];
+                coords[ii * 3] = temp[0];
+                coords[ii * 3 + 1] = temp[1];
+                coords[ii * 3 + 2] = temp[2];
+            }
+        }
+
+        // Move Pivot to After Smaller Elements
+
+        i++;
+        const int temp[3] = {coords[i * 3], coords[i * 3 + 1], coords[i * 3 + 2]};
+        coords[i * 3] = coords[high * 3];
+        coords[i * 3 + 1] = coords[high * 3 + 1];
+        coords[i * 3 + 2] = coords[high * 3 + 2];
+        coords[high * 3] = temp[0];
+        coords[high * 3 + 1] = temp[1];
+        coords[high * 3 + 2] = temp[2];
+
+        // Decide Whether Recursion is Needed
+        /*
+        Cases:
+        i == med_index, the median is in the correct spot, no more sorting
+        i > med_index, median is in left section, left section needs sorting
+        i < med_index, median in right section, sort right section
+        */
+
+        quicksort_recursive(coords, low, i - 1, width);
+        quicksort_recursive(coords, i + 1, high, width);
+
+    }
+
+}
+
 
 // KDTree Functions
 
@@ -134,7 +189,7 @@ float sum_list_float(const float list[], const int list_len) {
  * based on. HIGH and LOW determine the sorting bounds for a given level of
  * recursion.
  */
-void nth_sort_recursive(
+void median_sort_recursive(
     int *coords, const int low, const int high, const int axis, const int med_index
 ) {
 
@@ -185,9 +240,9 @@ void nth_sort_recursive(
         */
 
         if (i > med_index) {
-            nth_sort_recursive(coords, low, i - 1, axis, med_index);
+            median_sort_recursive(coords, low, i - 1, axis, med_index);
         } else if (i < med_index) {
-            nth_sort_recursive(coords, i + 1, high, axis, med_index);
+            median_sort_recursive(coords, i + 1, high, axis, med_index);
         }
 
     }
@@ -211,7 +266,7 @@ Node *build_recursive(int *coords, const int num_coords, const int depth) {
     everything else to the right.
     */
 
-    nth_sort_recursive(coords, 0, num_coords - 1, depth % 2, med_pos);
+    median_sort_recursive(coords, 0, num_coords - 1, depth % 2, med_pos);
 
     // Add Median Node to Tree
     // Every recursion adds one node
@@ -1149,6 +1204,9 @@ int main(int argc, char *argv[]) {
         water_tree_root = build_recursive(water_dots, num_water_dots, 0);
 
         // Sort Land and Water Dot Indexes
+
+        quicksort_recursive(land_dots, 0, num_land_dots - 1, width);
+        quicksort_recursive(water_dots, 0, num_water_dots - 1, width);
 
         // Run Workers
 
