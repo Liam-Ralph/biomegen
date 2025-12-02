@@ -16,7 +16,7 @@ runs and another C program to create multiple images or test generation speed.
 
 ## Operating System Support
 
-Version 3.0.0
+Version 3.0.0 and above
  - Linux supported, tested with Linux Mint 22.2 and antiX 23.2
  - MacOS and BSD OSs should be supported, but haven't been tested
  - Windows is not currently supported, but WSL should work

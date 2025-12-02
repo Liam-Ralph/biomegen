@@ -104,7 +104,7 @@ int get_int(const int min, const int max) {
 /**
  * Return the sum of a list of integers.
  */
-int sum_list_int(int *list, int list_len) {
+int sum_list_int(const int list[], const int list_len) {
     int sum = 0;
     for (int i = 0; i < list_len; i++) {
         sum += list[i];
@@ -115,7 +115,7 @@ int sum_list_int(int *list, int list_len) {
 /**
  * Return the sum of a list of floats.
  */
-float sum_list_float(float *list, int list_len) {
+float sum_list_float(const float list[], const int list_len) {
     float sum = 0;
     for (int i = 0; i < list_len; i++) {
         sum += list[i];
@@ -135,7 +135,7 @@ float sum_list_float(float *list, int list_len) {
  * recursion.
  */
 void nth_sort_recursive(
-    int coords[], const int low, const int high, const int axis, const int med_index
+    int *coords, const int low, const int high, const int axis, const int med_index
 ) {
 
     if (low < high) {
@@ -198,9 +198,10 @@ void nth_sort_recursive(
  * Build a KDTree from COORDS, and return the root node. Ensures the KDTree is
  * built with the lowest possible depth for maximum efficiency when querying the
  * tree. Every recursion creates one dot and calls this function to insert its
- * children from an array of possible dots. DEPTH should be 0.
+ * children from an array of possible dots. DEPTH should be 0. COORDS should be
+ * of length NUM_COORDS * 3.
  */
-Node *build_recursive(const int num_coords, int coords[num_coords * 3], const int depth) {
+Node *build_recursive(int *coords, const int num_coords, const int depth) {
 
     const int med_pos = num_coords / 2;
 
@@ -234,7 +235,7 @@ Node *build_recursive(const int num_coords, int coords[num_coords * 3], const in
             coords_left[i * 3 + 1] = coords[i * 3 + 1];
             coords_left[i * 3 + 2] = coords[i * 3 + 2];
         }
-        node->left = build_recursive(num_coords_left, coords_left, depth + 1);
+        node->left = build_recursive(coords_left, num_coords_left, depth + 1);
         free(coords_left);
 
         // Decide whether node will have a right child
@@ -249,7 +250,7 @@ Node *build_recursive(const int num_coords, int coords[num_coords * 3], const in
                 coords_right[i * 3 + 1] = coords[index * 3 + 1];
                 coords_right[i * 3 + 2] = coords[index * 3 + 2];
             }
-            node->right = build_recursive(num_coords_right, coords_right, depth + 1);
+            node->right = build_recursive(coords_right, num_coords_right, depth + 1);
             free(coords_right);
         }
 
@@ -268,7 +269,7 @@ Node *build_recursive(const int num_coords, int coords[num_coords * 3], const in
  * node.
  */
 void query_recursive(
-    Node *node, const int *coord, const int depth, int *index_ptr, int *min_dist_ptr
+    Node *node, const int coord[2], const int depth, int *index_ptr, int *min_dist_ptr
 ) {
 
     // Calculate Distance
@@ -315,8 +316,8 @@ void query_recursive(
  * DEPTH should be 0 when NODE is a root node.
  */
 void query_dist_recursive(
-    Node *node, const int *coord, const int depth,
-    int *dists, const int dists_len
+    Node *node, const int coord[2], const int depth,
+    int dists[], const int dists_len
 ) {
 
     // Calculate Distance
@@ -385,7 +386,7 @@ void free_recursive(Node *node) {
  * as well. The length of TYPE + NUM (as a string) must be at max 9 characters
  * (including null character).
  */
-void set_process_title(const char *type, const int num) {
+void set_process_title(const char type[], const int num) {
 
     // Example: type is "worker", num is 6: "biogen-worker6"
 
@@ -455,13 +456,13 @@ void track_progress(
 
             // Check if Section Complete
 
-            char *color;
+            char color[10];
             float section_time;
             if (section_times[i] != 0.0) {
-                color = ANSI_GREEN;
+                strncpy(color, ANSI_GREEN, 10);
                 section_time = section_times[i]; // Section complete
             } else {
-                color = ANSI_BLUE;
+                strncpy(color, ANSI_BLUE, 10);
                 if (i == 0 || section_times[i - 1] != 0.0) {
                     section_time = time_diff - sum_list_float(section_times, 7);
                     // Section in progress
@@ -494,13 +495,13 @@ void track_progress(
 
         // Total Progress
 
-        char *color;
+        char color[10];
         float total_time;
         if (section_times[7] != 0.0) {
-            color = ANSI_GREEN;
+            strncpy(color, ANSI_GREEN, 10);
             total_time = section_times[7];
         } else {
-            color = ANSI_BLUE;
+            strncpy(color, ANSI_BLUE, 10);
             total_time = (float)(time_now.tv_sec - start_time.tv_sec) +
                 (time_now.tv_nsec - start_time.tv_nsec) / 1000000000.0;
         }
@@ -705,7 +706,7 @@ void generate_biomes_water(
  */
 void generate_biomes_land(
     const int start_index, const int end_index, Node *origin_tree_root, const int num_dots,
-    const int *biome_origin_indexes, Dot *dots, _Atomic int *section_progress
+    const int biome_origin_indexes[], Dot *dots, _Atomic int *section_progress
 ) {
 
     // Generate Land Biomes
@@ -815,7 +816,7 @@ int main(int argc, char *argv[]) {
     // Get Inputs
 
     bool auto_mode;
-    char *output_file;
+    char output_file[229];
     int width, height, map_resolution, island_abundance, coastline_smoothing, processes;
     float island_size;
 
@@ -825,7 +826,7 @@ int main(int argc, char *argv[]) {
 
         auto_mode = false;
 
-        output_file = "result.png";
+        strncpy(output_file, "result.png", 11);
 
         // Get Program Version
 
@@ -928,7 +929,7 @@ int main(int argc, char *argv[]) {
         island_size = atoi(argv[5]) / 10.0;
         coastline_smoothing = atoi(argv[6]);
         processes = atoi(argv[7]);
-        output_file = argv[8];
+        strncpy(output_file, argv[8], 229);
 
     }
 
@@ -1053,10 +1054,6 @@ int main(int argc, char *argv[]) {
 
     section_progress_total[2] = num_reg_dots;
 
-    // Create Origin Dots Array
-
-
-
     // Create Piece Starts
 
     int piece_length = num_reg_dots / processes;
@@ -1082,7 +1079,7 @@ int main(int argc, char *argv[]) {
         land_origin_dots[i * 3 + 2] = i;
     }
     Node *origin_tree_root = NULL;
-    origin_tree_root = build_recursive(num_origin_dots, land_origin_dots, 0);
+    origin_tree_root = build_recursive(land_origin_dots, num_origin_dots, 0);
 
     // Run Workers
 
@@ -1148,11 +1145,10 @@ int main(int argc, char *argv[]) {
         Node *land_tree_root = NULL;
         Node *water_tree_root = NULL;
 
-        land_tree_root = build_recursive(num_land_dots, land_dots, 0);
-        water_tree_root = build_recursive(num_water_dots, water_dots, 0);
+        land_tree_root = build_recursive(land_dots, num_land_dots, 0);
+        water_tree_root = build_recursive(water_dots, num_water_dots, 0);
 
-        free(land_dots);
-        free(water_dots);
+        // Sort Land and Water Dot Indexes
 
         // Run Workers
 
@@ -1172,7 +1168,10 @@ int main(int argc, char *argv[]) {
             waitpid(fork_pids[i], NULL, 0);
         }
 
-        // Free Trees
+        // Free Dot Lists and Trees
+
+        free(land_dots);
+        free(water_dots);
 
         free_recursive(land_tree_root);
         free_recursive(water_tree_root);
@@ -1230,7 +1229,7 @@ int main(int argc, char *argv[]) {
         }
     }
     Node *land_tree_root = NULL;
-    land_tree_root = build_recursive(num_land_dots, land_dots, 0);
+    land_tree_root = build_recursive(land_dots, num_land_dots, 0);
     free(land_dots);
 
     // Run Workers
@@ -1353,7 +1352,7 @@ int main(int argc, char *argv[]) {
         biome_dots[i * 3 + 2] = biome_origin_indexes[i];
     }
     Node *biome_tree_root = NULL;
-    biome_tree_root = build_recursive(num_biome_dots, biome_dots, 0);
+    biome_tree_root = build_recursive(biome_dots, num_biome_dots, 0);
     free(biome_dots);
 
     // Run Workers
@@ -1407,7 +1406,7 @@ int main(int argc, char *argv[]) {
         dot_coords[i * 3 + 2] = i;
     }
     Node *tree_root = NULL;
-    tree_root = build_recursive(num_dots, dot_coords, 0);
+    tree_root = build_recursive(dot_coords, num_dots, 0);
     free(dot_coords);
 
     // Run Workers
@@ -1455,7 +1454,7 @@ int main(int argc, char *argv[]) {
 
     // Assign Image Pixels
 
-    png_byte **row_pointers = png_malloc(png_ptr, height * sizeof(png_byte *));
+    png_byte *row_pointers[] = png_malloc(png_ptr, height * sizeof(png_byte *));
     for (int y = 0; y < height; y++) {
         png_byte *row = png_malloc(png_ptr, 3 * sizeof(unsigned char) * width);
         row_pointers[y] = row;
