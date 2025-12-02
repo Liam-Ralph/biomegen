@@ -645,58 +645,52 @@ void smooth_coastlines(
     Dot *dots, _Atomic int *section_progress
 ) {
 
+    int dists_same[coastline_smoothing];
+    int dists_opp[coastline_smoothing];
+
+    // Coastline Smoothing for Land Dots
+
     for (int i = land_start; i < land_end; i++) {
 
-        int dot_coords[2] = {land_dots[i * 3], land_dots[i * 3 + 1]};
+        int dot_coord[2] = {land_dots[i * 3], land_dots[i * 3 + 1]};
+
+        // Calculate Maximum Distances
+
+        bool same_y = false;
+        if (i != 0 && land_dots[i * 3 + 1] == land_dots[(i - 1) * 3 + 1]) {
+            same_y = true;
+            for (int ii = 0; ii < coastline_smoothing; ii++) {
+                const int prev_dot_dist = land_dots[i * 3] - land_dots[(i - 1) * 3];
+                int min_dist_sq = (int)sqrt(dists_same[ii]) + 1 + prev_dot_dist;
+                // + 1 needed for floating-point errors (ceil didn't work)
+                dists_same[ii] = min_dist_sq * min_dist_sq;
+                min_dist_sq = (int)sqrt(dists_opp[ii]) + 1 + prev_dot_dist;
+                dists_opp[ii] = min_dist_sq * min_dist_sq;
+            }
+        } else {
+            for (int ii = 0; ii < coastline_smoothing; ii++) {
+                dists_same[ii] = INT_MAX;
+            }
+        }
 
         // Get Nearest Distances for Each Type
 
-        int dists_same[coastline_smoothing];
-        int dists_opp[coastline_smoothing];
-        for (int ii)
-
-    }
-
-    for (int i = start_index; i < end_index; i++) {
-    // Only includes "Land" and "Water" dots
-
-        // Get Dot Information
-
-        Dot *dot = &dots[i];
-        int dot_coord[2] = {dot->x, dot->y};
-
-        const bool land_dot = (dot->type == 'L');
-
-        // Get Nearest Coastline_Smoothing Dots of Each Type
-
-        int dists_same[coastline_smoothing];
-        int dists_opp[coastline_smoothing];
-        for (int ii = 0; ii < coastline_smoothing; ii++) {
-            dists_same[ii] = INT_MAX;
-        }
         long sum_same = 0;
         long sum_opp = 0;
-        Node *root_same;
-        Node *root_opp;
 
-        if (land_dot) {
-            root_same = land_tree_root;
-            root_opp = water_tree_root;
-        } else {
-            root_same = water_tree_root;
-            root_opp = land_tree_root;
-        }
-
-        query_dist_recursive(root_same, dot_coord, 0, dists_same, coastline_smoothing);
+        query_dist_recursive(land_tree_root, dot_coord, 0, dists_same, coastline_smoothing);
         for (int ii = 0; ii < coastline_smoothing; ii++) {
             sum_same += dists_same[ii];
         }
-        const int max = (sum_same < INT_MAX) ? sum_same : INT_MAX;
-        for (int ii = 0; ii < coastline_smoothing; ii++) {
-            dists_opp[ii] = max;
-        }
-        query_dist_recursive(root_opp, dot_coord, 0, dists_opp, coastline_smoothing);
 
+        if (!same_y) {
+            const int max = (sum_same < INT_MAX) ? sum_same : INT_MAX;
+            for (int ii = 0; ii < coastline_smoothing; ii++) {
+                dists_opp[ii] = max;
+            }
+        }
+
+        query_dist_recursive(water_tree_root, dot_coord, 0, dists_opp, coastline_smoothing);
         for (int ii = 0; ii < coastline_smoothing; ii++) {
             sum_opp += dists_opp[ii];
         }
@@ -704,7 +698,63 @@ void smooth_coastlines(
         // Change Dot Type if Closer to Opposite Type
 
         if (sum_same > sum_opp) {
-            dot->type = (land_dot) ? 'W' : 'L';
+            dots[land_dots[i * 3 + 2]].type = 'W';
+        }
+
+        atomic_fetch_add(&section_progress[3], 1);
+
+    }
+
+    // Coastline Smoothing for Water Dots
+
+    for (int i = water_start; i < water_end; i++) {
+
+        int dot_coord[2] = {water_dots[i * 3], water_dots[i * 3 + 1]};
+
+        // Calculate Maximum Distances
+
+        bool same_y = false;
+        if (i != 0 && water_dots[i * 3 + 1] == water_dots[(i - 1) * 3 + 1]) {
+            same_y = true;
+            for (int ii = 0; ii < coastline_smoothing; ii++) {
+                const int prev_dot_dist = water_dots[i * 3] - water_dots[(i - 1) * 3];
+                int min_dist_sq = (int)sqrt(dists_same[ii]) + 1 + prev_dot_dist;
+                dists_same[ii] = min_dist_sq * min_dist_sq;
+                min_dist_sq = (int)sqrt(dists_opp[ii]) + 1 + prev_dot_dist;
+                dists_opp[ii] = min_dist_sq * min_dist_sq;
+            }
+        } else {
+            for (int ii = 0; ii < coastline_smoothing; ii++) {
+                dists_same[ii] = INT_MAX;
+            }
+        }
+
+        // Get Nearest Distances for Each Type
+
+        long sum_same = 0;
+        long sum_opp = 0;
+
+        query_dist_recursive(water_tree_root, dot_coord, 0, dists_same, coastline_smoothing);
+        for (int ii = 0; ii < coastline_smoothing; ii++) {
+            sum_same += dists_same[ii];
+        }
+
+        if (!same_y) {
+            const int max = (sum_same < INT_MAX) ? sum_same : INT_MAX;
+            for (int ii = 0; ii < coastline_smoothing; ii++) {
+                dists_opp[ii] = max;
+            }
+        }
+
+        query_dist_recursive(land_tree_root, dot_coord, 0, dists_opp, coastline_smoothing);
+        for (int ii = 0; ii < coastline_smoothing; ii++) {
+            sum_opp += dists_opp[ii];
+        }
+
+        // Change Dot Type if Closer to Opposite Type
+
+        if (sum_same > sum_opp) {
+            dots[water_dots[i * 3 + 2]].type = 'L';
         }
 
         atomic_fetch_add(&section_progress[3], 1);
@@ -1560,7 +1610,7 @@ int main(int argc, char *argv[]) {
 
     // Assign Image Pixels
 
-    png_byte *row_pointers[] = png_malloc(png_ptr, height * sizeof(png_byte *));
+    png_byte **row_pointers = png_malloc(png_ptr, height * sizeof(png_byte *));
     for (int y = 0; y < height; y++) {
         png_byte *row = png_malloc(png_ptr, 3 * sizeof(unsigned char) * width);
         row_pointers[y] = row;
