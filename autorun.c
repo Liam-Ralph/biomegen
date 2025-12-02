@@ -45,7 +45,7 @@ int main() {
     // Opening Autorun Tasks
 
     fptr = fopen("autorun_tasks.txt", "r");
-    char raw_line[256]; // Max task length is 255 chars
+    char raw_line[256]; // Max task length is 256 chars
 
     while (fgets(raw_line, 256, fptr)) {
 
@@ -54,23 +54,24 @@ int main() {
         char line_copy[256];
         strcpy(line_copy, raw_line);
 
-        char *token = strtok(line_copy, ":");
+        char token[250];
+        strtok(line_copy, ":");
         int reps = atoi(line_copy); // Repetitions
 
-        token = strtok(NULL, ":");
+        strncpy(token, strtok(NULL, ":"), 2);
         bool show_rep_times = false; // Whether to show rep times
         if (strcmp(token, "y") == 0) {
             show_rep_times = true;
         }
 
-        token = strtok(NULL, ":");
+        strncpy(token, strtok(NULL, ":"), 2);
         bool save_png = false; // Whether to save png outputs
         if (strcmp(token, "y") == 0) {
             save_png = true;
         }
 
-        token = strtok(NULL, "\n");
-        char *inputs = token; // Inputs for main program
+        strncpy(token, strtok(NULL, ":\n"), 250);
+        char inputs[256] = token; // Inputs for main program
 
         printf("Running task \"%s\" for %d reps.\n", inputs, reps);
 
@@ -119,7 +120,7 @@ int main() {
 
             FILE *fp = popen(command, "r");
             fgets(buffer, 13, fp);
-            snprintf(output, 13, "%s", buffer);
+            strncpy(output, buffer, 13);
             pclose(fp);
 
             float time = atof(output);
@@ -163,7 +164,7 @@ int main() {
         // Delete Png File if not Saving
 
         if (!save_png) {
-            char *file_path = strtok(NULL, "");
+            char file_path[229] = strtok(NULL, "");
             remove(file_path);
         }
 
