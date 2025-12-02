@@ -638,13 +638,24 @@ void assign_sections(
  * COASTLINE_SMOOTHING dots of the same and opposite types.
  */
 void smooth_coastlines(
-    const int coastline_smoothing, const int start_index, const int end_index,
-    Node *land_tree_root, Node *water_tree_root,
-    const int num_dots, const int num_special_dots, const int num_reg_dots,
+    const int coastline_smoothing,
+    const int *land_dots, const int land_start, const int land_end, Node *land_tree_root,
+    const int *water_dots, const int water_start, const int water_end, Node *water_tree_root,
+    const int num_dots, const int num_land_dots, const int num_water_dots,
     Dot *dots, _Atomic int *section_progress
 ) {
 
-    // Smooth Coastlines
+    for (int i = land_start; i < land_end; i++) {
+
+        int dot_coords[2] = {land_dots[i * 3], land_dots[i * 3 + 1]};
+
+        // Get Nearest Distances for Each Type
+
+        int dists_same[coastline_smoothing];
+        int dists_opp[coastline_smoothing];
+        for (int ii)
+
+    }
 
     for (int i = start_index; i < end_index; i++) {
     // Only includes "Land" and "Water" dots
@@ -660,8 +671,8 @@ void smooth_coastlines(
 
         int dists_same[coastline_smoothing];
         int dists_opp[coastline_smoothing];
-        for (int i = 0; i < coastline_smoothing; i++) {
-            dists_same[i] = INT_MAX;
+        for (int ii = 0; ii < coastline_smoothing; ii++) {
+            dists_same[ii] = INT_MAX;
         }
         long sum_same = 0;
         long sum_opp = 0;
@@ -677,17 +688,17 @@ void smooth_coastlines(
         }
 
         query_dist_recursive(root_same, dot_coord, 0, dists_same, coastline_smoothing);
-        for (int i = 0; i < coastline_smoothing; i++) {
-            sum_same += dists_same[i];
+        for (int ii = 0; ii < coastline_smoothing; ii++) {
+            sum_same += dists_same[ii];
         }
         const int max = (sum_same < INT_MAX) ? sum_same : INT_MAX;
-        for (int i = 0; i < coastline_smoothing; i++) {
-            dists_opp[i] = max;
+        for (int ii = 0; ii < coastline_smoothing; ii++) {
+            dists_opp[ii] = max;
         }
         query_dist_recursive(root_opp, dot_coord, 0, dists_opp, coastline_smoothing);
 
-        for (int i = 0; i < coastline_smoothing; i++) {
-            sum_opp += dists_opp[i];
+        for (int ii = 0; ii < coastline_smoothing; ii++) {
+            sum_opp += dists_opp[ii];
         }
 
         // Change Dot Type if Closer to Opposite Type
@@ -1140,16 +1151,20 @@ int main(int argc, char *argv[]) {
 
     int fork_pids[processes]; // Create forks list
     for (int i = 0; i < processes; i++) {
+
         fork_pids[i] = fork(); // Create fork
-        if (fork_pids[i] == 0) {
-            // e.g. biogen-worker00
-            set_process_title("worker", i);
-            assign_sections( // Run worker
-                map_resolution, island_size, piece_starts[i], piece_starts[i + 1],
-                origin_tree_root, dots, section_progress
-            );
-            exit(0); // Kill worker
+        if (fork_pids[i] != 0) {
+            continue;
         }
+
+        // e.g. biogen-worker00
+        set_process_title("worker", i);
+        assign_sections( // Run worker
+            map_resolution, island_size, piece_starts[i], piece_starts[i + 1],
+            origin_tree_root, dots, section_progress
+        );
+        exit(0); // Kill worker
+
     }
     for (int i = 0; i < processes; i++) {
         waitpid(fork_pids[i], NULL, 0); // Wait for workers
@@ -1203,24 +1218,45 @@ int main(int argc, char *argv[]) {
         land_tree_root = build_recursive(land_dots, num_land_dots, 0);
         water_tree_root = build_recursive(water_dots, num_water_dots, 0);
 
-        // Sort Land and Water Dot Indexes
+        // Sort Land and Water Dots
 
         quicksort_recursive(land_dots, 0, num_land_dots - 1, width);
         quicksort_recursive(water_dots, 0, num_water_dots - 1, width);
 
+        // Create Piece Starts for Land and Water Dots
+
+        int land_piece_length = num_land_dots / processes;
+        int land_piece_starts[processes + 1];
+        for (int i = 0; i < processes; i++) {
+            land_piece_starts[i] = i * land_piece_length;
+        }
+        piece_starts[processes] = num_land_dots;
+
+        int water_piece_length = num_water_dots / processes;
+        int water_piece_starts[processes + 1];
+        for (int i = 0; i < processes; i++) {
+            water_piece_starts[i] = i * water_piece_length;
+        }
+        water_piece_starts[processes] = num_water_dots;
+
         // Run Workers
 
         for (int i = 0; i < processes; i++) {
+
             fork_pids[i] = fork();
-            if (fork_pids[i] == 0) {
-                set_process_title("worker", i);
-                smooth_coastlines(
-                    coastline_smoothing, piece_starts[i], piece_starts[i + 1],
-                    land_tree_root, water_tree_root,
-                    num_dots, num_special_dots, num_reg_dots, dots, section_progress
-                );
-                exit(0);
+            if (fork_pids[i] != 0) {
+                continue;
             }
+
+            set_process_title("worker", i);
+            smooth_coastlines(
+                coastline_smoothing,
+                land_dots, land_piece_starts[i], land_piece_starts[i + 1], land_tree_root,
+                water_dots, water_piece_starts[i], water_piece_starts[i + 1], water_tree_root,
+                num_dots, num_land_dots, num_water_dots, dots, section_progress
+            );
+            exit(0);
+
         }
         for (int i = 0; i < processes; i++) {
             waitpid(fork_pids[i], NULL, 0);
@@ -1293,15 +1329,19 @@ int main(int argc, char *argv[]) {
     // Run Workers
 
     for (int i = 0; i < processes; i++) {
+
         fork_pids[i] = fork();
-        if (fork_pids[i] == 0) {
-            set_process_title("worker", i);
-            generate_biomes_water(
-                piece_starts[i], piece_starts[i + 1], height, land_tree_root,
-                num_dots, dots, section_progress
-            );
-            exit(0);
+        if (fork_pids[i] != 0) {
+            continue;
         }
+
+        set_process_title("worker", i);
+        generate_biomes_water(
+            piece_starts[i], piece_starts[i + 1], height, land_tree_root,
+            num_dots, dots, section_progress
+        );
+        exit(0);
+
     }
     for (int i = 0; i < processes; i++) {
         waitpid(fork_pids[i], NULL, 0);
@@ -1416,15 +1456,19 @@ int main(int argc, char *argv[]) {
     // Run Workers
 
     for (int i = 0; i < processes; i++) {
+
         fork_pids[i] = fork();
-        if (fork_pids[i] == 0) {
-            set_process_title("worker", i);
-            generate_biomes_land(
-                piece_starts[i], piece_starts[i + 1], biome_tree_root, num_dots,
-                biome_origin_indexes, dots, section_progress
-            );
-            exit(0);
+        if (fork_pids[i] != 0) {
+            continue;
         }
+
+        set_process_title("worker", i);
+        generate_biomes_land(
+            piece_starts[i], piece_starts[i + 1], biome_tree_root, num_dots,
+            biome_origin_indexes, dots, section_progress
+        );
+        exit(0);
+
     }
     for (int i = 0; i < processes; i++) {
         waitpid(fork_pids[i], NULL, 0);
@@ -1470,15 +1514,19 @@ int main(int argc, char *argv[]) {
     // Run Workers
 
     for (int i = 0; i < processes; i++) {
+
         fork_pids[i] = fork();
-        if (fork_pids[i] == 0) {
-            set_process_title("worker", i);
-            generate_image(
-                section_starts[i], section_starts[i + 1], width, tree_root,
-                num_dots, dots, image_indexes, type_counts, section_progress
-            );
-            exit(0);
+        if (fork_pids[i] != 0) {
+            continue;
         }
+
+        set_process_title("worker", i);
+        generate_image(
+            section_starts[i], section_starts[i + 1], width, tree_root,
+            num_dots, dots, image_indexes, type_counts, section_progress
+        );
+        exit(0);
+
     }
     for (int i = 0; i < processes; i++) {
         waitpid(fork_pids[i], NULL, 0);
