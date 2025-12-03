@@ -659,8 +659,8 @@ void smooth_coastlines(
         bool same_y = false;
         if (i != land_start && land_dots[i * 3 + 1] == land_dots[(i - 1) * 3 + 1]) {
             same_y = true;
+            const int prev_dot_dist = land_dots[i * 3] - land_dots[(i - 1) * 3];
             for (int ii = 0; ii < coastline_smoothing; ii++) {
-                const int prev_dot_dist = land_dots[i * 3] - land_dots[(i - 1) * 3];
                 int min_dist_sq = (int)sqrt(dists_same[ii]) + 1 + prev_dot_dist;
                 // + 1 needed for floating-point errors (ceil didn't work)
                 dists_same[ii] = min_dist_sq * min_dist_sq;
@@ -716,8 +716,8 @@ void smooth_coastlines(
         bool same_y = false;
         if (i != water_start && water_dots[i * 3 + 1] == water_dots[(i - 1) * 3 + 1]) {
             same_y = true;
+            const int prev_dot_dist = water_dots[i * 3] - water_dots[(i - 1) * 3];
             for (int ii = 0; ii < coastline_smoothing; ii++) {
-                const int prev_dot_dist = water_dots[i * 3] - water_dots[(i - 1) * 3];
                 int min_dist_sq = (int)sqrt(dists_same[ii]) + 1 + prev_dot_dist;
                 dists_same[ii] = min_dist_sq * min_dist_sq;
                 min_dist_sq = (int)sqrt(dists_opp[ii]) + 1 + prev_dot_dist;
