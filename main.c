@@ -600,7 +600,7 @@ void assign_sections(
     Node *origin_tree_root, Dot *dots, _Atomic int *section_progress
 ) {
 
-    srand(0);
+    srand(time(NULL) + getpid());
 
     for (int i = start_index; i < end_index; i++) {
     // Non-water dots are not included
@@ -659,12 +659,14 @@ void smooth_coastlines(
         bool same_y = (i != land_start && land_dots[i * 3 + 1] == land_dots[(i - 1) * 3 + 1]);
         if (same_y) {
             const int prev_dot_dist = land_dots[i * 3] - land_dots[(i - 1) * 3];
+            int min_dist_same = (int)sqrt(dists_same[coastline_smoothing - 1]) + 1 + prev_dot_dist;
+            // + 1 needed for floating-point errors (ceil didn't work)
+            min_dist_same *= min_dist_same;
+            int min_dist_opp = (int)sqrt(dists_opp[coastline_smoothing - 1]) + 1 + prev_dot_dist;
+            min_dist_opp *= min_dist_opp;
             for (int ii = 0; ii < coastline_smoothing; ii++) {
-                int min_dist_sq = (int)sqrt(dists_same[ii]) + 1 + prev_dot_dist;
-                // + 1 needed for floating-point errors (ceil didn't work)
-                dists_same[ii] = min_dist_sq * min_dist_sq;
-                min_dist_sq = (int)sqrt(dists_opp[ii]) + 1 + prev_dot_dist;
-                dists_opp[ii] = min_dist_sq * min_dist_sq;
+                dists_same[ii] = min_dist_same;
+                dists_opp[ii] = min_dist_opp;
             }
         } else {
             for (int ii = 0; ii < coastline_smoothing; ii++) {
@@ -715,11 +717,13 @@ void smooth_coastlines(
         bool same_y = (i != water_start && water_dots[i * 3 + 1] == water_dots[(i - 1) * 3 + 1]);
         if (same_y) {
             const int prev_dot_dist = water_dots[i * 3] - water_dots[(i - 1) * 3];
+            int min_dist_same = (int)sqrt(dists_same[coastline_smoothing - 1]) + 1 + prev_dot_dist;
+            min_dist_same *= min_dist_same;
+            int min_dist_opp = (int)sqrt(dists_opp[coastline_smoothing - 1]) + 1 + prev_dot_dist;
+            min_dist_opp *= min_dist_opp;
             for (int ii = 0; ii < coastline_smoothing; ii++) {
-                int min_dist_sq = (int)sqrt(dists_same[ii]) + 1 + prev_dot_dist;
-                dists_same[ii] = min_dist_sq * min_dist_sq;
-                min_dist_sq = (int)sqrt(dists_opp[ii]) + 1 + prev_dot_dist;
-                dists_opp[ii] = min_dist_sq * min_dist_sq;
+                dists_same[ii] = min_dist_same;
+                dists_opp[ii] = min_dist_opp;
             }
         } else {
             for (int ii = 0; ii < coastline_smoothing; ii++) {
@@ -1120,7 +1124,7 @@ int main(int argc, char *argv[]) {
 
     section_progress_total[1] = num_dots;
 
-    srand(0);
+    srand(time(NULL));
 
     const int num_special_dots = num_dots / island_abundance * 2;
     const int num_reg_dots = num_dots - num_special_dots;
