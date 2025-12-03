@@ -602,7 +602,7 @@ void assign_sections(
     Node *origin_tree_root, Dot *dots, _Atomic int *section_progress
 ) {
 
-    srand(time(NULL) + getpid());
+    srand(0);
 
     for (int i = start_index; i < end_index; i++) {
     // Non-water dots are not included
@@ -773,11 +773,9 @@ void smooth_coastlines(
  * distance to the nearest land dot.
  */
 void generate_biomes_water(
-    const int start_index, const int end_index, int *water_dots, Node *land_tree_root,
+    const int start_index, const int end_index, const int *water_dots, Node *land_tree_root,
     const int height, const int num_dots, Dot *dots, _Atomic int *section_progress
 ) {
-
-    // Generate Water Biomes
 
     int land_dist;
 
@@ -832,30 +830,33 @@ void generate_biomes_water(
  * dots whose biomes are already before this function.
  */
 void generate_biomes_land(
-    const int start_index, const int end_index, Node *origin_tree_root, const int num_dots,
-    const int biome_origin_indexes[], Dot *dots, _Atomic int *section_progress
+    const int start_index, const int end_index, const int *land_dots,
+    Node *origin_tree_root, const int biome_origin_indexes[],
+    const int num_dots, Dot *dots, _Atomic int *section_progress
 ) {
 
-    // Generate Land Biomes
+    int min_dist;
 
     for (int i = start_index; i < end_index; i++) {
 
-        Dot *dot = &dots[i];
+        // Calculate Maxminum Distance
 
-        if (dot->type != 'L') {
-            continue;
+        if (i != start_index && land_dots[i * 3 + 1] == land_dots[(i - 1) * 3 + 1]) {
+            int min_dist_sq = (int)sqrt(min_dist) + 1 + land_dots[i * 3] - land_dots[(i - 1) * 3];
+            min_dist = min_dist_sq * min_dist_sq;
+        } else {
+            min_dist = INT_MAX;
         }
 
         // Find Nearest Biome Origin Dot
 
-        int min_dist = INT_MAX;
         int origin_index = 0;
-        const int coord[2] = {dot->x, dot->y};
+        const int coord[2] = {land_dots[i * 3], land_dots[i * 3 + 1]};
         query_recursive(origin_tree_root, coord, 0, &origin_index, &min_dist);
 
         // Set Dot Type
 
-        dot->type = dots[origin_index].type;
+        dots[land_dots[i * 3 + 2]].type = dots[origin_index].type;
 
         atomic_fetch_add(&section_progress[4], 1);
 
@@ -1133,7 +1134,7 @@ int main(int argc, char *argv[]) {
 
     section_progress_total[1] = num_dots;
 
-    srand(time(NULL));
+    srand(0);
 
     const int num_special_dots = num_dots / island_abundance * 2;
     const int num_reg_dots = num_dots - num_special_dots;
@@ -1400,7 +1401,7 @@ int main(int argc, char *argv[]) {
 
     quicksort_recursive(water_dots, 0, num_water_dots - 1, width);
 
-    // Create Piece Starts for Land and Water Dots
+    // Create Piece Starts Water Dots
 
     int water_piece_length = num_water_dots / processes;
     int water_piece_starts[processes + 1];
@@ -1537,6 +1538,32 @@ int main(int argc, char *argv[]) {
     biome_tree_root = build_recursive(biome_dots, num_biome_dots, 0);
     free(biome_dots);
 
+    // Create and Sort Lands
+    // Original "land_dots" was freed in water biome generation
+
+    int num_land_dots2 = 0;
+    int *land_dots2 = malloc(num_dots * 3 * sizeof(int));
+    for (int i = 0; i < num_dots; i++) {
+        const Dot *dot = &dots[i];
+        if (dot->type == 'L') {
+            land_dots2[num_land_dots2 * 3] = dot->x;
+            land_dots2[num_land_dots2 * 3 + 1] = dot->y;
+            land_dots2[num_land_dots2 * 3 + 2] = i;
+            num_land_dots2++;
+        }
+    }
+
+    quicksort_recursive(land_dots2, 0, num_land_dots2 - 1, width);
+
+    // Create Piece Starts Land Dots
+
+    int land_piece_length = num_land_dots2 / processes;
+    int land_piece_starts[processes + 1];
+    for (int i = 0; i < processes; i++) {
+        land_piece_starts[i] = i * land_piece_length;
+    }
+    land_piece_starts[processes] = num_land_dots2;
+
     // Run Workers
 
     for (int i = 0; i < processes; i++) {
@@ -1548,8 +1575,8 @@ int main(int argc, char *argv[]) {
 
         set_process_title("worker", i);
         generate_biomes_land(
-            piece_starts[i], piece_starts[i + 1], biome_tree_root, num_dots,
-            biome_origin_indexes, dots, section_progress
+            land_piece_starts[i], land_piece_starts[i + 1], land_dots2, 
+            biome_tree_root, biome_origin_indexes, num_dots, dots, section_progress
         );
         exit(0);
 
@@ -1558,8 +1585,9 @@ int main(int argc, char *argv[]) {
         waitpid(fork_pids[i], NULL, 0);
     }
 
-    // Free Tree
+    // Free Land Dots and Biome Tree
 
+    free(land_dots2);
     free_recursive(biome_tree_root);
 
     // Set Section Completion Time
