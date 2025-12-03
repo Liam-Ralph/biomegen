@@ -657,7 +657,7 @@ void smooth_coastlines(
         // Calculate Maximum Distances
 
         bool same_y = false;
-        if (i != 0 && land_dots[i * 3 + 1] == land_dots[(i - 1) * 3 + 1]) {
+        if (i != land_start && land_dots[i * 3 + 1] == land_dots[(i - 1) * 3 + 1]) {
             same_y = true;
             for (int ii = 0; ii < coastline_smoothing; ii++) {
                 const int prev_dot_dist = land_dots[i * 3] - land_dots[(i - 1) * 3];
@@ -714,7 +714,7 @@ void smooth_coastlines(
         // Calculate Maximum Distances
 
         bool same_y = false;
-        if (i != 0 && water_dots[i * 3 + 1] == water_dots[(i - 1) * 3 + 1]) {
+        if (i != water_start && water_dots[i * 3 + 1] == water_dots[(i - 1) * 3 + 1]) {
             same_y = true;
             for (int ii = 0; ii < coastline_smoothing; ii++) {
                 const int prev_dot_dist = water_dots[i * 3] - water_dots[(i - 1) * 3];
