@@ -1,6 +1,6 @@
 # BiomeGen
 ### Released July 2025
-### Version 3.0.2
+### Version 3.1.0
 ### Updated November 2025
 
 <br/>
@@ -16,7 +16,7 @@ runs and another C program to create multiple images or test generation speed.
 
 ## Operating System Support
 
-Version 3.0.0
+Version 3.0.0 and above
  - Linux supported, tested with Linux Mint 22.2 and antiX 23.2
  - MacOS and BSD OSs should be supported, but haven't been tested
  - Windows is not currently supported, but WSL should work
@@ -109,9 +109,8 @@ to do this:
 
 ## Planned Updates
 
-3.1.0
+3.2.0
  - Test more efficiency improvements
-     - Fixing coastline smoothing
      - Only creating one set of worker processes
 
 4.0.0
