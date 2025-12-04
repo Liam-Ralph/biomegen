@@ -598,23 +598,32 @@ void track_progress(
  * dot's distance from the nearest land origin dot.
  */
 void assign_sections(
-    const int map_resolution, const float island_size, const int start_index, const int end_index,
+    const int map_resolution, const float island_size,
+    const int start_index, const int end_index, const int *reg_dots,
     Node *origin_tree_root, Dot *dots, _Atomic int *section_progress
 ) {
 
     srand(0);
 
+    int min_dist;
+
     for (int i = start_index; i < end_index; i++) {
     // Non-water dots are not included
 
-        Dot *dot = &dots[i];
+        // Calculate Maximum Distance
+
+        if (i != start_index && reg_dots[i * 3 + 1] == reg_dots[(i - 1) * 3 + 1]) {
+            int min_dist_sq = (int)sqrt(min_dist) + 1 + reg_dots[i * 3] - reg_dots[(i - 1) * 3];
+            min_dist = min_dist_sq * min_dist_sq;
+        } else {
+            min_dist = INT_MAX;
+        }
 
         // Find Distance to Nearest Origin Dot
 
-        int min_dist = INT_MAX;
         // min and dist are squared, sqrt is not done until later
         int min_index = 0;
-        int coord[2] = {dot->x, dot->y};
+        int coord[2] = {reg_dots[i * 3], reg_dots[i * 3 + 1]};
         query_recursive(origin_tree_root, coord, 0, &min_index, &min_dist);
 
         // Calculate Chance
@@ -625,7 +634,7 @@ void assign_sections(
         int chance = (dist <= threshold) ? 9 : 1;
 
         if (rand() % 10 < chance) {
-            dot->type = 'L'; // Land
+            dots[reg_dots[i * 3 + 2]].type = 'L'; // Land
         }
 
         atomic_fetch_add(&section_progress[2], 1);
@@ -1182,20 +1191,6 @@ int main(int argc, char *argv[]) {
 
     section_progress_total[2] = num_reg_dots;
 
-    // Create Piece Starts
-
-    int piece_length = num_reg_dots / processes;
-
-    int piece_starts[processes + 1];
-    for (int i = 0; i < processes; i++) {
-        piece_starts[i] = i * piece_length + num_special_dots;
-    }
-    piece_starts[processes] = num_dots;
-    /*
-    used to create x pieces of size num_reg_dots / x, where x = processes
-    last piece may be larger, special dots are skipped
-    */
-
     // Create Land Origin KDTree
 
     const int num_origin_dots = num_special_dots / 2;
@@ -1208,6 +1203,30 @@ int main(int argc, char *argv[]) {
     }
     Node *origin_tree_root = NULL;
     origin_tree_root = build_recursive(land_origin_dots, num_origin_dots, 0);
+
+    // Create and Sort Regular Dots
+
+    int *reg_dots = malloc(num_reg_dots * 3 * sizeof(int));
+    for (int i = num_special_dots; i < num_dots; i++) {
+        Dot *dot = &dots[i];
+        const int index = i - num_special_dots;
+        reg_dots[index * 3] = dot->x;
+        reg_dots[index * 3 + 1] = dot->y;
+        reg_dots[index * 3 + 2] = i;
+    }
+
+    // Create Regular Piece Starts
+
+    int reg_piece_length = num_reg_dots / processes;
+    int reg_piece_starts[processes + 1];
+    for (int i = 0; i < processes; i++) {
+        reg_piece_starts[i] = i * reg_piece_length;
+    }
+    reg_piece_starts[processes] = num_reg_dots;
+    /*
+    used to create x pieces of size num_reg_dots / x, where x = processes
+    last piece may be larger, special dots are skipped
+    */
 
     // Run Workers
 
@@ -1222,7 +1241,7 @@ int main(int argc, char *argv[]) {
         // e.g. biogen-worker00
         set_process_title("worker", i);
         assign_sections( // Run worker
-            map_resolution, island_size, piece_starts[i], piece_starts[i + 1],
+            map_resolution, island_size, reg_piece_starts[i], reg_piece_starts[i + 1], reg_dots,
             origin_tree_root, dots, section_progress
         );
         exit(0); // Kill worker
@@ -1232,8 +1251,9 @@ int main(int argc, char *argv[]) {
         waitpid(fork_pids[i], NULL, 0); // Wait for workers
     }
 
-    // Free Land Origin Tree
+    // Free Regular Dots and Land Origin Tree
 
+    free(reg_dots);
     free_recursive(origin_tree_root);
 
     // Set Section Completion Time
@@ -1359,14 +1379,6 @@ int main(int argc, char *argv[]) {
             dot->type = 'W';
         }
     }
-
-    // Create Piece Starts for All Dots
-
-    piece_length = num_dots / processes;
-    for (int i = 0; i < processes; i++) {
-        piece_starts[i] = i * piece_length;
-    }
-    piece_starts[processes] = num_dots;
 
     // Create Water Biomes
     // Adds ice, depth
