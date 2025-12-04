@@ -485,8 +485,8 @@ void track_progress(
         "Setup", "Section Generation", "Section Assignment", "Coastline Smoothing",
         "Biome Generation", "Image Generation", "Finish"
     };
-    float section_weights[7] = {0.01, 0.01, 0.02, 0.60, 0.06, 0.10, 0.20};
-    // Used for overall progress bar (e.g. Setup takes ~1% of total time)
+    float section_weights[7] = {0.03, 0.01, 0.01, 0.14, 0.04, 0.24, 0.53};
+    // Used for overall progress bar (e.g. Setup takes ~3% of total time)
 
     while (true) {
 
@@ -603,7 +603,7 @@ void assign_sections(
     Node *origin_tree_root, Dot *dots, _Atomic int *section_progress
 ) {
 
-    srand(0);
+    srand(time(NULL) + getpid());
 
     int min_dist;
 
@@ -1143,7 +1143,7 @@ int main(int argc, char *argv[]) {
 
     section_progress_total[1] = num_dots;
 
-    srand(0);
+    srand(time(NULL));
 
     const int num_special_dots = num_dots / island_abundance * 2;
     const int num_reg_dots = num_dots - num_special_dots;
@@ -1668,7 +1668,7 @@ int main(int argc, char *argv[]) {
 
     // --Finish--
 
-    atomic_store(&section_progress_total[6], height);
+    atomic_store(&section_progress_total[6], height * 5);
 
     // Create Image
 
@@ -1787,11 +1787,13 @@ int main(int argc, char *argv[]) {
 
     fclose(fptr);
 
+    atomic_store(&section_progress[6], height * 5);
+
+    // Set Section Completion Time
+
     clock_gettime(CLOCK_REALTIME, &time_now);
     section_times[6] = (float)(time_now.tv_sec - start_time.tv_sec) +
         (time_now.tv_nsec - start_time.tv_nsec) / 1000000000.0 - sum_list_float(section_times, 7);
-
-    // Set Section Completion Time
 
     section_times[7] = (float)(time_now.tv_sec - start_time.tv_sec) +
         (time_now.tv_nsec - start_time.tv_nsec) / 1000000000.0;

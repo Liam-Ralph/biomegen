@@ -1,3 +1,9 @@
+## Version 3.1.0 (December 2025)
+
+ - Improved section assignment, coastline smoothing, and biome generation.
+ - Fixed minor error in coastline smoothing.
+ - Cleaned code.
+
 ## Version 3.0.2 (December 2025)
 
  - Refactored autorun.c, removing Windows support.
