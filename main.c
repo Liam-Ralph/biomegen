@@ -1194,7 +1194,7 @@ int main(int argc, char *argv[]) {
     // Create Land Origin KDTree
 
     const int num_origin_dots = num_special_dots / 2;
-    int land_origin_dots[num_origin_dots * 3 * sizeof(int)];
+    int *land_origin_dots = malloc(num_origin_dots * 3 * sizeof(int));
     for (int i = 0; i < num_origin_dots; i++) {
         Dot *dot = &dots[i];
         land_origin_dots[i * 3] = dot->x;
@@ -1203,6 +1203,7 @@ int main(int argc, char *argv[]) {
     }
     Node *origin_tree_root = NULL;
     origin_tree_root = build_recursive(land_origin_dots, num_origin_dots, 0);
+    free(land_origin_dots);
 
     // Create and Sort Regular Dots
 
