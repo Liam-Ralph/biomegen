@@ -1409,7 +1409,7 @@ int main(int argc, char *argv[]) {
     land_tree_root = build_recursive(land_dots, num_land_dots, 0);
     free(land_dots);
 
-    // Sort Land Dots
+    // Sort Water Dots
 
     quicksort_recursive(water_dots, 0, num_water_dots - 1, width);
 
