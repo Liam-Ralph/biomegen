@@ -71,7 +71,8 @@ int main() {
         }
 
         strncpy(token, strtok(NULL, ":\n"), 250);
-        char inputs[256] = token; // Inputs for main program
+        char inputs[256]; // Inputs for main program
+        strncpy(inputs, token, 256);
 
         printf("Running task \"%s\" for %d reps.\n", inputs, reps);
 
@@ -164,7 +165,8 @@ int main() {
         // Delete Png File if not Saving
 
         if (!save_png) {
-            char file_path[229] = strtok(NULL, "");
+            char file_path[229];
+            strncpy(file_path, strtok(NULL, ""), 229);
             remove(file_path);
         }
 
