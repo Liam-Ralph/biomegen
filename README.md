@@ -109,9 +109,8 @@ to do this:
 
 ## Planned Updates
 
-3.1.0
+3.2.0
  - Test more efficiency improvements
-     - Fixing coastline smoothing
      - Only creating one set of worker processes
 
 4.0.0

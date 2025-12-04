@@ -1587,7 +1587,7 @@ int main(int argc, char *argv[]) {
 
         set_process_title("worker", i);
         generate_biomes_land(
-            land_piece_starts[i], land_piece_starts[i + 1], land_dots2, 
+            land_piece_starts[i], land_piece_starts[i + 1], land_dots2,
             biome_tree_root, biome_origin_indexes, num_dots, dots, section_progress
         );
         exit(0);
