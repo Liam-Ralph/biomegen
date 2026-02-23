@@ -123,6 +123,11 @@ float sum_list_float(const float list[], const int list_len) {
     return sum;
 }
 
+/**
+ * Sort the given COORDS using the quicksort algorithm. HIGH and LOW are the
+ * bounds for a given level of recursion. WIDTH is used to calculate the value
+ * of a coordinate (y * width + x).
+ */
 void quicksort_recursive(int *coords, const int low, const int high, const int width) {
 
     if (low < high) {
