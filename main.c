@@ -42,7 +42,7 @@ BiomeGen, a terminal application for generating png maps.
 
 // Structures
 
-typedef struct {
+typedef struct Dot {
     short x;
     short y;
     char type;
