@@ -1374,7 +1374,7 @@ int main(int argc, char *argv[]) {
 
     // --Biome Generation--
 
-    atomic_store(&section_progress_total[4], num_dots);
+    section_progress_total[4] = num_dots;
 
     // Remove "Land Origin" and "Water Forced" Dots
 
@@ -1617,7 +1617,7 @@ int main(int argc, char *argv[]) {
 
     // --Image Generation--
 
-    atomic_store(&section_progress_total[5], height);
+    section_progress_total[5] = height;
 
     // Create Section Starts
 
@@ -1675,7 +1675,7 @@ int main(int argc, char *argv[]) {
 
     // --Finish--
 
-    atomic_store(&section_progress_total[6], height * 5);
+    section_progress_total[6] = height * 5;
 
     // Create Image
 
