@@ -1,7 +1,7 @@
 # BiomeGen
 ### Released July 2025
-### Version 3.1.0
-### Updated December 2025
+### Version 3.1.1
+### Updated August 2026
 
 <br/>
 
@@ -108,17 +108,3 @@ to do this:
  - `sample_inputs.txt`
    Includes a number of inputs that can pasted into your terminal
    (Ctrl + Shift + V usually works for this).
-
-<br/>
-
-## Planned Updates
-
-3.2.0
- - Test more efficiency improvements
-     - Only creating one set of worker processes
-
-4.0.0
- - Rewrite land biome generation algorithm
-     - Calculate based on prevailing wind direction, rainfall, moutain effects
- - Rewrite coastline smoothing algorithm
-     - Achieve something similar in a more efficient manner

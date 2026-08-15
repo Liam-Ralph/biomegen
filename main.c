@@ -40,7 +40,7 @@ BiomeGen, a terminal application for generating png maps.
 #define ANSI_RESET "\033[0m"
 
 
-// Structures
+// Structs
 
 typedef struct Dot {
     short x;
