@@ -1,11 +1,12 @@
 # BiomeGen
 ### Released July 2025
-### Version 3.1.0
-### Updated December 2025
+### Version 3.1.1
+### Updated August 2026
 
 <br/>
 
 ## Description
+
 BiomeGen is a C map generation tool that provides output in a png format.
 Customization options include map dimensions, island abundance, island size, and
 island abundance relative to water. Generates water, land, and various biomes.
@@ -27,6 +28,7 @@ Python Versions (v2.1.6 and below)
 <br/>
 
 ## License
+
 This project is licensed under the GNU General Public License v3.0 (GNU GPLv3),
 as detailed in LICENSE, with the following exceptions:
  - `result.png`, the project's output, which is licensed under
@@ -39,6 +41,7 @@ as detailed in LICENSE, with the following exceptions:
 <br/>
 
 ## Compilation
+
 This project requires the `math.h` library for autorun.c, and the `math.h` and `png.h`
 libraries for main.c. Autorun should compile with `gcc autorun.c -o autorun -lm -Wall`.
 If the `gcc` command is available on your system, autorun should be able to properly
@@ -101,20 +104,7 @@ to do this:
 <br/>
 
 ## Other Files
+
  - `sample_inputs.txt`
    Includes a number of inputs that can pasted into your terminal
    (Ctrl + Shift + V usually works for this).
-
-<br/>
-
-## Planned Updates
-
-3.2.0
- - Test more efficiency improvements
-     - Only creating one set of worker processes
-
-4.0.0
- - Rewrite land biome generation algorithm
-     - Calculate based on prevailing wind direction, rainfall, moutain effects
- - Rewrite coastline smoothing algorithm
-     - Achieve something similar in a more efficient manner

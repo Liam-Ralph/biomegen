@@ -1,3 +1,7 @@
+## Version 3.1.1 (August 2026)
+
+ - Cleaned code.
+
 ## Version 3.1.0 (December 2025)
 
  - Improved section assignment, coastline smoothing, and biome generation.

@@ -42,7 +42,7 @@ BiomeGen, a terminal application for generating png maps.
 
 // Structs
 
-typedef struct {
+typedef struct Dot {
     short x;
     short y;
     char type;
@@ -72,6 +72,7 @@ typedef struct Node {
     struct Node *left;
     struct Node *right;
 } Node;
+
 
 // General Functions
 // (Alphabetical order)
@@ -123,6 +124,11 @@ float sum_list_float(const float list[], const int list_len) {
     return sum;
 }
 
+/**
+ * Sort the given COORDS using the quicksort algorithm. HIGH and LOW are the
+ * bounds for a given level of recursion. WIDTH is used to calculate the value
+ * of a coordinate (y * width + x).
+ */
 void quicksort_recursive(int *coords, const int low, const int high, const int width) {
 
     if (low < high) {
@@ -1368,7 +1374,7 @@ int main(int argc, char *argv[]) {
 
     // --Biome Generation--
 
-    atomic_store(&section_progress_total[4], num_dots);
+    section_progress_total[4] = num_dots;
 
     // Remove "Land Origin" and "Water Forced" Dots
 
@@ -1611,7 +1617,7 @@ int main(int argc, char *argv[]) {
 
     // --Image Generation--
 
-    atomic_store(&section_progress_total[5], height);
+    section_progress_total[5] = height;
 
     // Create Section Starts
 
@@ -1669,7 +1675,7 @@ int main(int argc, char *argv[]) {
 
     // --Finish--
 
-    atomic_store(&section_progress_total[6], height * 5);
+    section_progress_total[6] = height * 5;
 
     // Create Image
 
