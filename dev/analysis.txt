@@ -4,5 +4,21 @@ map_resolution 50
 island_abundance 120
 island_size 50
 coastline_smoothing 5
-
 then 100M pixels and 2M dots
+
+Dot = 6 bytes
+Node = 32 bytes
+
+kdtree takes = 64M bytes
+array would take 16 * 2M = 32M bytes
+
+dots takes 6 * 2M = 12M bytes
+
+image_indexes takes 4 * 100M = 400M
+pixels takes 3 * 100M = 300M
+could probably go straight to pixels during calculation to remove image_indexes
+
+build_recursive mallocs left and right coords
+
+use memcpy instead of copying individually
+

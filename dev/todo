@@ -1,4 +1,5 @@
 time analysis of kd tree creation and querying
 analyze memory usage of kd trees
 consider using uintXX_t etc.
-look into dtermining max threads from hardware (_SC_NPROCESSORS_ONLN maybe?)
+look into dtermining max threads from hardware (_SC_NPROCESSORS_ONLN and sysctl maybe?)
+use enum for type
