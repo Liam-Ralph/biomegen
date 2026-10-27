@@ -1,0 +1,8 @@
+hypothetical scenario:
+10000 x 10000 pixels
+map_resolution 50
+island_abundance 120
+island_size 50
+coastline_smoothing 5
+
+then 100M pixels and 2M dots
