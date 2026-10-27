@@ -35,6 +35,8 @@ BiomeGen, a terminal application for generating png maps.
 
 // Definitions
 
+#define PATH_README "../README.md"
+
 #define ANSI_GREEN "\033[38;5;2m"
 #define ANSI_BLUE "\033[38;5;4m"
 #define ANSI_RESET "\033[0m"
@@ -974,7 +976,7 @@ int main(int argc, char *argv[]) {
         // Get Program Version
 
         char file_line[29];
-        FILE *fptr = fopen("README.md", "r");
+        FILE *fptr = fopen(PATH_README, "r");
         fgets(file_line, 29, fptr);
         fgets(file_line, 29, fptr);
         fgets(file_line, 29, fptr);

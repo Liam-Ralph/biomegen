@@ -9,6 +9,13 @@
 #include <unistd.h>
 
 
+// Defintions
+
+#define PATH_README "../README.md"
+#define PATH_AUTORUN_TASKS "../src/autorun_tasks.txt"
+#define PATH_AUTORUN_RESULTS "../src/autorun_results.csv"
+
+
 // Main Function
 
 int main() {
@@ -26,7 +33,7 @@ int main() {
     // Getting Program Version
 
     char file_line[29];
-    FILE *fptr = fopen("README.md", "r");
+    FILE *fptr = fopen(PATH_README, "r");
     fgets(file_line, 29, fptr);
     fgets(file_line, 29, fptr);
     fgets(file_line, 29, fptr);
@@ -39,12 +46,13 @@ int main() {
     // Compiling Main Program
 
     if (!access("main", F_OK) == 0) {
-        system("gcc -D_GNU_SOURCE main.c -o main -lm -lpng");
+        printf("main executable missing.");
+        return 1;
     }
 
     // Opening Autorun Tasks
 
-    fptr = fopen("autorun_tasks.txt", "r");
+    fptr = fopen(PATH_AUTORUN_TASKS, "r");
     char raw_line[256]; // Max task length is 256 chars
 
     while (fgets(raw_line, 256, fptr)) {
@@ -200,7 +208,7 @@ int main() {
 
         // Saving Results to File
 
-        FILE *fptr_results = fopen("autorun_results.csv", "a");
+        FILE *fptr_results = fopen(PATH_AUTORUN_RESULTS, "a");
         fprintf(
             fptr_results, "%s, %d, %d, %d, %d, %f, %f, %d",
             version, width, height, processes, reps, mean, std_deviation, pix_per_sec

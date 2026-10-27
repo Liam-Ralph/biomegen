@@ -1,6 +1,6 @@
-.vscode
+*.out
+*.exe
 main
 autorun
-*.exe
-*.out
-production-files
+
+/build
