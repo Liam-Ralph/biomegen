@@ -22,3 +22,7 @@ build_recursive mallocs left and right coords
 
 use memcpy instead of copying individually
 
+_____________________
+
+Dot = 6 bytes
+removed indexes, shouldn't be needed

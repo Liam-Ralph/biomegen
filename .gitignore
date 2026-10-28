@@ -4,3 +4,5 @@ main
 autorun
 
 /build
+
+test.c

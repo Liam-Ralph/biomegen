@@ -1,3 +1,12 @@
+## Version 3.2.0 (November 2026)
+
+ - KD Tree now builds on top of existing array.
+ - Greatly reduced memory usage.
+ - Switched to CMake.
+ - Enabled compiler optimizations by default.
+ - 32-bit systems should be supported now.
+ - Cleaned code.
+
 ## Version 3.1.1 (August 2026)
 
  - Cleaned code.

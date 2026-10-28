@@ -16,13 +16,14 @@ BiomeGen, a terminal application for generating png maps.
 
 // Includes
 
-#define _POSIX_C_SOURCE 199309L // Needed for CLOCK_REALTIME
+#define _POSIX_C_SOURCE 199309L // Needed for CLOCK_MONOTONIC
 
 #include <limits.h>
 #include <math.h>
 #include <png.h>
 #include <stdatomic.h>
 #include <stdbool.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -44,46 +45,29 @@ BiomeGen, a terminal application for generating png maps.
 
 // Structs
 
+typedef enum DotType : uint8_t {
+    ICE, SHALLOW_WATER, WATER, DEEP_WATER, ROCK, DESERT, JUNGLE, FOREST, PLAINS, TAIGA, SNOW,
+    WATER_FORCED, LAND, LAND_ORIGIN
+} DotType;
+
 typedef struct Dot {
-    short x;
-    short y;
-    char type;
-    /*
-    I = Ice
-    s = Shallow Water
-    W = Water
-    d = Deep Water
-
-    R = Rock
-    D = Desert
-    J = Jungle
-    F = Forest
-    P = Plains
-    T = Taiga
-    S = Snow
-
-    w = Water Forced
-    L = Land
-    l = Land Origin
-    */
+    uint16_t x;
+    uint16_t y;
+    DotType type;
 } Dot;
-
-typedef struct Node {
-    int coord[2];
-    int index;
-    struct Node *left;
-    struct Node *right;
-} Node;
 
 
 // General Functions
 // (Alphabetical order)
 
 /**
- * Get a sanitized integer input from the user between MIN and MAX,
+ * Get a sanitized integer input from the user between `min` and `max`,
  * both inclusive.
+ * 
+ * @param min
+ * @param max
  */
-int get_int(const int min, const int max) {
+int get_int(int min, int max) {
 
     int result;
 
@@ -92,11 +76,10 @@ int get_int(const int min, const int max) {
         int scanf_return = scanf("%d", &result);
         while (getchar() != '\n');
 
-        if (scanf_return != 1 || result < min || result > max) {
+        if (scanf_return != 1 || result < min || result > max)
             printf("Input must be an integer between %d and %d (both inclusive).\n", min, max);
-        } else {
+        else
             break;
-        }
 
     }
 
@@ -106,81 +89,77 @@ int get_int(const int min, const int max) {
 
 /**
  * Return the sum of a list of integers.
+ * 
+ * @param list
+ * @param len the length of the list
  */
-int sum_list_int(const int list[], const int list_len) {
+int sum_list_int(const int list[], int len) {
     int sum = 0;
-    for (int i = 0; i < list_len; i++) {
+    for (int i = 0; i < len; i++)
         sum += list[i];
-    }
     return sum;
 }
 
 /**
  * Return the sum of a list of floats.
+ * 
+ * @param list
+ * @param len the length of the list
  */
-float sum_list_float(const float list[], const int list_len) {
+float sum_list_float(const float list[], int len) {
     float sum = 0;
-    for (int i = 0; i < list_len; i++) {
+    for (int i = 0; i < len; i++)
         sum += list[i];
-    }
     return sum;
 }
 
 /**
- * Sort the given COORDS using the quicksort algorithm. HIGH and LOW are the
- * bounds for a given level of recursion. WIDTH is used to calculate the value
- * of a coordinate (y * width + x).
+ * Swaps two dots in an array.
+ * 
+ * @param dots
+ * @param i first index to swap with
+ * @param ii second index to swap with
  */
-void quicksort_recursive(int *coords, const int low, const int high, const int width) {
+void swap(Dot *dots, int i, int ii) {
+    const Dot temp = dots[i];
+    dots[i] = dots[ii];
+    dots[ii] = temp;
+}
+
+/**
+ * Sort the given `dots` using the quicksort algorithm.
+ * 
+ * A dot's value is equal to `dot.y * width + dot.x`.
+ * 
+ * @param dots array to sort
+ * @param low
+ * @param high
+ * @param width needed to calculate a dot's value
+ */
+void quicksort_recursive(Dot *dots, int low, int high, int width) {
 
     if (low < high) {
 
-        /*
-        Pivot value is the value at coords[high]. Every value less than pivot
-        will be to the left of wherever pivot ends up. Remember: a coord is
-        {x, y, index (of equivalent dot in dots)}. The array isn't 2D as it
-        requires malloc.
-        */
-        int pivot = coords[high * 3 + 1] * width + coords[high * 3];
+        // Calculate Pivot Value
+
+        uint32_t pivot = dots[high].y * width + dots[high].x;
 
         // Move Smaller Elements to the Left
 
         int i = low - 1;
 
-        for (int ii = low; ii <= high - 1; ii++) {
-            if (coords[ii * 3 + 1] * width + coords[ii * 3] < pivot) {
-                i++;
-                const int temp[3] = {coords[i * 3], coords[i * 3 + 1], coords[i * 3 + 2]};
-                coords[i * 3] = coords[ii * 3];
-                coords[i * 3 + 1] = coords[ii * 3 + 1];
-                coords[i * 3 + 2] = coords[ii * 3 + 2];
-                coords[ii * 3] = temp[0];
-                coords[ii * 3 + 1] = temp[1];
-                coords[ii * 3 + 2] = temp[2];
-            }
-        }
+        for (int ii = low; ii <= high - 1; ii++)
+            if (dots[ii].y * width + dots[ii].x < pivot)
+                swap(dots, ++i, ii);
 
         // Move Pivot to After Smaller Elements
 
-        i++;
-        const int temp[3] = {coords[i * 3], coords[i * 3 + 1], coords[i * 3 + 2]};
-        coords[i * 3] = coords[high * 3];
-        coords[i * 3 + 1] = coords[high * 3 + 1];
-        coords[i * 3 + 2] = coords[high * 3 + 2];
-        coords[high * 3] = temp[0];
-        coords[high * 3 + 1] = temp[1];
-        coords[high * 3 + 2] = temp[2];
+        swap(dots, ++i, high);
 
-        // Decide Whether Recursion is Needed
-        /*
-        Cases:
-        i == med_index, the median is in the correct spot, no more sorting
-        i > med_index, median is in left section, left section needs sorting
-        i < med_index, median in right section, sort right section
-        */
+        // Recursion
 
-        quicksort_recursive(coords, low, i - 1, width);
-        quicksort_recursive(coords, i + 1, high, width);
+        quicksort_recursive(dots, low, i - 1, width);
+        quicksort_recursive(dots, i + 1, high, width);
 
     }
 
@@ -190,91 +169,71 @@ void quicksort_recursive(int *coords, const int low, const int high, const int w
 // KDTree Functions
 
 /**
- * Sort the given COORDS until the median index is correctly sorted. In other
- * words, median index will be correct, everything before median index will be
- * less than the value at median index, and everything after will be greater.
- * AXIS determines which value of a coordinate is its value (x or y) to sort
- * based on. HIGH and LOW determine the sorting bounds for a given level of
- * recursion.
+ * Sort the given `dots` until the median index is correctly sorted.
+ * 
+ * After completion, the median index will be in the correct place, everything
+ * to the left will be lower or equal, and everything right will be greater or
+ * equal. `axis` determines whether to sort based on x or y values. Algorithm
+ * is similar to quicksort.
+ * 
+ * @param dots array to sort
+ * @param low
+ * @param high
+ * @param axis
+ * @param med_index index of the median (length of dots / 2)
  */
-void median_sort_recursive(
-    int *coords, const int low, const int high, const int axis, const int med_index
-) {
+void median_sort_recursive(Dot *dots, int low, int high, bool axis, int med_index) {
 
     if (low < high) {
 
-        /*
-        Pivot value is the value at coords[high]. Every value less than pivot
-        will be to the left of wherever pivot ends up. Remember: a coord is
-        {x, y, index (of equivalent dot in dots)}. The array isn't 2D as it
-        requires malloc.
-        */
-        int pivot = coords[high * 3 + axis];
+        // Calculate Pivot Value
+
+        uint32_t pivot = axis ? dots[high].y : dots[high].x;
 
         // Move Smaller Elements to the Left
 
         int i = low - 1;
 
-        for (int ii = low; ii <= high - 1; ii++) {
-            if (coords[ii * 3 + axis] < pivot) {
-                i++;
-                const int temp[3] = {coords[i * 3], coords[i * 3 + 1], coords[i * 3 + 2]};
-                coords[i * 3] = coords[ii * 3];
-                coords[i * 3 + 1] = coords[ii * 3 + 1];
-                coords[i * 3 + 2] = coords[ii * 3 + 2];
-                coords[ii * 3] = temp[0];
-                coords[ii * 3 + 1] = temp[1];
-                coords[ii * 3 + 2] = temp[2];
-            }
-        }
+        for (int ii = low; ii <= high - 1; ii++)
+            if (axis ? dots[i].y : dots[i].x < pivot)
+                swap(dots, ++i, ii);
 
         // Move Pivot to After Smaller Elements
 
-        i++;
-        const int temp[3] = {coords[i * 3], coords[i * 3 + 1], coords[i * 3 + 2]};
-        coords[i * 3] = coords[high * 3];
-        coords[i * 3 + 1] = coords[high * 3 + 1];
-        coords[i * 3 + 2] = coords[high * 3 + 2];
-        coords[high * 3] = temp[0];
-        coords[high * 3 + 1] = temp[1];
-        coords[high * 3 + 2] = temp[2];
+        swap(dots, ++i, high);
 
-        // Decide Whether Recursion is Needed
-        /*
-        Cases:
-        i == med_index, the median is in the correct spot, no more sorting
-        i > med_index, median is in left section, left section needs sorting
-        i < med_index, median in right section, sort right section
-        */
+        // Recusion
+        // Recurses only into side containing med_index, no recursion if i == med_index
 
-        if (i > med_index) {
-            median_sort_recursive(coords, low, i - 1, axis, med_index);
-        } else if (i < med_index) {
-            median_sort_recursive(coords, i + 1, high, axis, med_index);
-        }
+        if (i > med_index)
+            median_sort_recursive(dots, low, i - 1, axis, med_index);
+        else if (i < med_index)
+            median_sort_recursive(dots, i + 1, high, axis, med_index);
 
     }
 
 }
 
 /**
- * Build a KDTree from COORDS, and return the root node. Ensures the KDTree is
- * built with the lowest possible depth for maximum efficiency when querying the
- * tree. Every recursion creates one dot and calls this function to insert its
- * children from an array of possible dots. DEPTH should be 0. COORDS should be
- * of length NUM_COORDS * 3.
+ * Build a 2D KD Tree within `dots`.
+ * 
+ * Ensures the KD Tree is complete, so it has the smallest height for effiency,
+ * and so it fits within the array. `low` and `high` must be non-negative, and
+ * `low + high` must not overflow in a signed int.
+ * 
+ * @param dots array to build on
+ * @param low
+ * @param high
+ * @param depth current depth, must be zero on top level call
  */
-Node *build_recursive(int *coords, const int num_coords, const int depth) {
+void build_recursive(Dot *dots, int low, int high, int depth) {
 
-    const int med_pos = num_coords / 2;
+    int med_pos = (high + low) >> 1;
+    // 10000 + 10000 < 2^15 - 1, so this won't overflow on 32-bit systems
 
-    // Sort Coords Around Median Position
-    /*
-    Median coord will be in correct place, everything less will be to the left,
-    everything else to the right.
-    */
+    // Median Sort Dots
 
-    median_sort_recursive(coords, 0, num_coords - 1, depth % 2, med_pos);
+    median_sort_recursive(dots, low, high, depth % 2, med_pos);
 
     // Add Median Node to Tree
     // Every recursion adds one node
@@ -505,7 +464,7 @@ void track_progress(
         // Section Progress
 
         struct timespec time_now;
-        clock_gettime(CLOCK_REALTIME, &time_now);
+        clock_gettime(CLOCK_MONOTONIC, &time_now);
         float time_diff = (float)(time_now.tv_sec - start_time.tv_sec) +
             (time_now.tv_nsec - start_time.tv_nsec) / 1000000000.0;
 
@@ -1079,7 +1038,7 @@ int main(int argc, char *argv[]) {
     }
 
     struct timespec start_time;
-    clock_gettime(CLOCK_REALTIME, &start_time);
+    clock_gettime(CLOCK_MONOTONIC, &start_time);
 
     // --Setup--
 
@@ -1141,7 +1100,7 @@ int main(int argc, char *argv[]) {
     // Set Section Completion Time
 
     struct timespec time_now;
-    clock_gettime(CLOCK_REALTIME, &time_now);
+    clock_gettime(CLOCK_MONOTONIC, &time_now);
     section_times[0] = (float)(time_now.tv_sec - start_time.tv_sec) +
         (time_now.tv_nsec - start_time.tv_nsec) / 1000000000.0;
     atomic_store(&section_progress[0], 1);
@@ -1190,7 +1149,7 @@ int main(int argc, char *argv[]) {
 
     // Set Section Completion Time
 
-    clock_gettime(CLOCK_REALTIME, &time_now);
+    clock_gettime(CLOCK_MONOTONIC, &time_now);
     section_times[1] = (float)(time_now.tv_sec - start_time.tv_sec) +
         (time_now.tv_nsec - start_time.tv_nsec) / 1000000000.0 - sum_list_float(section_times, 7);
 
@@ -1267,7 +1226,7 @@ int main(int argc, char *argv[]) {
 
     // Set Section Completion Time
 
-    clock_gettime(CLOCK_REALTIME, &time_now);
+    clock_gettime(CLOCK_MONOTONIC, &time_now);
     section_times[2] = (float)(time_now.tv_sec - start_time.tv_sec) +
         (time_now.tv_nsec - start_time.tv_nsec) / 1000000000.0 - sum_list_float(section_times, 7);
 
@@ -1370,7 +1329,7 @@ int main(int argc, char *argv[]) {
 
     // Set Section Completion Time
 
-    clock_gettime(CLOCK_REALTIME, &time_now);
+    clock_gettime(CLOCK_MONOTONIC, &time_now);
     section_times[3] = (float)(time_now.tv_sec - start_time.tv_sec) +
         (time_now.tv_nsec - start_time.tv_nsec) / 1000000000.0 - sum_list_float(section_times, 7);
 
@@ -1613,7 +1572,7 @@ int main(int argc, char *argv[]) {
 
     // Set Section Completion Time
 
-    clock_gettime(CLOCK_REALTIME, &time_now);
+    clock_gettime(CLOCK_MONOTONIC, &time_now);
     section_times[4] = (float)(time_now.tv_sec - start_time.tv_sec) +
         (time_now.tv_nsec - start_time.tv_nsec) / 1000000000.0 - sum_list_float(section_times, 7);
 
@@ -1671,7 +1630,7 @@ int main(int argc, char *argv[]) {
 
     // Set Section Completion Time
 
-    clock_gettime(CLOCK_REALTIME, &time_now);
+    clock_gettime(CLOCK_MONOTONIC, &time_now);
     section_times[5] = (float)(time_now.tv_sec - start_time.tv_sec) +
         (time_now.tv_nsec - start_time.tv_nsec) / 1000000000.0 - sum_list_float(section_times, 7);
 
@@ -1800,7 +1759,7 @@ int main(int argc, char *argv[]) {
 
     // Set Section Completion Time
 
-    clock_gettime(CLOCK_REALTIME, &time_now);
+    clock_gettime(CLOCK_MONOTONIC, &time_now);
     section_times[6] = (float)(time_now.tv_sec - start_time.tv_sec) +
         (time_now.tv_nsec - start_time.tv_nsec) / 1000000000.0 - sum_list_float(section_times, 7);
 
@@ -1824,7 +1783,7 @@ int main(int argc, char *argv[]) {
     // Completion
 
     struct timespec end_time;
-    clock_gettime(CLOCK_REALTIME, &end_time);
+    clock_gettime(CLOCK_MONOTONIC, &end_time);
     char formatted_time[32];
     float completion_time = (float)(time_now.tv_sec - start_time.tv_sec) +
         (time_now.tv_nsec - start_time.tv_nsec) / 1000000000.0;

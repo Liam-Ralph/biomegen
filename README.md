@@ -1,7 +1,7 @@
 # BiomeGen
 ### Released July 2025
-### Version 3.1.1
-### Updated August 2026
+### Version 3.2.0
+### Updated November 2026
 
 <br/>
 
