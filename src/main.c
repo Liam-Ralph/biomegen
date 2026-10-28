@@ -222,11 +222,12 @@ void median_sort_recursive(Dot *dots, int low, int high, bool axis, int med_inde
  * `low + high` must not overflow in a signed int.
  * 
  * @param dots array to build on
+ * @param index the index to select on this call, must be 0 on top level call
  * @param low
  * @param high
- * @param depth current depth, must be zero on top level call
+ * @param depth current depth, must be 0 on top level call
  */
-void build_recursive(Dot *dots, int low, int high, int depth) {
+void build_recursive(Dot *dots, int index, int low, int high, int depth) {
 
     int med_pos = (high + low) >> 1;
     // 10000 + 10000 < 2^15 - 1, so this won't overflow on 32-bit systems
@@ -238,14 +239,11 @@ void build_recursive(Dot *dots, int low, int high, int depth) {
     // Add Median Node to Tree
     // Every recursion adds one node
 
-    Node *node = malloc(sizeof(Node));
-    node->coord[0] = coords[med_pos * 3];
-    node->coord[1] = coords[med_pos * 3 + 1];
-    node->index = coords[med_pos * 3 + 2];
-    node->left = NULL;
-    node->right = NULL;
+    swap(dots, index, med_pos);
 
-    // Decide whether node will have a left child
+    // Left Side Recursion
+
+    build_recursive()
 
     const int num_coords_left = med_pos;
 
