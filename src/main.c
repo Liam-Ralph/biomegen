@@ -56,9 +56,12 @@ typedef struct Dot {
     DotType type;
 } Dot;
 
+typedef struct timespec timespec;
+
 
 // General Functions
-// (Alphabetical order)
+
+// User Input
 
 /**
  * Get a sanitized integer input from the user between `min` and `max`,
@@ -89,20 +92,49 @@ int get_int(int min, int max) {
 
 }
 
+// Timespec Functions
+
 /**
- * Sum a list of doubles.
+ * Calculate the difference between two timespecs.
+ * 
+ * Calculates `start - end`.
+ * 
+ * @param start
+ * @param end
+ * 
+ * @return difference
+ */
+timespec diff_timespecs(timespec start, timespec end) {
+    timespec diff = {end.tv_sec - start.tv_sec, end.tv_nsec - start.tv_nsec};
+    if (diff.tv_nsec < 0) {
+        diff.tv_nsec += 1000000000;
+        diff.tv_sec--;
+    }
+    return diff;
+}
+
+/**
+ * Sum a list of timespecs.
  * 
  * @param list
  * @param len the length of the list
  * 
  * @return sum of the list
  */
-double sum_list_double(const double list[], size_t len) {
-    double sum = 0.0;
-    for (size_t i = 0; i < len; i++)
-        sum += list[i];
+timespec sum_list_timespec(const timespec *list, size_t len) {
+    timespec sum = {0, 0};
+    for (size_t i = 0; i < len; i++) {
+        sum.tv_sec += list[i].tv_sec;
+        sum.tv_nsec += list[i].tv_nsec;
+    }
+    while (sum.tv_nsec >= 1000000000) {
+        sum.tv_nsec -= 1000000000;
+        sum.tv_sec++;
+    }
     return sum;
 }
+
+// Sorting Functions
 
 /**
  * Swaps two dots in an array.
@@ -443,16 +475,16 @@ void set_process_title(const char type[], const int num) {
  * @param section_times elapsed time for each section
  */
 void track_progress(
-    struct timespec start_time,
-    _Atomic int *section_progress, int *section_progress_total, double *section_times
+    timespec start_time,
+    _Atomic int *section_progress, int *section_progress_total, timespec *section_times
 ) {
 
     char section_names[7][20] = {
         "Setup", "Section Generation", "Section Assignment", "Coastline Smoothing",
         "Biome Generation", "Image Generation", "Finish"
     };
-    double section_weights[7] = {0.03, 0.01, 0.01, 0.14, 0.04, 0.24, 0.53};
-    // Used for overall progress bar (e.g. Setup takes ~3% of total time)
+    double section_weights[7] = {0.01, 0.01, 0.03, 0.24, 0.04, 0.53, 0.14};
+    // Used for overall progress bar (e.g. Setup takes ~1% of total time)
 
     while (true) {
 
@@ -462,10 +494,9 @@ void track_progress(
 
         // Section Progress
 
-        struct timespec time_now;
+        timespec time_now;
         clock_gettime(CLOCK_MONOTONIC, &time_now);
-        double time_diff = (double)(time_now.tv_sec - start_time.tv_sec) +
-            (time_now.tv_nsec - start_time.tv_nsec) / 1000000000.0;
+        timespec time_diff = diff_timespecs(start_time, time_now);
 
         double total_progress = 0.0;
 
@@ -510,7 +541,7 @@ void track_progress(
             }
             char formatted_time[32];
             snprintf(
-                formatted_time, 32, "%2d:%08.5f", (int)section_time / 60, fmod(section_time, 60.0f)
+                formatted_time, 32, "%2d:%08.5f", (int)section_time / 60, fmod(section_time, 60.0)
             );
             printf("%s%s\n", ANSI_RESET, formatted_time);
 
@@ -539,7 +570,7 @@ void track_progress(
             printf("█");
         }
         char formatted_time[32];
-        snprintf(formatted_time, 32, "%2d:%08.5f", (int)total_time / 60, fmod(total_time, 60.0f));
+        snprintf(formatted_time, 32, "%2d:%08.5f", (int)total_time / 60, fmod(total_time, 60.0));
         printf("%s%s\n", ANSI_RESET, formatted_time);
 
         // Check Exit Status
@@ -1788,7 +1819,7 @@ int main(int argc, char *argv[]) {
     double completion_time = (double)(time_now.tv_sec - start_time.tv_sec) +
         (time_now.tv_nsec - start_time.tv_nsec) / 1000000000.0;
     snprintf(
-        formatted_time, 32, "%2d:%08.5f", (int)completion_time / 60, fmod(completion_time, 60.0f)
+        formatted_time, 32, "%2d:%08.5f", (int)completion_time / 60, fmod(completion_time, 60.0)
     );
 
     if (!auto_mode) {

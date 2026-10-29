@@ -6,6 +6,7 @@ remove const from function arg when passed by value
 
 store section times as a timespec
 check if +1 still needed for floating-point errors
+recalculate section percentages
 
 look into determining max threads from hardware (_SC_NPROCESSORS_ONLN and sysctl maybe?)
 update readme file
