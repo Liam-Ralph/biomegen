@@ -66,6 +66,8 @@ typedef struct Dot {
  * 
  * @param min
  * @param max
+ * 
+ * @return valid user input
  */
 int get_int(int min, int max) {
 
@@ -88,27 +90,16 @@ int get_int(int min, int max) {
 }
 
 /**
- * Return the sum of a list of integers.
+ * Sum a list of floats.
  * 
  * @param list
  * @param len the length of the list
- */
-int sum_list_int(const int list[], int len) {
-    int sum = 0;
-    for (int i = 0; i < len; i++)
-        sum += list[i];
-    return sum;
-}
-
-/**
- * Return the sum of a list of floats.
  * 
- * @param list
- * @param len the length of the list
+ * @return sum of the list
  */
-float sum_list_float(const float list[], int len) {
+float sum_list_float(const float list[], size_t len) {
     float sum = 0;
-    for (int i = 0; i < len; i++)
+    for (size_t i = 0; i < len; i++)
         sum += list[i];
     return sum;
 }
@@ -120,7 +111,7 @@ float sum_list_float(const float list[], int len) {
  * @param i first index to swap with
  * @param ii second index to swap with
  */
-void swap(Dot *dots, int i, int ii) {
+void swap(Dot *dots, size_t i, size_t ii) {
     const Dot temp = dots[i];
     dots[i] = dots[ii];
     dots[ii] = temp;
@@ -136,7 +127,7 @@ void swap(Dot *dots, int i, int ii) {
  * @param high
  * @param width needed to calculate a dot's value
  */
-void quicksort_recursive(Dot *dots, int low, int high, int width) {
+void quicksort_recursive(Dot *dots, size_t low, size_t high, uint32_t width) {
 
     if (low < high) {
 
@@ -146,20 +137,21 @@ void quicksort_recursive(Dot *dots, int low, int high, int width) {
 
         // Move Smaller Elements to the Left
 
-        int i = low - 1;
+        size_t p = low;
 
-        for (int ii = low; ii <= high - 1; ii++)
-            if (dots[ii].y * width + dots[ii].x < pivot)
-                swap(dots, ++i, ii);
+        for (size_t i = low; i < high; i++)
+            if (dots[i].y * width + dots[i].x < pivot)
+                swap(dots, p++, i);
 
         // Move Pivot to After Smaller Elements
 
-        swap(dots, ++i, high);
+        swap(dots, p, high);
 
         // Recursion
 
-        quicksort_recursive(dots, low, i - 1, width);
-        quicksort_recursive(dots, i + 1, high, width);
+        if (p > low)
+            quicksort_recursive(dots, low, p - 1, width);
+        quicksort_recursive(dots, p + 1, high, width);
 
     }
 
@@ -173,229 +165,229 @@ void quicksort_recursive(Dot *dots, int low, int high, int width) {
  * 
  * After completion, the median index will be in the correct place, everything
  * to the left will be lower or equal, and everything right will be greater or
- * equal. `axis` determines whether to sort based on x or y values. Algorithm
- * is similar to quicksort.
+ * equal.
  * 
  * @param dots array to sort
  * @param low
  * @param high
- * @param axis
- * @param med_index index of the median (length of dots / 2)
+ * @param med_index
+ * @param axis determines whether to sort by x (false) or y (true) values
  */
-void median_sort_recursive(Dot *dots, int low, int high, bool axis, int med_index) {
+void median_sort(Dot *dots, size_t low, size_t high, size_t med_index, bool axis) {
 
-    if (low < high) {
+    while (low < high) {
 
         // Calculate Pivot Value
 
-        uint32_t pivot = axis ? dots[high].y : dots[high].x;
+        uint16_t pivot = axis ? dots[high].y : dots[high].x;
 
-        // Move Smaller Elements to the Left
+        // Sort Based on Pivot
 
-        int i = low - 1;
+        size_t lt = low;
+        size_t i = low;
+        size_t gt = high;
 
-        for (int ii = low; ii <= high - 1; ii++)
-            if (axis ? dots[i].y : dots[i].x < pivot)
-                swap(dots, ++i, ii);
+        while (i <= gt) {
+            uint16_t key = axis ? dots[i].y : dots[i].x;
+            if (key < pivot)
+                swap(dots, lt++, i++);
+            else if (key > pivot)
+                swap(dots, i, gt--);
+            else
+                i++;
+        }
 
-        // Move Pivot to After Smaller Elements
+        // Adjust low or high
 
-        swap(dots, ++i, high);
-
-        // Recusion
-        // Recurses only into side containing med_index, no recursion if i == med_index
-
-        if (i > med_index)
-            median_sort_recursive(dots, low, i - 1, axis, med_index);
-        else if (i < med_index)
-            median_sort_recursive(dots, i + 1, high, axis, med_index);
+        if (med_index < lt)
+            high = lt - 1;
+        else if (med_index > gt)
+            low = gt + 1;
+        else
+            return;
 
     }
 
 }
 
 /**
- * Build a 2D KD Tree within `dots`.
+ * Build a 2D KD Tree within `tree_dot` using `dots`.
  * 
  * Ensures the KD Tree is complete, so it has the smallest height for effiency,
  * and so it fits within the array. `low` and `high` must be non-negative, and
  * `low + high` must not overflow in a signed int.
  * 
- * @param dots array to build on
- * @param index the index to select on this call, must be 0 on top level call
- * @param low
- * @param high
- * @param depth current depth, must be 0 on top level call
+ * @param dots array to build using. Won't contain the tree, but will still be
+ * modified
+ * @param tree_dots array to build tree in. Must have same capacity.
+ * @param index the index to build on this call, must be 0 in initial call
+ * @param low must be 0 in initial call
+ * @param high must be length of dots - 1 in initial call
+ * @param depth current depth, must be 0 in initial call
  */
-void build_recursive(Dot *dots, int index, int low, int high, int depth) {
+void build_recursive(Dot *dots, Dot *tree_dots, size_t index, size_t low, size_t high, int depth) {
 
-    int med_pos = (high + low) >> 1;
-    // 10000 + 10000 < 2^15 - 1, so this won't overflow on 32-bit systems
+    // Base Cases
+
+    if (low > high) return;
+    if (low == high) {
+        tree_dots[index] = dots[low];
+        return;
+    }
 
     // Median Sort Dots
 
-    median_sort_recursive(dots, low, high, depth % 2, med_pos);
+    const size_t med_pos = (high + low) >> 1;
+
+    median_sort(dots, low, high, med_pos, depth % 2);
+    // it seems this is faster than storing axis and doing !axis in each recursive call
 
     // Add Median Node to Tree
     // Every recursion adds one node
 
-    swap(dots, index, med_pos);
+    tree_dots[index] = dots[med_pos];
 
-    // Left Side Recursion
+    // Recursion
 
-    build_recursive()
-
-    const int num_coords_left = med_pos;
-
-    if (num_coords_left > 0) {
-
-        int *coords_left = malloc(num_coords_left * 3 * sizeof(int));
-        for (int i = 0; i < med_pos; i++) {
-            coords_left[i * 3] = coords[i * 3];
-            coords_left[i * 3 + 1] = coords[i * 3 + 1];
-            coords_left[i * 3 + 2] = coords[i * 3 + 2];
-        }
-        node->left = build_recursive(coords_left, num_coords_left, depth + 1);
-        free(coords_left);
-
-        // Decide whether node will have a right child
-
-        const int num_coords_right = num_coords - med_pos - 1;
-
-        if (num_coords_right > 0) {
-            int *coords_right = malloc(num_coords_right * 3 * sizeof(int));
-            for (int i = 0; i < num_coords_right; i++) {
-                const int index = i + med_pos + 1;
-                coords_right[i * 3] = coords[index * 3];
-                coords_right[i * 3 + 1] = coords[index * 3 + 1];
-                coords_right[i * 3 + 2] = coords[index * 3 + 2];
-            }
-            node->right = build_recursive(coords_right, num_coords_right, depth + 1);
-            free(coords_right);
-        }
-
-    }
-
-    // Return node to place it within the tree
-    return node;
+    const size_t left_index = index * 2 + 1;
+    depth++;
+    build_recursive(dots, tree_dots, left_index, low, med_pos - 1, depth);
+    build_recursive(dots, tree_dots, left_index + 1, med_pos + 1, high, depth);
 
 }
 
 /**
- * Query the KDTree to modify MIN_DIST, the distance to the nearest node. When
- * INDEX_PTR is not null, it stores the index of the nearest node, which
- * corresponds to the index of the dot it was created from. Calls itself
- * recursively to query children of NODE. DEPTH should be 0 when NODE is a root
- * node.
+ * Query a 2D KD Tree for the nearest neighbor to a coordinate.
+ * 
+ * Query the 2D KD Tree to get the distance to `coord`'s nearest neighbor. When
+ * `type_ptr` is not null, it stores the type of the nearest dot.
+ * 
+ * @param tree_dots KD Tree to search
+ * @param len length of `tree_dots`
+ * @param index index of Dot to check, must be 0 in initial call
+ * @param coord coordinate to search with, of form {x, y}
+ * @param depth current depth, must be 0 in initial call
+ * @param min_dist_sq_ptr pointer to store squared minimum distance in
+ * @param type_ptr pointer to store nearest neighbor type, or NULL
+ * @param min_dist_care query ends if a distance below this is found, make 0 for
+ * regular calls
  */
-void query_recursive(
-    Node *node, const int coord[2], const int depth, int *index_ptr, int *min_dist_ptr
+void nearest_neighbor_recursive(
+    Dot *tree_dots, size_t len, size_t index, const uint32_t coord[2], uint32_t depth,
+    uint32_t *min_dist_sq_ptr, DotType *type_ptr, uint32_t min_dist_sq_care
 ) {
 
     // Calculate Distance
 
-    const int diff_x = node->coord[0] - coord[0];
-    const int diff_y = node->coord[1] - coord[1];
+    const int32_t diff_x = coord[0] - tree_dots[index].x;
+    const int32_t diff_y = coord[1] - tree_dots[index].y;
+    const uint32_t dist_sq = diff_x * diff_x + diff_y * diff_y;
     // Distance is squared for efficiency
-    const int dist = diff_x * diff_x + diff_y * diff_y;
 
     // Update Minimum Distance and Index Pointers
 
-    if (dist < *min_dist_ptr) {
-        *min_dist_ptr = dist;
-        if (index_ptr != NULL) {
-            *index_ptr = node->index;
-        } else if (dist < 15 * 15) {
-            return; // Shortcut specifically for water biome generation
+    if (dist_sq < *min_dist_sq_ptr) {
+        *min_dist_sq_ptr = dist_sq;
+        if (type_ptr != NULL) {
+            *type_ptr = tree_dots[index].type;
+        } else if (dist_sq < min_dist_sq_care) {
+            return;
         }
     }
 
     // Decide Whether Recursion is Needed
 
-    const int axis = depth % 2;
+    const bool axis = depth % 2;
+    const uint32_t dot_value = (axis ? tree_dots[index].y : tree_dots[index].x);
+    const int32_t dist_line = dot_value - coord[axis];
+    const uint32_t dist_line_sq = dist_line * dist_line;
+    // Whether distance to splitting line is less than current max dist
 
-    const int dist_line = node->coord[axis] - coord[axis];
-    const int dist_sq = dist_line * dist_line;
-    // Whether distance to splitting line is less than max_dist
-    if (node->left != NULL && (dist_sq < *min_dist_ptr || coord[axis] < node->coord[axis])) {
+    size_t index_child = 2 * index + 1;
+    depth++;
+    if (index_child < len && (dist_line_sq < *min_dist_sq_ptr || coord[axis] < dot_value))
         /*
         Recursion only if coord is close enough to dividing line, or coord would
         be inside bounds of left child
         */
-        query_recursive(node->left, coord, depth + 1, index_ptr, min_dist_ptr);
-    }
-    if (node->right != NULL && (dist_sq < *min_dist_ptr || coord[axis] >= node->coord[axis])) {
-        query_recursive(node->right, coord, depth + 1, index_ptr, min_dist_ptr);
-    }
+        nearest_neighbor_recursive(
+            tree_dots, len, index_child, coord, depth,
+            min_dist_sq_ptr, type_ptr, min_dist_sq_care
+        );
+    index_child++;
+    if (index_child < len && (dist_line_sq < *min_dist_sq_ptr || coord[axis] >= dot_value))
+        nearest_neighbor_recursive(
+            tree_dots, len, index_child, coord, depth,
+            min_dist_sq_ptr, type_ptr, min_dist_sq_care
+        );
 
 }
 
 /**
- * Query the KDTree to modify DISTS, the distances of the nearest DISTS_LEN
- * points to COORD. Recursively navigates down the KDTree, editing DISTS and
- * the value at MAX_DIST_PTR whenever it finds a node whose distance is less
- * than the value at MAX_DIST_PTR. All distances are squared for efficiency.
- * DEPTH should be 0 when NODE is a root node.
+ * Query a 2D KD Tree for the nearest neighbors to a coordinate.
+ * 
+ * Query the 2D KD Tree to get the distance to `coord`'s nearest neighbors.
+ * 
+ * @param tree_dots KD Tree to search
+ * @param len length of `tree_dots`
+ * @param index index of Dot to check, must be 0 in initial call
+ * @param coord coordinate to search with, of form {x, y}
+ * @param dists_sq array to write neighbor squared distances to,
+ * must be {0...} on initial call
+ * @param dists_sq_len number of neighbors to track, must be greater than 0
+ * @param depth current depth, must be 0 in initial call
  */
-void query_dist_recursive(
-    Node *node, const int coord[2], const int depth,
-    int dists[], const int dists_len
+void nearest_neighbors_recursive(
+    Dot *tree_dots, size_t len, size_t index, const uint32_t coord[2],
+    uint32_t *dists_sq, size_t dists_sq_len, uint32_t depth
 ) {
 
     // Calculate Distance
 
-    const int diff_x = node->coord[0] - coord[0];
-    const int diff_y = node->coord[1] - coord[1];
-    const int dist = diff_x * diff_x + diff_y * diff_y; // Squared distance
+    const int32_t diff_x = tree_dots[index].x - coord[0];
+    const int32_t diff_y = tree_dots[index].y - coord[1];
+    const uint32_t dist_sq = diff_x * diff_x + diff_y * diff_y; // Squared distance
 
     // Update Distances List
 
-    if (dist < dists[dists_len - 1] && dist != 0) {
-        for (int i = dists_len - 1; i >= 0; i--) {
-            if (i == 0 || dist >= dists[i - 1]) {
+    if (dist_sq < dists_sq[dists_sq_len - 1] && dist_sq != 0) {
+        size_t i = dists_sq_len - 1;
+        while (true) {
+            if (i == 0 || dist_sq >= dists_sq[i - 1]) {
                 // Found insertion position, insert and break
-                dists[i] = dist;
+                dists_sq[i] = dist_sq;
                 break;
             }
             // After insertion position, shift element
-            dists[i] = dists[i - 1];
+            dists_sq[i] = dists_sq[--i];
         }
     }
 
     // Decide Whether Recursion is Needed
 
-    const int axis = depth % 2;
-
-    const int dist_line = node->coord[axis] - coord[axis];
-    const int dist_sq = dist_line * dist_line;
+    const uint32_t max_dist = dists_sq[dists_sq_len - 1];
+    const bool axis = depth % 2;
+    const uint32_t dot_value = (axis ? tree_dots[index].y : tree_dots[index].x);
+    const int32_t dist_line = dot_value - coord[axis];
+    const uint32_t dist_line_sq = dist_line * dist_line;
     // Whether distance to splitting line is less than max_dist
-    if (node->left != NULL && (dist_sq < dists[dists_len - 1] || coord[axis] < node->coord[axis])) {
+
+    size_t index_child = 2 * index + 1;
+    depth++;
+    if (index_child < len && (dist_line_sq < max_dist || coord[axis] < dot_value))
         /*
         Recursion only if coord is close enough to dividing line, or coord would
         be inside bounds of left child
         */
-        query_dist_recursive(node->left, coord, depth + 1, dists, dists_len);
-    }
-    if (
-        node->right != NULL && (dist_sq < dists[dists_len - 1] || coord[axis] >= node->coord[axis])
-    ) {
-        query_dist_recursive(node->right, coord, depth + 1, dists, dists_len);
-    }
+        nearest_neighbors_recursive(
+            tree_dots, len, index_child, coord, dists_sq, dists_sq_len, depth
+        );
+    index_child++;
+    if (index_child < len && (dist_line_sq < max_dist || coord[axis] >= dot_value))
+        nearest_neighbors_recursive(
+            tree_dots, len, index_child, coord, dists_sq, dists_sq_len, depth
+        );
 
-}
-
-/**
- * Recursively free NODE and its children.
- */
-void free_recursive(Node *node) {
-    if (node->left != NULL) {
-        free_recursive(node->left);
-    }
-    if (node->right != NULL) {
-        free_recursive(node->right);
-    }
-    free(node);
-    node = NULL;
 }
 
 
@@ -965,6 +957,7 @@ int main(int argc, char *argv[]) {
 
         printf("Map Width (pixels):\n");
         width = get_int(500, 10000);
+        // if this max is raised multiple types need to be changed, even if the max < 2^16
 
         printf("\nMap Height:\n");
         height = get_int(500, 10000);
