@@ -3,8 +3,10 @@ use enum for type
 rewrite all docstrings
 rewrite docstring to use `foo` instead of FOO
 remove const from function arg when passed by value
-
 store section times as a timespec
+check if any timespec functions unused
+store island_size as integer
+
 check if +1 still needed for floating-point errors
 recalculate section percentages
 

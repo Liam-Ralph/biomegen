@@ -97,7 +97,7 @@ int get_int(int min, int max) {
 /**
  * Calculate the difference between two timespecs.
  * 
- * Calculates `start - end`.
+ * Calculates `end - start`.
  * 
  * @param start
  * @param end
@@ -114,24 +114,29 @@ timespec diff_timespecs(timespec start, timespec end) {
 }
 
 /**
- * Sum a list of timespecs.
+ * Calculate a section's time.
  * 
- * @param list
- * @param len the length of the list
+ * Calculates `time_now - start_time - ∑(prev_sections)`.
  * 
- * @return sum of the list
+ * @param time_now
+ * @param start_time
+ * @param prev_sections
+ * @param len length of `prev_sections` (or the part thereof to be used)
  */
-timespec sum_list_timespec(const timespec *list, size_t len) {
-    timespec sum = {0, 0};
+timespec calc_section_timespec(
+    timespec time_now, timespec start_time, const timespec *prev_sections, size_t len
+) {
+    timespec result = time_now;
+    result.tv_sec -= start_time.tv_sec;
+    result.tv_nsec -= start_time.tv_nsec;
     for (size_t i = 0; i < len; i++) {
-        sum.tv_sec += list[i].tv_sec;
-        sum.tv_nsec += list[i].tv_nsec;
+        result.tv_sec -= prev_sections[i].tv_sec;
+        result.tv_nsec -= prev_sections[i].tv_nsec;
     }
-    while (sum.tv_nsec >= 1000000000) {
-        sum.tv_nsec -= 1000000000;
-        sum.tv_sec++;
+    while (result.tv_nsec < 0) {
+        result.tv_nsec += 1000000000;
+        result.tv_sec--;
     }
-    return sum;
 }
 
 // Sorting Functions
@@ -496,7 +501,6 @@ void track_progress(
 
         timespec time_now;
         clock_gettime(CLOCK_MONOTONIC, &time_now);
-        timespec time_diff = diff_timespecs(start_time, time_now);
 
         double total_progress = 0.0;
 
@@ -511,93 +515,103 @@ void track_progress(
             // Check if Section Complete
 
             char color[10];
-            double section_time;
-            if (section_times[i] != 0.0) {
+            timespec section_time;
+            if (section_times[i].tv_nsec != 0 || section_times[i].tv_sec != 0) {
                 strncpy(color, ANSI_GREEN, 10);
                 section_time = section_times[i]; // Section complete
             } else {
                 strncpy(color, ANSI_BLUE, 10);
-                if (i == 0 || section_times[i - 1] != 0.0) {
-                    section_time = time_diff - sum_list_double(section_times, 7);
+                if (i == 0 || section_times[i - 1].tv_nsec != 0 || section_times[i - 1].tv_sec != 0)
+                    section_time = calc_section_timespec(time_now, start_time, section_times, i);
                     // Section in progress
-                } else {
-                    section_time = 0.0; // Section hasn't started
-                }
+                else
+                    section_time = (timespec){0, 0}; // Section hasn't started
             }
 
             // Print Output for Section Progress
 
             printf(
-                "%s[%d/7] %-20s%8.2f%% %s",
+                "%s[%d/7] %-20s%8.2lf%% %s",
                 color, i + 1, section_names[i], progress_section * 100, ANSI_GREEN
             ); // "[1/7] Setup               100.00% "
-            int green_bars = (int)round(20 * progress_section);
-            for (int ii = 0; ii < green_bars; ii++) {
+            size_t green_bars = (size_t)round(20 * progress_section);
+            for (size_t ii = 0; ii < green_bars; ii++)
                 printf("█");
-            }
             printf("%s", ANSI_BLUE);
-            for (int ii = 0; ii < 20 - green_bars; ii++) {
+            for (size_t ii = 0; ii < 20 - green_bars; ii++)
                 printf("█");
-            }
-            char formatted_time[32];
-            snprintf(
-                formatted_time, 32, "%2d:%08.5f", (int)section_time / 60, fmod(section_time, 60.0)
+            printf(
+                "%s%2d:%08.5lf\n", ANSI_RESET, section_time.tv_sec / 60,
+                section_time.tv_sec + section_time.tv_nsec / 1000000000.0
             );
-            printf("%s%s\n", ANSI_RESET, formatted_time);
 
         }
 
         // Total Progress
 
         char color[10];
-        double total_time;
-        if (section_times[7] != 0.0) {
+        timespec total_time;
+        bool break_now = false;
+        if (section_times[7].tv_nsec != 0 || section_times[7].tv_sec != 0) {
             strncpy(color, ANSI_GREEN, 10);
             total_time = section_times[7];
+            break_now = true;
         } else {
             strncpy(color, ANSI_BLUE, 10);
-            total_time = (double)(time_now.tv_sec - start_time.tv_sec) +
-                (time_now.tv_nsec - start_time.tv_nsec) / 1000000000.0;
+            total_time = diff_timespecs(start_time, time_now);
         }
 
-        printf("%s      Total Progress      %8.2f%% %s", color, total_progress * 100, ANSI_GREEN);
-        int green_bars = (int)round(20 * total_progress);
-        for (int i = 0; i < green_bars; i++) {
+        printf("%s      Total Progress      %8.2lf%% %s", color, total_progress * 100, ANSI_GREEN);
+        size_t green_bars = (size_t)round(20 * total_progress);
+        for (size_t i = 0; i < green_bars; i++)
             printf("█");
-        }
         printf("%s", ANSI_BLUE);
-        for (int i = 0; i < 20 - green_bars; i++) {
+        for (size_t i = 0; i < 20 - green_bars; i++)
             printf("█");
-        }
-        char formatted_time[32];
-        snprintf(formatted_time, 32, "%2d:%08.5f", (int)total_time / 60, fmod(total_time, 60.0));
-        printf("%s%s\n", ANSI_RESET, formatted_time);
+        printf(
+            "%s%2d:%08.5f\n", ANSI_RESET, total_time.tv_sec / 60,
+            total_time.tv_sec + total_time.tv_nsec / 1000000000.0
+        );
 
         // Check Exit Status
 
-        if (strcmp(color, ANSI_GREEN) == 0) {
+        if (break_now)
             break; // All sections done, exit tracking process
-        }
 
         // Sleep 0.1 Seconds
 
         struct timespec sleep_time;
         sleep_time.tv_sec = 0;
         sleep_time.tv_nsec = 100000000;
-        nanosleep(&sleep_time, &sleep_time);
+        nanosleep(&sleep_time, NULL);
 
     }
 
 }
 
 /**
- * Assign sections of the map. Land and water are randomly assigned based on a
- * dot's distance from the nearest land origin dot.
+ * Assign sections of the map.
+ * 
+ * Land and water are randomly assigned based on a dot's distance from the
+ * nearest land origin dot.
+ * 
+ * @param map_resolution
+ * @param island_size
+ * @param start_index
+ * @param end_index
+ * @param reg_dots
+ * @param origin_tree_dots
+ * @param dots
+ * @param section_progress
  */
 void assign_sections(
     const int map_resolution, const double island_size,
     const int start_index, const int end_index, const int *reg_dots,
     Node *origin_tree_root, Dot *dots, _Atomic int *section_progress
+
+    uint32_t map_resolution, uint32_t island_size,
+    size_t start_index, size_t end_index, 
+
 ) {
 
     srand(time(NULL) + getpid());
