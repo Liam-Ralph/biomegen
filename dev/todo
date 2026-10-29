@@ -1,9 +1,12 @@
 consider using uintXX_t etc.
 use enum for type
-look into determining max threads from hardware (_SC_NPROCESSORS_ONLN and sysctl maybe?)
 rewrite all docstrings
 rewrite docstring to use `foo` instead of FOO
 remove const from function arg when passed by value
-update readme file
 
+store section times as a timespec
+check if +1 still needed for floating-point errors
+
+look into determining max threads from hardware (_SC_NPROCESSORS_ONLN and sysctl maybe?)
+update readme file
 check if build_recursive can every run on a sorted dots (can only happen on initial call)

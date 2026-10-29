@@ -90,15 +90,15 @@ int get_int(int min, int max) {
 }
 
 /**
- * Sum a list of floats.
+ * Sum a list of doubles.
  * 
  * @param list
  * @param len the length of the list
  * 
  * @return sum of the list
  */
-float sum_list_float(const float list[], size_t len) {
-    float sum = 0;
+double sum_list_double(const double list[], size_t len) {
+    double sum = 0.0;
     for (size_t i = 0; i < len; i++)
         sum += list[i];
     return sum;
@@ -395,10 +395,15 @@ void nearest_neighbors_recursive(
 // (Order of use)
 
 /**
- * Set the process's title to "biogen-" + TYPE. If NUM >= 0, then NUM, padded to
- * a length of 2 (not including null character) with leading zeros will be added
- * as well. The length of TYPE + NUM (as a string) must be at max 9 characters
- * (including null character).
+ * Set the process title.
+ * 
+ * Set the process title to `"biogen-" + type`. If 0 <= `num` < 100, then it is
+ * padded to a length of 2 (3 including null character) with leading zeros and
+ * then added to the process title as well. The length of `type + num` must be
+ * at most 9 characters (including null character).
+ * 
+ * @param type the type of process
+ * @param num process number if applicable (ignored if outside [0, 100))
  */
 void set_process_title(const char type[], const int num) {
 
@@ -428,21 +433,25 @@ void set_process_title(const char type[], const int num) {
 }
 
 /**
- * Track the progress of map generation, and show the progress in the terminal.
- * START_TIME is the time at the start of map generation in main(), and the
- * other inputs are all shared memory used to track section progress and times.
- * Not used in automated inputs mode.
+ * Track map generation progress.
+ * 
+ * Track map generation progress and display in terminal.
+ * 
+ * @param start_time time at start of map generation
+ * @param section_progress completed work units for each section
+ * @param section_progress_total total work units for each section
+ * @param section_times elapsed time for each section
  */
 void track_progress(
     struct timespec start_time,
-    _Atomic int *section_progress, int *section_progress_total, float *section_times
+    _Atomic int *section_progress, int *section_progress_total, double *section_times
 ) {
 
     char section_names[7][20] = {
         "Setup", "Section Generation", "Section Assignment", "Coastline Smoothing",
         "Biome Generation", "Image Generation", "Finish"
     };
-    float section_weights[7] = {0.03, 0.01, 0.01, 0.14, 0.04, 0.24, 0.53};
+    double section_weights[7] = {0.03, 0.01, 0.01, 0.14, 0.04, 0.24, 0.53};
     // Used for overall progress bar (e.g. Setup takes ~3% of total time)
 
     while (true) {
@@ -455,30 +464,30 @@ void track_progress(
 
         struct timespec time_now;
         clock_gettime(CLOCK_MONOTONIC, &time_now);
-        float time_diff = (float)(time_now.tv_sec - start_time.tv_sec) +
+        double time_diff = (double)(time_now.tv_sec - start_time.tv_sec) +
             (time_now.tv_nsec - start_time.tv_nsec) / 1000000000.0;
 
-        float total_progress = 0.0;
+        double total_progress = 0.0;
 
         for (int i = 0; i < 7; i++) {
 
             // Calculate Section Progress
 
-            float progress_section =
-                atomic_load(&section_progress[i]) / (float)section_progress_total[i];
+            double progress_section =
+                atomic_load(&section_progress[i]) / (double)section_progress_total[i];
             total_progress += progress_section * section_weights[i];
 
             // Check if Section Complete
 
             char color[10];
-            float section_time;
+            double section_time;
             if (section_times[i] != 0.0) {
                 strncpy(color, ANSI_GREEN, 10);
                 section_time = section_times[i]; // Section complete
             } else {
                 strncpy(color, ANSI_BLUE, 10);
                 if (i == 0 || section_times[i - 1] != 0.0) {
-                    section_time = time_diff - sum_list_float(section_times, 7);
+                    section_time = time_diff - sum_list_double(section_times, 7);
                     // Section in progress
                 } else {
                     section_time = 0.0; // Section hasn't started
@@ -510,13 +519,13 @@ void track_progress(
         // Total Progress
 
         char color[10];
-        float total_time;
+        double total_time;
         if (section_times[7] != 0.0) {
             strncpy(color, ANSI_GREEN, 10);
             total_time = section_times[7];
         } else {
             strncpy(color, ANSI_BLUE, 10);
-            total_time = (float)(time_now.tv_sec - start_time.tv_sec) +
+            total_time = (double)(time_now.tv_sec - start_time.tv_sec) +
                 (time_now.tv_nsec - start_time.tv_nsec) / 1000000000.0;
         }
 
@@ -555,7 +564,7 @@ void track_progress(
  * dot's distance from the nearest land origin dot.
  */
 void assign_sections(
-    const int map_resolution, const float island_size,
+    const int map_resolution, const double island_size,
     const int start_index, const int end_index, const int *reg_dots,
     Node *origin_tree_root, Dot *dots, _Atomic int *section_progress
 ) {
@@ -585,8 +594,8 @@ void assign_sections(
 
         // Calculate Chance
 
-        float dist = sqrt(min_dist) / sqrt(map_resolution);
-        float threshold = ((float)(min_index % 20) / 19.0f * 1.5f + 0.25f) * island_size;
+        double dist = sqrt(min_dist) / sqrt(map_resolution);
+        double threshold = ((min_index % 20) / 19.0 * 1.5 + 0.25) * island_size;
 
         int chance = (dist <= threshold) ? 9 : 1;
 
@@ -749,8 +758,8 @@ void generate_biomes_water(
 
         // Calculate Distance to Equator
 
-        const float equator_dist =
-            fabs((float)water_dots[i * 3 + 1] - height / 2.0) / height * 20.0;
+        const double equator_dist =
+            fabs((double)water_dots[i * 3 + 1] - height / 2.0) / height * 20.0;
 
         // Calculate Maximum Land Distance
 
@@ -912,7 +921,7 @@ int main(int argc, char *argv[]) {
     bool auto_mode;
     char output_file[229];
     int width, height, map_resolution, island_abundance, coastline_smoothing, processes;
-    float island_size;
+    double island_size;
 
     if (argc == 1) {
 
@@ -1043,8 +1052,8 @@ int main(int argc, char *argv[]) {
         NULL, sizeof(int) * 7, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0
     );
 
-    float *section_times = mmap(
-        NULL, sizeof(float) * 8, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0
+    double *section_times = mmap(
+        NULL, sizeof(double) * 8, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0
     );
 
     for (int i = 0; i < 8; i++) {
@@ -1092,7 +1101,7 @@ int main(int argc, char *argv[]) {
 
     struct timespec time_now;
     clock_gettime(CLOCK_MONOTONIC, &time_now);
-    section_times[0] = (float)(time_now.tv_sec - start_time.tv_sec) +
+    section_times[0] = (double)(time_now.tv_sec - start_time.tv_sec) +
         (time_now.tv_nsec - start_time.tv_nsec) / 1000000000.0;
     atomic_store(&section_progress[0], 1);
 
@@ -1141,8 +1150,8 @@ int main(int argc, char *argv[]) {
     // Set Section Completion Time
 
     clock_gettime(CLOCK_MONOTONIC, &time_now);
-    section_times[1] = (float)(time_now.tv_sec - start_time.tv_sec) +
-        (time_now.tv_nsec - start_time.tv_nsec) / 1000000000.0 - sum_list_float(section_times, 7);
+    section_times[1] = (double)(time_now.tv_sec - start_time.tv_sec) +
+        (time_now.tv_nsec - start_time.tv_nsec) / 1000000000.0 - sum_list_double(section_times, 7);
 
     // --Section Assignment--
     // Assign dots as "Land", "Land Origin", "Water", or "Water Forced"
@@ -1218,8 +1227,8 @@ int main(int argc, char *argv[]) {
     // Set Section Completion Time
 
     clock_gettime(CLOCK_MONOTONIC, &time_now);
-    section_times[2] = (float)(time_now.tv_sec - start_time.tv_sec) +
-        (time_now.tv_nsec - start_time.tv_nsec) / 1000000000.0 - sum_list_float(section_times, 7);
+    section_times[2] = (double)(time_now.tv_sec - start_time.tv_sec) +
+        (time_now.tv_nsec - start_time.tv_nsec) / 1000000000.0 - sum_list_double(section_times, 7);
 
     // --Coastline Smoothing--
 
@@ -1321,8 +1330,8 @@ int main(int argc, char *argv[]) {
     // Set Section Completion Time
 
     clock_gettime(CLOCK_MONOTONIC, &time_now);
-    section_times[3] = (float)(time_now.tv_sec - start_time.tv_sec) +
-        (time_now.tv_nsec - start_time.tv_nsec) / 1000000000.0 - sum_list_float(section_times, 7);
+    section_times[3] = (double)(time_now.tv_sec - start_time.tv_sec) +
+        (time_now.tv_nsec - start_time.tv_nsec) / 1000000000.0 - sum_list_double(section_times, 7);
 
     // --Biome Generation--
 
@@ -1423,7 +1432,7 @@ int main(int argc, char *argv[]) {
 
         Dot *dot = &dots[ii];
 
-        const float equator_dist = fabs((float)dot->y - height / 2.0) / height * 20.0;
+        const double equator_dist = fabs((double)dot->y - height / 2.0) / height * 20.0;
 
         char probs[10];
         if (equator_dist < 1) {
@@ -1564,8 +1573,8 @@ int main(int argc, char *argv[]) {
     // Set Section Completion Time
 
     clock_gettime(CLOCK_MONOTONIC, &time_now);
-    section_times[4] = (float)(time_now.tv_sec - start_time.tv_sec) +
-        (time_now.tv_nsec - start_time.tv_nsec) / 1000000000.0 - sum_list_float(section_times, 7);
+    section_times[4] = (double)(time_now.tv_sec - start_time.tv_sec) +
+        (time_now.tv_nsec - start_time.tv_nsec) / 1000000000.0 - sum_list_double(section_times, 7);
 
     // --Image Generation--
 
@@ -1622,8 +1631,8 @@ int main(int argc, char *argv[]) {
     // Set Section Completion Time
 
     clock_gettime(CLOCK_MONOTONIC, &time_now);
-    section_times[5] = (float)(time_now.tv_sec - start_time.tv_sec) +
-        (time_now.tv_nsec - start_time.tv_nsec) / 1000000000.0 - sum_list_float(section_times, 7);
+    section_times[5] = (double)(time_now.tv_sec - start_time.tv_sec) +
+        (time_now.tv_nsec - start_time.tv_nsec) / 1000000000.0 - sum_list_double(section_times, 7);
 
     // --Finish--
 
@@ -1751,10 +1760,10 @@ int main(int argc, char *argv[]) {
     // Set Section Completion Time
 
     clock_gettime(CLOCK_MONOTONIC, &time_now);
-    section_times[6] = (float)(time_now.tv_sec - start_time.tv_sec) +
-        (time_now.tv_nsec - start_time.tv_nsec) / 1000000000.0 - sum_list_float(section_times, 7);
+    section_times[6] = (double)(time_now.tv_sec - start_time.tv_sec) +
+        (time_now.tv_nsec - start_time.tv_nsec) / 1000000000.0 - sum_list_double(section_times, 7);
 
-    section_times[7] = (float)(time_now.tv_sec - start_time.tv_sec) +
+    section_times[7] = (double)(time_now.tv_sec - start_time.tv_sec) +
         (time_now.tv_nsec - start_time.tv_nsec) / 1000000000.0;
 
     // Wait for Tracker Process
@@ -1767,7 +1776,7 @@ int main(int argc, char *argv[]) {
 
     munmap(section_progress, sizeof(int) * 7);
     munmap(section_progress_total, sizeof(int) * 7);
-    munmap(section_times, sizeof(float) * 8);
+    munmap(section_times, sizeof(double) * 8);
     munmap(dots, sizeof(Dot) * num_dots);
     munmap(image_indexes, sizeof(int) * width * height);
 
@@ -1776,7 +1785,7 @@ int main(int argc, char *argv[]) {
     struct timespec end_time;
     clock_gettime(CLOCK_MONOTONIC, &end_time);
     char formatted_time[32];
-    float completion_time = (float)(time_now.tv_sec - start_time.tv_sec) +
+    double completion_time = (double)(time_now.tv_sec - start_time.tv_sec) +
         (time_now.tv_nsec - start_time.tv_nsec) / 1000000000.0;
     snprintf(
         formatted_time, 32, "%2d:%08.5f", (int)completion_time / 60, fmod(completion_time, 60.0f)
@@ -1798,7 +1807,7 @@ int main(int argc, char *argv[]) {
         for (int i = 4; i < 11; i++) {
             count_land += type_counts[i];
         }
-        float tot_pct_fact = 100.0 / (height * width); // total percentage factor
+        double tot_pct_fact = 100.0 / (height * width); // total percentage factor
         printf(
             "Water %6.2f%%\nLand  %6.2f%%\n",
             count_water * tot_pct_fact, count_land * tot_pct_fact
@@ -1813,7 +1822,7 @@ int main(int argc, char *argv[]) {
         printf("       %% of Land/Water | %% of Total\n");
         for (int i = 0; i < 11; i++) {
 
-            float group_pct_fact = 100.0;
+            double group_pct_fact = 100.0;
             if (i < 4) {
                 group_pct_fact /= count_water;
             } else {
