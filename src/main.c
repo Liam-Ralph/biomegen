@@ -27,6 +27,7 @@ BiomeGen, a terminal application for generating png maps.
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/ioctl.h>
 #include <sys/mman.h>
 #include <sys/prctl.h>
 #include <sys/wait.h>
@@ -434,29 +435,29 @@ void nearest_neighbors_recursive(
 /**
  * Set the process title.
  * 
- * Set the process title to `"biogen-" + type`. If 0 <= `num` < 100, then it is
- * padded to a length of 2 (3 including null character) with leading zeros and
- * then added to the process title as well. The length of `type + num` must be
- * at most 9 characters (including null character).
+ * Set the process title to `"bg-" + type + num`. If 0 <= `num` < 1000, then it
+ * is padded to a length of 3 (4 including null character) with leading zeros
+ * and then added to the process title as well. The length of `type + num` must
+ * be at most 13 characters (including null character).
  * 
  * @param type the type of process
- * @param num process number if applicable (ignored if outside [0, 100))
+ * @param num process number if applicable, ignored if below 0
  */
 void set_process_title(const char type[], const int num) {
 
-    // Example: type is "worker", num is 6: "biogen-worker6"
+    // Example: type is "worker", num is 6: "bg-worker6"
 
     // Concatenate Type
 
-    char string[16] = "biogen-";
-    strncat(string, type, 9);
+    char string[16] = "bg-";
+    strncat(string, type, 13);
 
     // Concatenate Num
 
-    if (0 <= num && num < 100) {
-        char num_str[3];
-        snprintf(num_str, 3, "%02d", num);
-        strncat(string, num_str, 3);
+    if (0 <= num && num < 1000) {
+        char num_str[4];
+        snprintf(num_str, 4, "%03d", num);
+        strncat(string, num_str, 4);
     }
 
     // Set Process Title
@@ -490,6 +491,11 @@ void track_progress(
     };
     double section_weights[7] = {0.01, 0.01, 0.03, 0.24, 0.04, 0.53, 0.14};
     // Used for overall progress bar (e.g. Setup takes ~1% of total time)
+
+    struct winsize w;
+    ioctl(STDOUT_FILENO, TIOCGWINSZ, &w);
+    size_t columns = (size_t)w.ws_col - 47;
+    if (100 < columns) columns = 100;
 
     while (true) {
 
@@ -534,11 +540,11 @@ void track_progress(
                 "%s[%d/7] %-20s%8.2lf%% %s",
                 color, i + 1, section_names[i], progress_section * 100, ANSI_GREEN
             ); // "[1/7] Setup               100.00% "
-            size_t green_bars = (size_t)round(20 * progress_section);
+            size_t green_bars = (size_t)round(columns * progress_section);
             for (size_t ii = 0; ii < green_bars; ii++)
                 printf("█");
             printf("%s", ANSI_BLUE);
-            for (size_t ii = 0; ii < 20 - green_bars; ii++)
+            for (size_t ii = 0; ii < columns - green_bars; ii++)
                 printf("█");
             printf(
                 "%s%2d:%08.5lf\n", ANSI_RESET, section_time.tv_sec / 60,
@@ -562,11 +568,11 @@ void track_progress(
         }
 
         printf("%s      Total Progress      %8.2lf%% %s", color, total_progress * 100, ANSI_GREEN);
-        size_t green_bars = (size_t)round(20 * total_progress);
+        size_t green_bars = (size_t)round(columns * total_progress);
         for (size_t i = 0; i < green_bars; i++)
             printf("█");
         printf("%s", ANSI_BLUE);
-        for (size_t i = 0; i < 20 - green_bars; i++)
+        for (size_t i = 0; i < columns - green_bars; i++)
             printf("█");
         printf(
             "%s%2d:%08.5f\n", ANSI_RESET, total_time.tv_sec / 60,
@@ -610,7 +616,7 @@ void assign_sections(
     Node *origin_tree_root, Dot *dots, _Atomic int *section_progress
 
     uint32_t map_resolution, uint32_t island_size,
-    size_t start_index, size_t end_index, 
+    size_t start_index, size_t end_index, const 
 
 ) {
 
@@ -963,16 +969,14 @@ int main(int argc, char *argv[]) {
 
     // Get Inputs
 
-    bool auto_mode;
+    bool auto_mode = (argc == 1);
     char output_file[229];
-    int width, height, map_resolution, island_abundance, coastline_smoothing, processes;
-    double island_size;
+    uint32_t width, height, map_resolution, island_abundance, island_size,
+        coastline_smoothing, processes;
 
-    if (argc == 1) {
+    if (auto_mode) {
 
         // Manual Inputs Mode
-
-        auto_mode = false;
 
         strncpy(output_file, "result.png", 11);
 
@@ -997,15 +1001,8 @@ int main(int argc, char *argv[]) {
             "https://github.com/liam-ralph\n"
             "This project is licensed under the GNU General Public License v3.0,\n"
             "except for result.png, this program's output, licensed under The Unlicense.\n"
-            "\033[38;5;1mWARNING: In some terminals, the refreshing progress screen\n"
-            "may flash, which could cause problems for people with epilepsy.%s\n"
-            "Press ENTER to begin.\n", version, ANSI_RESET
+            "Press ENTER to begin.\n", version
         );
-        /*
-        I do not know if the flashing lights this program sometimes makes could reasonably cause
-        epilepsy or not, but I put this just in case. You can increase sleep_time.tv_nsec to help
-        with this.
-        */
         getchar();
         system("clear");
 
@@ -1021,7 +1018,7 @@ int main(int argc, char *argv[]) {
             "Choose a number between 50 and 500. 100 is the default.\n"
             "Larger numbers produce lower resolutions, with larger pieces\n"
             "while lower numbers take longer to generate.\n"
-            "Map Resolution:\n"
+            "Map Resolution: "
         );
         map_resolution = get_int(50, 500); // controls the number of dots
 
@@ -1030,7 +1027,7 @@ int main(int argc, char *argv[]) {
             "and the ration of land to water.\n"
             "Choose a number between 10 and 1000. 120 is the default.\n"
             "Larger numbers produces less land.\n"
-            "Island Abundance:\n"
+            "Island Abundance: "
         );
         island_abundance = get_int(10, 1000);
         // controls the number of "Land Origin" and "Water Forced" dots
@@ -1039,16 +1036,16 @@ int main(int argc, char *argv[]) {
             "\nIsland size controls average island size.\n"
             "Choose a number between 10 and 100. 50 is the default.\n"
             "Larger numbers produce larger islands.\n"
-            "Island Size:\n"
+            "Island Size: "
         );
-        island_size = get_int(10, 100) / 10.0;
+        island_size = get_int(10, 100);
 
         printf(
             "\nCoastline smoothing controls how smooth or rough coastlines look.\n"
             "Choose a number between 0 and 100. Larger numbers cause more smoothing.\n"
             "A value of 0 causes no smoothing. A value of 5 causes some smoothing,\n"
             "and is the default value.\n"
-            "Coastline Smoothing:\n"
+            "Coastline Smoothing: "
         );
         coastline_smoothing = get_int(0, 100);
 
@@ -1059,9 +1056,16 @@ int main(int argc, char *argv[]) {
             "and CPU load. Values less than 4 threads are usually very inefficient.\n"
             "Ensure you monitor your CPU for overheating, and halt the program if\n"
             "high temperatures occur. Using fewer threads may reduce temperatures.\n"
-            "Number of Threads:\n"
+            "Number of Threads: "
         );
-        processes = get_int(1, 64); // Change this for CPUs with >64 threads
+        #ifdef __linux__
+            int max_processors = (int)sysconf(_SC_NPROCESSORS_ONLN);
+        #elif BSD || __Apple__
+            int max_processors;
+            sysctlbyname("hw.ncpu", &ncpu, &sizeof(int), NULL, 0);
+        #endif
+        if (max_processors > 9999) max_processors = 9999;
+        processes = get_int(1, max_processors);
 
         system("clear");
 
@@ -1075,14 +1079,14 @@ int main(int argc, char *argv[]) {
         height = atoi(argv[2]);
         map_resolution = atoi(argv[3]);
         island_abundance = atoi(argv[4]);
-        island_size = atoi(argv[5]) / 10.0;
+        island_size = atoi(argv[5]);
         coastline_smoothing = atoi(argv[6]);
         processes = atoi(argv[7]);
         strncpy(output_file, argv[8], 229);
 
     }
 
-    struct timespec start_time;
+    timespec start_time;
     clock_gettime(CLOCK_MONOTONIC, &start_time);
 
     // --Setup--
@@ -1097,15 +1101,16 @@ int main(int argc, char *argv[]) {
         NULL, sizeof(int) * 7, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0
     );
 
-    double *section_times = mmap(
-        NULL, sizeof(double) * 8, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0
+    timespec *section_times = mmap(
+        NULL, sizeof(timespec) * 8, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0
     );
 
-    for (int i = 0; i < 8; i++) {
+    for (size_t i = 0; i < 7; i++) {
         atomic_init(&section_progress[i], 0);
         section_progress_total[i] = 1;
-        section_times[i] = 0;
+        section_times[i] = (timespec){0, 0};
     }
+    section_times[7] = (timespec){0, 0};
 
     const int num_dots = width * height / map_resolution;
 
@@ -1113,18 +1118,11 @@ int main(int argc, char *argv[]) {
         NULL, sizeof(Dot) * num_dots, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0
     );
 
-    int *image_indexes = mmap(
-        NULL, sizeof(int) * width * height,
-        PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0
+    uint32_t *type_counts = mmap(
+        NULL, sizeof(uint32_t) * 11, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0
     );
-
-    for (int i = 0; i < width * height; i++) {
-        image_indexes[i] = 0;
-    }
-
-    int *type_counts = mmap(
-        NULL, sizeof(int) * 11, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0
-    );
+    for (size_t i = 0; i < 11; i++)
+        type_counts[i] = 0;
 
     int tracker_process_pid = -1;
 

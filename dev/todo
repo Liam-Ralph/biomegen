@@ -7,9 +7,10 @@ store section times as a timespec
 check if any timespec functions unused
 store island_size as integer
 
+change terminal updating to only overwrite instead of clearing and rewriting
+
 check if +1 still needed for floating-point errors
 recalculate section percentages
 
-look into determining max threads from hardware (_SC_NPROCESSORS_ONLN and sysctl maybe?)
 update readme file
 check if build_recursive can every run on a sorted dots (can only happen on initial call)
