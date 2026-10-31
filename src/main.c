@@ -18,7 +18,6 @@ BiomeGen, a terminal application for generating png maps.
 
 #define _POSIX_C_SOURCE 199309L // Needed for CLOCK_MONOTONIC
 
-#include <limits.h>
 #include <math.h>
 #include <png.h>
 #include <stdatomic.h>
@@ -259,8 +258,8 @@ void median_sort(Dot *dots, size_t low, size_t high, size_t med_index, bool axis
  * modified
  * @param tree_dots array to build tree in. Must have same capacity.
  * @param index the index to build on this call, must be 0 in initial call
- * @param low must be 0 in initial call
- * @param high must be length of dots - 1 in initial call
+ * @param low
+ * @param high
  * @param depth current depth, must be 0 in initial call
  */
 void build_recursive(Dot *dots, Dot *tree_dots, size_t index, size_t low, size_t high, int depth) {
@@ -306,13 +305,13 @@ void build_recursive(Dot *dots, Dot *tree_dots, size_t index, size_t low, size_t
  * @param coord coordinate to search with, of form {x, y}
  * @param depth current depth, must be 0 in initial call
  * @param min_dist_sq_ptr pointer to store squared minimum distance in
- * @param type_ptr pointer to store nearest neighbor type, or NULL
+ * @param nearest_index_ptr pointer to store nearest neighbor index, or NULL
  * @param min_dist_care query ends if a distance below this is found, make 0 for
  * regular calls
  */
 void nearest_neighbor_recursive(
     Dot *tree_dots, size_t len, size_t index, const uint32_t coord[2], uint32_t depth,
-    uint32_t *min_dist_sq_ptr, DotType *type_ptr, uint32_t min_dist_sq_care
+    uint32_t *min_dist_sq_ptr, size_t *nearest_index_ptr, uint32_t min_dist_sq_care
 ) {
 
     // Calculate Distance
@@ -326,8 +325,8 @@ void nearest_neighbor_recursive(
 
     if (dist_sq < *min_dist_sq_ptr) {
         *min_dist_sq_ptr = dist_sq;
-        if (type_ptr != NULL) {
-            *type_ptr = tree_dots[index].type;
+        if (nearest_index_ptr != NULL) {
+            *nearest_index_ptr = index;
         } else if (dist_sq < min_dist_sq_care) {
             return;
         }
@@ -350,13 +349,13 @@ void nearest_neighbor_recursive(
         */
         nearest_neighbor_recursive(
             tree_dots, len, index_child, coord, depth,
-            min_dist_sq_ptr, type_ptr, min_dist_sq_care
+            min_dist_sq_ptr, nearest_index_ptr, min_dist_sq_care
         );
     index_child++;
     if (index_child < len && (dist_line_sq < *min_dist_sq_ptr || coord[axis] >= dot_value))
         nearest_neighbor_recursive(
             tree_dots, len, index_child, coord, depth,
-            min_dist_sq_ptr, type_ptr, min_dist_sq_care
+            min_dist_sq_ptr, nearest_index_ptr, min_dist_sq_care
         );
 
 }
@@ -482,7 +481,7 @@ void set_process_title(const char type[], const int num) {
  */
 void track_progress(
     timespec start_time,
-    _Atomic int *section_progress, int *section_progress_total, timespec *section_times
+    _Atomic uint32_t *section_progress, uint32_t *section_progress_total, timespec *section_times
 ) {
 
     char section_names[7][20] = {
@@ -603,56 +602,52 @@ void track_progress(
  * 
  * @param map_resolution
  * @param island_size
- * @param start_index
- * @param end_index
- * @param reg_dots
- * @param origin_tree_dots
+ * @param start_index start of worker's piece
+ * @param end_index end of worker's piece
+ * @param num_origin_dots
  * @param dots
  * @param section_progress
  */
 void assign_sections(
-    const int map_resolution, const double island_size,
-    const int start_index, const int end_index, const int *reg_dots,
-    Node *origin_tree_root, Dot *dots, _Atomic int *section_progress
-
     uint32_t map_resolution, uint32_t island_size,
-    size_t start_index, size_t end_index, const 
-
+    size_t start_index, size_t end_index, uint32_t num_origin_dots,
+    Dot *dots, _Atomic uint32_t *section_progress
 ) {
 
     srand(time(NULL) + getpid());
 
-    int min_dist;
+    uint32_t min_dist_sq;
 
     for (int i = start_index; i < end_index; i++) {
     // Non-water dots are not included
 
         // Calculate Maximum Distance
 
-        if (i != start_index && reg_dots[i * 3 + 1] == reg_dots[(i - 1) * 3 + 1]) {
-            int min_dist_sq = (int)sqrt(min_dist) + 1 + reg_dots[i * 3] - reg_dots[(i - 1) * 3];
-            min_dist = min_dist_sq * min_dist_sq;
+        if (i != start_index && dots[i].y == dots[i - 1].y) {
+            uint32_t min_dist = (uint32_t)sqrt(min_dist) + dots[i].x - dots[i - 1].x;
+            min_dist_sq = min_dist * min_dist;
         } else {
-            min_dist = INT_MAX;
+            min_dist_sq = UINT32_MAX;
         }
 
         // Find Distance to Nearest Origin Dot
 
         // min and dist are squared, sqrt is not done until later
-        int min_index = 0;
-        int coord[2] = {reg_dots[i * 3], reg_dots[i * 3 + 1]};
-        query_recursive(origin_tree_root, coord, 0, &min_index, &min_dist);
+        uint32_t coord[2] = {dots[i].x, dots[i].y};
+        size_t nearest_index;
+        nearest_neighbor_recursive(
+            dots, num_origin_dots, 0, coord, 0, &min_dist_sq, &nearest_index, 0
+        );
 
         // Calculate Chance
 
-        double dist = sqrt(min_dist) / sqrt(map_resolution);
-        double threshold = ((min_index % 20) / 19.0 * 1.5 + 0.25) * island_size;
+        double dist = sqrt(min_dist_sq) / sqrt(map_resolution);
+        double threshold = ((nearest_index % 20) / 19.0 * 1.5 + 0.25) * island_size;
 
         int chance = (dist <= threshold) ? 9 : 1;
 
-        if (rand() % 10 < chance) {
-            dots[reg_dots[i * 3 + 2]].type = 'L'; // Land
-        }
+        if (rand() % 10 < chance)
+            dots[i].type = LAND;
 
         atomic_fetch_add(&section_progress[2], 1);
 
@@ -1093,12 +1088,12 @@ int main(int argc, char *argv[]) {
 
     // Shared Memory
 
-    _Atomic int *section_progress = mmap(
-        NULL, sizeof(int) * 7, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0
+    _Atomic uint32_t *section_progress = mmap(
+        NULL, sizeof(uint32_t) * 7, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0
     );
 
-    int *section_progress_total = mmap(
-        NULL, sizeof(int) * 7, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0
+    uint32_t *section_progress_total = mmap(
+        NULL, sizeof(uint32_t) * 7, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0
     );
 
     timespec *section_times = mmap(
@@ -1112,7 +1107,7 @@ int main(int argc, char *argv[]) {
     }
     section_times[7] = (timespec){0, 0};
 
-    const int num_dots = width * height / map_resolution;
+    const uint32_t num_dots = width * height / map_resolution;
 
     Dot *dots = mmap(
         NULL, sizeof(Dot) * num_dots, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0
@@ -1124,7 +1119,7 @@ int main(int argc, char *argv[]) {
     for (size_t i = 0; i < 11; i++)
         type_counts[i] = 0;
 
-    int tracker_process_pid = -1;
+    pid_t tracker_process_pid = -1;
 
     if (!auto_mode) {
 
@@ -1142,10 +1137,9 @@ int main(int argc, char *argv[]) {
 
     // Set Section Completion Time
 
-    struct timespec time_now;
+    timespec time_now;
     clock_gettime(CLOCK_MONOTONIC, &time_now);
-    section_times[0] = (double)(time_now.tv_sec - start_time.tv_sec) +
-        (time_now.tv_nsec - start_time.tv_nsec) / 1000000000.0;
+    section_times[0] = diff_timespecs(start_time, time_now);
     atomic_store(&section_progress[0], 1);
 
     // --Section Generation--
@@ -1155,8 +1149,8 @@ int main(int argc, char *argv[]) {
 
     srand(time(NULL));
 
-    const int num_special_dots = num_dots / island_abundance * 2;
-    const int num_reg_dots = num_dots - num_special_dots;
+    const uint32_t num_special_dots = num_dots / island_abundance * 2;
+    const uint32_t num_reg_dots = num_dots - num_special_dots;
 
     bool *used_coords = calloc(width * height, sizeof(bool));
 
@@ -1164,7 +1158,7 @@ int main(int argc, char *argv[]) {
 
         // Find Unused Coordinate
 
-        int ii;
+        uint32_t ii;
         do {
             ii = rand() % (width * height);
         } while (used_coords[ii]);
@@ -1173,16 +1167,14 @@ int main(int argc, char *argv[]) {
 
         used_coords[ii] = true;
 
-        Dot new_dot = { .x = ii % width, .y = ii / width };
+        dots[i] = (Dot){ .x = ii % width, .y = ii / width };
         if (i < num_special_dots / 2) {
-            new_dot.type = 'l'; // Land Origin, origin points for islands
+            dots[i].type = LAND_ORIGIN; // origin points for islands
         } else if (i < num_special_dots) {
-            new_dot.type = 'w'; // Water Forced (good for making lakes)
+            dots[i].type = WATER_FORCED; // good for making lakes
         } else {
-            new_dot.type = 'W'; // Water (default)
+            dots[i].type = WATER; // default
         }
-
-        dots[i] = new_dot;
 
         atomic_fetch_add(&section_progress[1], 1);
 
@@ -1193,8 +1185,7 @@ int main(int argc, char *argv[]) {
     // Set Section Completion Time
 
     clock_gettime(CLOCK_MONOTONIC, &time_now);
-    section_times[1] = (double)(time_now.tv_sec - start_time.tv_sec) +
-        (time_now.tv_nsec - start_time.tv_nsec) / 1000000000.0 - sum_list_double(section_times, 7);
+    section_times[1] = calc_section_timespec(time_now, start_time, section_times, 1);
 
     // --Section Assignment--
     // Assign dots as "Land", "Land Origin", "Water", or "Water Forced"
@@ -1203,75 +1194,50 @@ int main(int argc, char *argv[]) {
 
     // Create Land Origin KDTree
 
-    const int num_origin_dots = num_special_dots / 2;
-    int *land_origin_dots = malloc(num_origin_dots * 3 * sizeof(int));
-    for (int i = 0; i < num_origin_dots; i++) {
-        Dot *dot = &dots[i];
-        land_origin_dots[i * 3] = dot->x;
-        land_origin_dots[i * 3 + 1] = dot->y;
-        land_origin_dots[i * 3 + 2] = i;
-    }
-    Node *origin_tree_root = NULL;
-    origin_tree_root = build_recursive(land_origin_dots, num_origin_dots, 0);
-    free(land_origin_dots);
+    const uint32_t num_origin_dots = num_special_dots / 2;
+    Dot *tree_dots_temp = malloc(num_origin_dots * sizeof(Dot));
+    build_recursive(dots, tree_dots_temp, 0, 0, num_origin_dots, 0);
+    memcpy(dots, tree_dots_temp, num_origin_dots * sizeof(Dot));
+    free(tree_dots_temp);
 
-    // Create and Sort Regular Dots
+    // Sort Regular Dots
 
-    int *reg_dots = malloc(num_reg_dots * 3 * sizeof(int));
-    for (int i = num_special_dots; i < num_dots; i++) {
-        Dot *dot = &dots[i];
-        const int index = i - num_special_dots;
-        reg_dots[index * 3] = dot->x;
-        reg_dots[index * 3 + 1] = dot->y;
-        reg_dots[index * 3 + 2] = i;
-    }
+    quicksort_recursive(dots, num_special_dots, num_dots, width);
 
-    // Create Regular Piece Starts
+    // Create Regular Dot Piece Starts
 
-    int reg_piece_length = num_reg_dots / processes;
-    int reg_piece_starts[processes + 1];
-    for (int i = 0; i < processes; i++) {
-        reg_piece_starts[i] = i * reg_piece_length;
-    }
-    reg_piece_starts[processes] = num_reg_dots;
-    /*
-    used to create x pieces of size num_reg_dots / x, where x = processes
-    last piece may be larger, special dots are skipped
-    */
+    size_t reg_piece_length = num_reg_dots / processes;
+    size_t reg_piece_starts[processes + 1];
+    for (size_t i = 0; i < processes; i++)
+        reg_piece_starts[i] = num_special_dots + i * reg_piece_length;
+    reg_piece_starts[processes] = num_dots;
 
     // Run Workers
 
-    int fork_pids[processes]; // Create forks list
-    for (int i = 0; i < processes; i++) {
+    pid_t fork_pids[processes]; // Create forks list
+    for (size_t i = 0; i < processes; i++) {
 
         fork_pids[i] = fork(); // Create fork
         if (fork_pids[i] != 0) {
             continue;
         }
 
-        // e.g. biogen-worker00
         set_process_title("worker", i);
-        assign_sections( // Run worker
-            map_resolution, island_size, reg_piece_starts[i], reg_piece_starts[i + 1], reg_dots,
-            origin_tree_root, dots, section_progress
+        // e.g. bg-worker000
+        assign_sections(
+            map_resolution, island_size, reg_piece_starts[i], reg_piece_starts[i + 1],
+            num_origin_dots, dots, section_progress
         );
-        exit(0); // Kill worker
+        exit(0);
 
     }
-    for (int i = 0; i < processes; i++) {
+    for (size_t i = 0; i < processes; i++)
         waitpid(fork_pids[i], NULL, 0); // Wait for workers
-    }
-
-    // Free Regular Dots and Land Origin Tree
-
-    free(reg_dots);
-    free_recursive(origin_tree_root);
 
     // Set Section Completion Time
 
     clock_gettime(CLOCK_MONOTONIC, &time_now);
-    section_times[2] = (double)(time_now.tv_sec - start_time.tv_sec) +
-        (time_now.tv_nsec - start_time.tv_nsec) / 1000000000.0 - sum_list_double(section_times, 7);
+    section_times[2] = calc_section_timespec(time_now, start_time, section_times, 2);
 
     // --Coastline Smoothing--
 
