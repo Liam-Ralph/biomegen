@@ -12,5 +12,9 @@ change terminal updating to only overwrite instead of clearing and rewriting
 check if +1 still needed for floating-point errors
 recalculate section percentages
 
+make timespecs pass by reference where applicable for functions
+
 update readme file
-check if build_recursive can every run on a sorted dots (can only happen on initial call)
+check if quicksort can every run on a sorted dots (can only happen on initial call)
+
+consider switching to pthread

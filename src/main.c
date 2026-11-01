@@ -210,13 +210,14 @@ void quicksort_recursive(Dot *dots, size_t low, size_t high, uint32_t width) {
  * @param med_index
  * @param axis determines whether to sort by x (false) or y (true) values
  */
-void median_sort(Dot *dots, size_t low, size_t high, size_t med_index, bool axis) {
+void median_select(Dot *dots, size_t low, size_t high, size_t med_index, bool axis) {
 
     while (low < high) {
 
         // Calculate Pivot Value
 
-        uint16_t pivot = axis ? dots[high].y : dots[high].x;
+        size_t pi = low + rand() % (high - low);
+        uint16_t pivot = axis ? dots[pi].y : dots[pi].x;
 
         // Sort Based on Pivot
 
@@ -276,7 +277,7 @@ void build_recursive(Dot *dots, Dot *tree_dots, size_t index, size_t low, size_t
 
     const size_t med_pos = (high + low) >> 1;
 
-    median_sort(dots, low, high, med_pos, depth % 2);
+    median_select(dots, low, high, med_pos, depth % 2);
     // it seems this is faster than storing axis and doing !axis in each recursive call
 
     // Add Median Node to Tree
@@ -611,15 +612,16 @@ void track_progress(
 void assign_sections(
     uint32_t map_resolution, uint32_t island_size,
     size_t start_index, size_t end_index, uint32_t num_origin_dots,
-    Dot *dots, _Atomic uint32_t *section_progress
+    Dot *dots, uint32_t *land_dots_count_ptr, _Atomic uint32_t *section_progress
 ) {
 
     srand(time(NULL) + getpid());
 
     uint32_t min_dist_sq;
+    uint32_t land_dots_count = 0;
 
     for (int i = start_index; i < end_index; i++) {
-    // Non-water dots are not included
+        // Non-water dots are not included
 
         // Calculate Maximum Distance
 
@@ -646,12 +648,16 @@ void assign_sections(
 
         int chance = (dist <= threshold) ? 9 : 1;
 
-        if (rand() % 10 < chance)
+        if (rand() % 10 < chance) {
             dots[i].type = LAND;
+            land_dots_count++;
+        }
 
         atomic_fetch_add(&section_progress[2], 1);
 
     }
+
+    *land_dots_count_ptr = land_dots_count;
 
 }
 
@@ -1212,21 +1218,27 @@ int main(int argc, char *argv[]) {
         reg_piece_starts[i] = num_special_dots + i * reg_piece_length;
     reg_piece_starts[processes] = num_dots;
 
+    // Land Dots Counter
+    // Used to optimize the start of coastline smoothing
+    uint32_t *land_dots_counts = mmap(
+        NULL, sizeof(uint32_t) * processes,
+        PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0
+    );
+
     // Run Workers
 
     pid_t fork_pids[processes]; // Create forks list
     for (size_t i = 0; i < processes; i++) {
 
         fork_pids[i] = fork(); // Create fork
-        if (fork_pids[i] != 0) {
+        if (fork_pids[i] != 0)
             continue;
-        }
 
         set_process_title("worker", i);
         // e.g. bg-worker000
         assign_sections(
             map_resolution, island_size, reg_piece_starts[i], reg_piece_starts[i + 1],
-            num_origin_dots, dots, section_progress
+            num_origin_dots, dots, &land_dots_counts[i], section_progress
         );
         exit(0);
 
@@ -1247,40 +1259,65 @@ int main(int argc, char *argv[]) {
 
         // Create Land and Water Dots
 
-        int num_land_dots = 0;
-        int num_water_dots = 0;
-        int *land_dots = malloc(num_reg_dots * 3 * sizeof(int));
-        int *water_dots = malloc(num_reg_dots * 3 * sizeof(int));
-        // num_land_dots + num_water_dots == num_reg_dots, so this is the max
+        uint32_t num_land_dots = 0;
+        for (size_t i = 0; i < processes; i++)
+            num_land_dots += land_dots_counts[i];
+        munmap(land_dots_counts, sizeof(uint32_t) * processes);
+        uint32_t num_water_dots = num_reg_dots - num_land_dots;
 
-        for (int i = num_special_dots; i < num_dots; i++) {
-        // Only includes "Land" and "Water" dots
-            const Dot *dot = &dots[i];
-            if (dot->type == 'L') {
-                land_dots[num_land_dots * 3] = dot->x;
-                land_dots[num_land_dots * 3 + 1] = dot->y;
-                land_dots[num_land_dots * 3 + 2] = i;
-                num_land_dots++;
-            } else {
-                water_dots[num_water_dots * 3] = dot->x;
-                water_dots[num_water_dots * 3 + 1] = dot->y;
-                water_dots[num_water_dots * 3 + 2] = i;
-                num_water_dots++;
-            }
+        Dot *land_dots = malloc(num_land_dots * sizeof(Dot));
+        Dot *water_dots = malloc(num_water_dots * sizeof(Dot));
+        uint32_t land_counter = 0;
+        uint32_t water_counter = 0;
+
+        for (size_t i = num_special_dots; i < num_dots; i++) {
+            // Only includes "Land" and "Water" dots
+            if (dots[i].type == LAND) 
+                memcpy(&land_dots[land_counter++], &dots[i], sizeof(Dot));
+            else
+                memcpy(&water_dots[water_counter++], &dots[i], sizeof(Dot));
         }
 
-        // Create Land and Water KDTrees
+        memcpy(&dots[num_special_dots], land_dots, num_land_dots * sizeof(Dot));
+        memcpy(&dots[num_special_dots + num_land_dots], water_dots, num_water_dots * sizeof(Dot));
 
-        Node *land_tree_root = NULL;
-        Node *water_tree_root = NULL;
+        // Smooth Land Dots
 
-        land_tree_root = build_recursive(land_dots, num_land_dots, 0);
-        water_tree_root = build_recursive(water_dots, num_water_dots, 0);
+        // Build Water Tree
 
-        // Sort Land and Water Dots
+        Dot *water_tree_dots = malloc(num_water_dots * sizeof(Dot));
+        memcpy(water_tree_dots, water_dots, num_water_dots * sizeof(Dot));
+        build_recursive(water_dots, water_tree_dots, 0, 0, num_water_dots, 0);
+        free(water_dots);
 
-        quicksort_recursive(land_dots, 0, num_land_dots - 1, width);
-        quicksort_recursive(water_dots, 0, num_water_dots - 1, width);
+        // Create Land Piece Starts
+
+        size_t land_piece_length = num_land_dots / processes;
+        size_t land_piece_starts[processes + 1];
+        for (size_t i = 0; i < processes; i++) {
+            land_piece_starts[i] = num_special_dots + i * land_piece_length;
+        }
+        land_piece_starts[processes] = num_dots;
+
+        // Run Workers
+
+        free(water_tree_dots);
+
+        // Smooth Water Dots
+
+        // Build Land Tree
+
+        Dot *land_tree_dots = malloc(num_land_dots * sizeof(Dot));
+        memcpy(land_tree_dots, land_dots, num_land_dots * sizeof(Dot));
+        build_recursive(land_dots, land_tree_dots, 0, 0, num_land_dots, 0);
+        free(land_dots);
+
+        // Create Water Piece Starts
+
+        // Run Workers
+
+        free(land_tree_dots);
+
 
         // Create Piece Starts for Land and Water Dots
 
@@ -1332,6 +1369,7 @@ int main(int argc, char *argv[]) {
     } else {
 
         // Coastline smoothing would have no effect
+        munmap(land_dots_counts, sizeof(uint32_t) * processes);
         atomic_store(&section_progress[3], 1);
 
     }
@@ -1339,8 +1377,7 @@ int main(int argc, char *argv[]) {
     // Set Section Completion Time
 
     clock_gettime(CLOCK_MONOTONIC, &time_now);
-    section_times[3] = (double)(time_now.tv_sec - start_time.tv_sec) +
-        (time_now.tv_nsec - start_time.tv_nsec) / 1000000000.0 - sum_list_double(section_times, 7);
+    section_times[3] = calc_section_timespec(time_now, start_time, section_times, 3);
 
     // --Biome Generation--
 
