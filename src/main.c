@@ -445,7 +445,7 @@ void nearest_neighbors_recursive(
  */
 void set_process_title(const char type[], const int num) {
 
-    // Example: type is "worker", num is 6: "bg-worker6"
+    // Example: type is "worker", num is 6: "bg-worker006"
 
     // Concatenate Type
 
@@ -626,8 +626,8 @@ void assign_sections(
         // Calculate Maximum Distance
 
         if (i != start_index && dots[i].y == dots[i - 1].y) {
-            uint32_t min_dist = (uint32_t)sqrt(min_dist) + dots[i].x - dots[i - 1].x;
-            min_dist_sq = min_dist * min_dist;
+            min_dist_sq = (uint32_t)sqrt(min_dist_sq) + dots[i].x - dots[i - 1].x + 1;
+            min_dist_sq *= min_dist_sq;
         } else {
             min_dist_sq = UINT32_MAX;
         }
@@ -662,131 +662,109 @@ void assign_sections(
 }
 
 /**
- * Smooth map coastlines for a more realistic, aesthetically pleasing map.
- * Reassigns land and water dots based on the average distance of the nearest
- * COASTLINE_SMOOTHING dots of the same and opposite types.
+ * Smooth coastlines.
+ * 
+ * Smooth coastlines for land and water dots by comparing the nearest
+ * `coastline_smoothing` dots of the same and opposite type.
+ * 
+ * @param coastline_smoothing
+ * @param land_start
+ * @param land_end
+ * @param water_start
+ * @param water_end
+ * @param dots
+ * @param land_tree_dots
+ * @param water_tree_dots
+ * @param num_land_dots
+ * @param num_water_dots
+ * @param section_progress
  */
 void smooth_coastlines(
-    const int coastline_smoothing,
-    const int *land_dots, const int land_start, const int land_end, Node *land_tree_root,
-    const int *water_dots, const int water_start, const int water_end, Node *water_tree_root,
-    const int num_dots, const int num_land_dots, const int num_water_dots,
-    Dot *dots, _Atomic int *section_progress
+    uint32_t coastline_smoothing,
+    size_t land_start, size_t land_end, size_t water_start, size_t water_end,
+    Dot *dots, const Dot* land_tree_dots, const Dot *water_tree_dots,
+    uint32_t num_land_dots, uint32_t num_water_dots, _Atomic uint32_t *section_progress
 ) {
 
-    int dists_same[coastline_smoothing];
-    int dists_opp[coastline_smoothing];
+    uint32_t dists_same_sq[coastline_smoothing];
+    uint32_t dists_opp_sq[coastline_smoothing];
 
-    // Coastline Smoothing for Land Dots
+    // Setup for Land
 
-    for (int i = land_start; i < land_end; i++) {
+    size_t start = land_start;
+    Dot *same_tree_dots = land_tree_dots;
+    Dot *opp_tree_dots = water_tree_dots;
+    uint32_t num_same_dots = num_land_dots;
+    uint32_t num_opp_dots = num_water_dots;
+    DotType opp_type = WATER;
 
-        int dot_coord[2] = {land_dots[i * 3], land_dots[i * 3 + 1]};
+    // Coastline Smoothing
+
+    for (size_t i = land_start; i < water_end; i++) {
+
+        if (i == land_end) {
+
+            // Setup for Water
+
+            i = water_start;
+            start = water_start;
+            Dot *same_tree_dots = water_tree_dots;
+            Dot *opp_tree_dots = land_tree_dots;
+            uint32_t num_same_dots = num_water_dots;
+            uint32_t num_opp_dots = num_land_dots;
+            opp_type = LAND;
+
+        }
 
         // Calculate Maximum Distances
 
-        bool same_y = (i != land_start && land_dots[i * 3 + 1] == land_dots[(i - 1) * 3 + 1]);
+        const bool same_y = (i != start && dots[i].y == dots[i - 1].y);
         if (same_y) {
-            const int prev_dot_dist = land_dots[i * 3] - land_dots[(i - 1) * 3];
-            int min_dist_same = (int)sqrt(dists_same[coastline_smoothing - 1]) + 1 + prev_dot_dist;
-            // + 1 needed for floating-point errors (ceil didn't work)
-            min_dist_same *= min_dist_same;
-            int min_dist_opp = (int)sqrt(dists_opp[coastline_smoothing - 1]) + 1 + prev_dot_dist;
-            min_dist_opp *= min_dist_opp;
-            for (int ii = 0; ii < coastline_smoothing; ii++) {
-                dists_same[ii] = min_dist_same;
-                dists_opp[ii] = min_dist_opp;
+            const uint32_t prev_dot_dist = dots[i].x - dots[i - 1].x + 1;
+            uint32_t min_dist_same_sq =
+                (uint32_t)sqrt(dists_same_sq[coastline_smoothing - 1]) + prev_dot_dist;
+            min_dist_same_sq *= min_dist_same_sq;
+            uint32_t min_dist_opp_sq =
+                (uint32_t)sqrt(dists_opp_sq[coastline_smoothing - 1]) + prev_dot_dist;
+            min_dist_opp_sq *= min_dist_opp_sq;
+            for (size_t ii = 0; ii < coastline_smoothing; ii++) {
+                dists_same_sq[ii] = min_dist_same_sq;
+                dists_opp_sq[ii] = min_dist_opp_sq;
             }
         } else {
-            for (int ii = 0; ii < coastline_smoothing; ii++) {
-                dists_same[ii] = INT_MAX;
-            }
+            for (size_t ii = 0; ii < coastline_smoothing; ii++)
+                dists_same_sq[ii] = UINT32_MAX;
         }
 
         // Get Nearest Distances for Each Type
 
-        long sum_same = 0;
-        long sum_opp = 0;
+        uint32_t dot_coord[2] = {dots[i].x, dots[i].y};
 
-        query_dist_recursive(land_tree_root, dot_coord, 0, dists_same, coastline_smoothing);
-        for (int ii = 0; ii < coastline_smoothing; ii++) {
-            sum_same += dists_same[ii];
-        }
+        uint64_t sum_same = 0;
+        uint64_t sum_opp = 0;
+
+        nearest_neighbors_recursive(
+            same_tree_dots, num_same_dots, 0, dot_coord, dists_same_sq, coastline_smoothing, 0
+        );
+        for (size_t ii = 0; ii < coastline_smoothing; ii++)
+            sum_same += dists_same_sq[ii];
 
         if (!same_y) {
-            const int max = (sum_same < INT_MAX) ? sum_same : INT_MAX;
-            for (int ii = 0; ii < coastline_smoothing; ii++) {
-                dists_opp[ii] = max;
-            }
+            const uint32_t max = (sum_same < UINT32_MAX) ? sum_same : UINT32_MAX;
+            for (size_t ii = 0; ii < coastline_smoothing; ii++)
+                dists_opp_sq[ii] = max;
         }
 
-        query_dist_recursive(water_tree_root, dot_coord, 0, dists_opp, coastline_smoothing);
-        for (int ii = 0; ii < coastline_smoothing; ii++) {
-            sum_opp += dists_opp[ii];
-        }
+        nearest_neighbors_recursive(
+            opp_tree_dots, num_opp_dots, 0, dot_coord, dists_same_sq, coastline_smoothing, 0
+        );
+        for (size_t ii = 0; ii < coastline_smoothing; ii++)
+            sum_opp += dists_opp_sq[ii];
 
         // Change Dot Type if Closer to Opposite Type
 
-        if (sum_same > sum_opp) {
-            dots[land_dots[i * 3 + 2]].type = 'W';
-        }
-
-        atomic_fetch_add(&section_progress[3], 1);
-
-    }
-
-    // Coastline Smoothing for Water Dots
-
-    for (int i = water_start; i < water_end; i++) {
-
-        int dot_coord[2] = {water_dots[i * 3], water_dots[i * 3 + 1]};
-
-        // Calculate Maximum Distances
-
-        bool same_y = (i != water_start && water_dots[i * 3 + 1] == water_dots[(i - 1) * 3 + 1]);
-        if (same_y) {
-            const int prev_dot_dist = water_dots[i * 3] - water_dots[(i - 1) * 3];
-            int min_dist_same = (int)sqrt(dists_same[coastline_smoothing - 1]) + 1 + prev_dot_dist;
-            min_dist_same *= min_dist_same;
-            int min_dist_opp = (int)sqrt(dists_opp[coastline_smoothing - 1]) + 1 + prev_dot_dist;
-            min_dist_opp *= min_dist_opp;
-            for (int ii = 0; ii < coastline_smoothing; ii++) {
-                dists_same[ii] = min_dist_same;
-                dists_opp[ii] = min_dist_opp;
-            }
-        } else {
-            for (int ii = 0; ii < coastline_smoothing; ii++) {
-                dists_same[ii] = INT_MAX;
-            }
-        }
-
-        // Get Nearest Distances for Each Type
-
-        long sum_same = 0;
-        long sum_opp = 0;
-
-        query_dist_recursive(water_tree_root, dot_coord, 0, dists_same, coastline_smoothing);
-        for (int ii = 0; ii < coastline_smoothing; ii++) {
-            sum_same += dists_same[ii];
-        }
-
-        if (!same_y) {
-            const int max = (sum_same < INT_MAX) ? sum_same : INT_MAX;
-            for (int ii = 0; ii < coastline_smoothing; ii++) {
-                dists_opp[ii] = max;
-            }
-        }
-
-        query_dist_recursive(land_tree_root, dot_coord, 0, dists_opp, coastline_smoothing);
-        for (int ii = 0; ii < coastline_smoothing; ii++) {
-            sum_opp += dists_opp[ii];
-        }
-
-        // Change Dot Type if Closer to Opposite Type
-
-        if (sum_same > sum_opp) {
-            dots[water_dots[i * 3 + 2]].type = 'L';
-        }
+        if (sum_same > sum_opp)
+            dots[i].type = opp_type;
 
         atomic_fetch_add(&section_progress[3], 1);
 
@@ -1234,7 +1212,7 @@ int main(int argc, char *argv[]) {
         if (fork_pids[i] != 0)
             continue;
 
-        set_process_title("worker", i);
+        set_process_title("sa-worker", i);
         // e.g. bg-worker000
         assign_sections(
             map_resolution, island_size, reg_piece_starts[i], reg_piece_starts[i + 1],
@@ -1281,16 +1259,19 @@ int main(int argc, char *argv[]) {
         memcpy(&dots[num_special_dots], land_dots, num_land_dots * sizeof(Dot));
         memcpy(&dots[num_special_dots + num_land_dots], water_dots, num_water_dots * sizeof(Dot));
 
-        // Smooth Land Dots
+        // Build Trees
 
-        // Build Water Tree
+        Dot *land_tree_dots = malloc(num_land_dots * sizeof(Dot));
+        memcpy(land_tree_dots, land_dots, num_land_dots * sizeof(Dot));
+        build_recursive(land_dots, land_tree_dots, 0, 0, num_land_dots, 0);
+        free(land_dots);
 
         Dot *water_tree_dots = malloc(num_water_dots * sizeof(Dot));
         memcpy(water_tree_dots, water_dots, num_water_dots * sizeof(Dot));
         build_recursive(water_dots, water_tree_dots, 0, 0, num_water_dots, 0);
         free(water_dots);
 
-        // Create Land Piece Starts
+        // Create Piece Starts
 
         size_t land_piece_length = num_land_dots / processes;
         size_t land_piece_starts[processes + 1];
@@ -1299,72 +1280,36 @@ int main(int argc, char *argv[]) {
         }
         land_piece_starts[processes] = num_dots;
 
-        // Run Workers
-
-        free(water_tree_dots);
-
-        // Smooth Water Dots
-
-        // Build Land Tree
-
-        Dot *land_tree_dots = malloc(num_land_dots * sizeof(Dot));
-        memcpy(land_tree_dots, land_dots, num_land_dots * sizeof(Dot));
-        build_recursive(land_dots, land_tree_dots, 0, 0, num_land_dots, 0);
-        free(land_dots);
-
-        // Create Water Piece Starts
-
-        // Run Workers
-
-        free(land_tree_dots);
-
-
-        // Create Piece Starts for Land and Water Dots
-
-        int land_piece_length = num_land_dots / processes;
-        int land_piece_starts[processes + 1];
-        for (int i = 0; i < processes; i++) {
-            land_piece_starts[i] = i * land_piece_length;
+        size_t water_piece_length = num_water_dots / processes;
+        size_t water_piece_starts[processes + 1];
+        for (size_t i = 0; i < processes; i++) {
+            water_piece_starts[i] = num_special_dots + i * water_piece_length;
         }
-        land_piece_starts[processes] = num_land_dots;
-
-        int water_piece_length = num_water_dots / processes;
-        int water_piece_starts[processes + 1];
-        for (int i = 0; i < processes; i++) {
-            water_piece_starts[i] = i * water_piece_length;
-        }
-        water_piece_starts[processes] = num_water_dots;
+        water_piece_starts[processes] = num_dots;
 
         // Run Workers
 
         for (int i = 0; i < processes; i++) {
 
             fork_pids[i] = fork();
-            if (fork_pids[i] != 0) {
+            if (fork_pids[i] != 0)
                 continue;
-            }
 
-            set_process_title("worker", i);
+            set_process_title("cl-worker", i);
             smooth_coastlines(
                 coastline_smoothing,
-                land_dots, land_piece_starts[i], land_piece_starts[i + 1], land_tree_root,
-                water_dots, water_piece_starts[i], water_piece_starts[i + 1], water_tree_root,
-                num_dots, num_land_dots, num_water_dots, dots, section_progress
+                land_piece_starts[i], land_piece_starts[i + 1],
+                water_piece_starts[i], water_piece_starts[i + 1],
+                dots, land_tree_dots, water_dots, num_land_dots, num_water_dots, section_progress
             );
             exit(0);
 
         }
-        for (int i = 0; i < processes; i++) {
+        for (int i = 0; i < processes; i++)
             waitpid(fork_pids[i], NULL, 0);
-        }
 
-        // Free Dot Lists and Trees
-
-        free(land_dots);
-        free(water_dots);
-
-        free_recursive(land_tree_root);
-        free_recursive(water_tree_root);
+        free(land_tree_dots);
+        free(water_tree_dots);
 
     } else {
 
