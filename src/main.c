@@ -1135,6 +1135,7 @@ int main(int argc, char *argv[]) {
 
     const uint32_t num_special_dots = num_dots / island_abundance * 2;
     const uint32_t num_reg_dots = num_dots - num_special_dots;
+    const uint32_t num_origin_dots = num_special_dots / 2;
 
     bool *used_coords = calloc(width * height, sizeof(bool));
 
@@ -1152,7 +1153,7 @@ int main(int argc, char *argv[]) {
         used_coords[ii] = true;
 
         dots[i] = (Dot){ .x = ii % width, .y = ii / width };
-        if (i < num_special_dots / 2) {
+        if (i < num_origin_dots) {
             dots[i].type = LAND_ORIGIN; // origin points for islands
         } else if (i < num_special_dots) {
             dots[i].type = WATER_FORCED; // good for making lakes
@@ -1176,9 +1177,8 @@ int main(int argc, char *argv[]) {
 
     section_progress_total[2] = num_reg_dots;
 
-    // Create Land Origin KDTree
+    // Create Land Origin KD Tree
 
-    const uint32_t num_origin_dots = num_special_dots / 2;
     Dot *tree_dots_temp = malloc(num_origin_dots * sizeof(Dot));
     build_recursive(dots, tree_dots_temp, 0, 0, num_origin_dots, 0);
     memcpy(dots, tree_dots_temp, num_origin_dots * sizeof(Dot));
@@ -1330,14 +1330,10 @@ int main(int argc, char *argv[]) {
 
     // Remove "Land Origin" and "Water Forced" Dots
 
-    for (int i = 0; i < num_special_dots; i++) {
-        Dot *dot = &dots[i];
-        if (dot->type == 'l') {
-            dot->type = 'L';
-        } else if (dot->type == 'w') {
-            dot->type = 'W';
-        }
-    }
+    for (size_t i = 0; i < num_origin_dots; i++)
+        dots[i].type = LAND;
+    for (size_t i = num_origin_dots; i < num_special_dots; i++)
+        dots[i].type = WATER;
 
     // Create Water Biomes
     // Adds ice, depth
