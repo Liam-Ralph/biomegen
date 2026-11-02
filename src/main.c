@@ -683,11 +683,14 @@ void smooth_coastlines(
     uint32_t coastline_smoothing,
     size_t land_start, size_t land_end, size_t water_start, size_t water_end,
     Dot *dots, const Dot* land_tree_dots, const Dot *water_tree_dots,
-    uint32_t num_land_dots, uint32_t num_water_dots, _Atomic uint32_t *section_progress
+    uint32_t num_land_dots, uint32_t num_water_dots,
+    int32_t *swapped_to_land_counts_ptr, _Atomic uint32_t *section_progress
 ) {
 
     uint32_t dists_same_sq[coastline_smoothing];
     uint32_t dists_opp_sq[coastline_smoothing];
+
+    int32_t swapped_to_land_counts = 0;
 
     // Setup for Land
 
@@ -763,12 +766,16 @@ void smooth_coastlines(
 
         // Change Dot Type if Closer to Opposite Type
 
-        if (sum_same > sum_opp)
+        if (sum_same > sum_opp) {
             dots[i].type = opp_type;
+            (opp_type == LAND) ? swapped_to_land_counts++ : swapped_to_land_counts--;
+        }
 
         atomic_fetch_add(&section_progress[3], 1);
 
     }
+
+    *swapped_to_land_counts_ptr = swapped_to_land_counts;
 
 }
 
@@ -1136,6 +1143,7 @@ int main(int argc, char *argv[]) {
     const uint32_t num_special_dots = num_dots / island_abundance * 2;
     const uint32_t num_reg_dots = num_dots - num_special_dots;
     const uint32_t num_origin_dots = num_special_dots / 2;
+    // Assumed in biome generation that num_water_forced_dots = num_origin_dots
 
     bool *used_coords = calloc(width * height, sizeof(bool));
 
@@ -1179,14 +1187,14 @@ int main(int argc, char *argv[]) {
 
     // Create Land Origin KD Tree
 
-    Dot *tree_dots_temp = malloc(num_origin_dots * sizeof(Dot));
+    Dot *tree_dots_temp = malloc(sizeof(Dot) * num_origin_dots);
     build_recursive(dots, tree_dots_temp, 0, 0, num_origin_dots, 0);
-    memcpy(dots, tree_dots_temp, num_origin_dots * sizeof(Dot));
+    memcpy(dots, tree_dots_temp, sizeof(Dot) * num_origin_dots);
     free(tree_dots_temp);
 
     // Sort Regular Dots
 
-    quicksort_recursive(dots, num_special_dots, num_dots, width);
+    quicksort_recursive(dots, num_special_dots, num_dots - 1, width);
 
     // Create Regular Dot Piece Starts
 
@@ -1198,6 +1206,7 @@ int main(int argc, char *argv[]) {
 
     // Land Dots Counter
     // Used to optimize the start of coastline smoothing
+
     uint32_t *land_dots_counts = mmap(
         NULL, sizeof(uint32_t) * processes,
         PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0
@@ -1231,20 +1240,31 @@ int main(int argc, char *argv[]) {
 
     // --Coastline Smoothing--
 
+    // Swapped Dots Counter
+    // Used to optimize start of biome generation
+
+    int32_t *swapped_to_land_counts = mmap(
+        NULL, sizeof(int32_t) * processes, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0
+    );
+
+    // Count Land and Water Dots
+
+    uint32_t num_land_dots = 0;
+    for (size_t i = 0; i < processes; i++)
+        num_land_dots += land_dots_counts[i];
+    munmap(land_dots_counts, sizeof(uint32_t) * processes);
+    uint32_t num_water_dots = num_reg_dots - num_land_dots;
+
+    // Coastline Smoothing
+
     if (coastline_smoothing != 0) {
 
         section_progress_total[3] = num_reg_dots;
 
         // Create Land and Water Dots
 
-        uint32_t num_land_dots = 0;
-        for (size_t i = 0; i < processes; i++)
-            num_land_dots += land_dots_counts[i];
-        munmap(land_dots_counts, sizeof(uint32_t) * processes);
-        uint32_t num_water_dots = num_reg_dots - num_land_dots;
-
-        Dot *land_dots = malloc(num_land_dots * sizeof(Dot));
-        Dot *water_dots = malloc(num_water_dots * sizeof(Dot));
+        Dot *land_dots = malloc(sizeof(Dot) * num_land_dots);
+        Dot *water_dots = malloc(sizeof(Dot) * num_water_dots);
         uint32_t land_counter = 0;
         uint32_t water_counter = 0;
 
@@ -1256,18 +1276,18 @@ int main(int argc, char *argv[]) {
                 memcpy(&water_dots[water_counter++], &dots[i], sizeof(Dot));
         }
 
-        memcpy(&dots[num_special_dots], land_dots, num_land_dots * sizeof(Dot));
-        memcpy(&dots[num_special_dots + num_land_dots], water_dots, num_water_dots * sizeof(Dot));
+        memcpy(&dots[num_special_dots], land_dots, sizeof(Dot) * num_land_dots);
+        memcpy(&dots[num_special_dots + num_land_dots], water_dots, sizeof(Dot) * num_water_dots);
 
         // Build Trees
 
-        Dot *land_tree_dots = malloc(num_land_dots * sizeof(Dot));
-        memcpy(land_tree_dots, land_dots, num_land_dots * sizeof(Dot));
+        Dot *land_tree_dots = malloc(sizeof(Dot) * num_land_dots);
+        memcpy(land_tree_dots, land_dots, sizeof(Dot) * num_land_dots);
         build_recursive(land_dots, land_tree_dots, 0, 0, num_land_dots, 0);
         free(land_dots);
 
-        Dot *water_tree_dots = malloc(num_water_dots * sizeof(Dot));
-        memcpy(water_tree_dots, water_dots, num_water_dots * sizeof(Dot));
+        Dot *water_tree_dots = malloc(sizeof(Dot) * num_water_dots);
+        memcpy(water_tree_dots, water_dots, sizeof(Dot) * num_water_dots);
         build_recursive(water_dots, water_tree_dots, 0, 0, num_water_dots, 0);
         free(water_dots);
 
@@ -1300,7 +1320,8 @@ int main(int argc, char *argv[]) {
                 coastline_smoothing,
                 land_piece_starts[i], land_piece_starts[i + 1],
                 water_piece_starts[i], water_piece_starts[i + 1],
-                dots, land_tree_dots, water_dots, num_land_dots, num_water_dots, section_progress
+                dots, land_tree_dots, water_dots, num_land_dots, num_water_dots,
+                &swapped_to_land_counts[i], section_progress
             );
             exit(0);
 
@@ -1314,7 +1335,6 @@ int main(int argc, char *argv[]) {
     } else {
 
         // Coastline smoothing would have no effect
-        munmap(land_dots_counts, sizeof(uint32_t) * processes);
         atomic_store(&section_progress[3], 1);
 
     }
@@ -1335,13 +1355,58 @@ int main(int argc, char *argv[]) {
     for (size_t i = num_origin_dots; i < num_special_dots; i++)
         dots[i].type = WATER;
 
+    // Calculate Number of Land and Water Dots
+
+    int32_t num_swapped_to_land = 0;
+    for (size_t i = 0; i < processes; i++)
+        num_swapped_to_land += swapped_to_land_counts[i];
+    munmap(swapped_to_land_counts, sizeof(int32_t) * processes);
+    num_land_dots += num_origin_dots + num_swapped_to_land;
+    num_water_dots += num_origin_dots - num_swapped_to_land;
+    // num_origin_dots = num_water_forced_dots (assumed below as well)
+
+    // Allocate Memory
+
+    Dot *land_tree_dots = malloc(sizeof(Dot) * num_land_dots); // land_dots_unsorted
+    Dot *land_dots_sorted = malloc(sizeof(Dot) * num_land_dots);
+
+    Dot *water_dots_unsorted = malloc(sizeof(Dot) * num_water_dots);
+    Dot *water_dots_sorted = malloc(sizeof(Dot) * num_water_dots);
+
+    // Split Land and Water Dots from Dots
+
+    memcpy(land_tree_dots, dots, sizeof(Dot) * num_origin_dots);
+    memcpy(water_dots_unsorted, &dots[num_origin_dots], sizeof(Dot) * num_origin_dots);
+
+    size_t land_counter = num_origin_dots;
+    size_t water_counter = num_origin_dots;
+    for (size_t i = num_special_dots; i < num_dots; i++) {
+        if (dots[i].type == LAND)
+            memcpy(&land_tree_dots[land_counter++], &dots[i], sizeof(Dot));
+        else
+            memcpy(&water_dots_unsorted[water_counter++], &dots[i], sizeof(Dot));
+    }
+
+    // Sort Former Land and Water Dots
+
+    quicksort_recursive(land_tree_dots, 0, num_origin_dots - 1, width);
+    quicksort_recursive(water_dots_unsorted, 0, num_origin_dots - 1, width);
+
+    // Merge Parts of Unsorted Dots into Sorted Dots
+
+    size_t i1, i2, i3, ii = 0;
+    // section 1 len = num_origin_dots, section2 len = num_land_dots - num_switched to water
+    // section 3 = num_switched_to_land
+    while (i1 + i2 + i3 < num_land_dots) {
+
+        ii++;
+    }
+
     // Create Water Biomes
     // Adds ice, depth
 
     // Build Land Dots KDTree
 
-    int num_land_dots = 0;
-    int num_water_dots = 0;
     int *land_dots = malloc(num_dots * 3 * sizeof(int));
     int *water_dots = malloc(num_dots * 3 * sizeof(int));
 

@@ -20,3 +20,8 @@ update readme file
 check if quicksort can every run on a sorted dots (can only happen on initial call)
 
 consider switching to pthread
+
+for counts map and stored for later (num_land_dots, num_dots_switched_to_land, etc.) consider
+    switching to return value (don't have to pass pointer)
+
+add biome_size option (used in number of biome origin dots)
