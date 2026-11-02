@@ -59,6 +59,11 @@ typedef struct Dot {
 typedef struct timespec timespec;
 
 
+// Global Variables
+
+uint32_t width; // Used for row-major order
+
+
 // General Functions
 
 // User Input
@@ -139,6 +144,12 @@ timespec calc_section_timespec(
     }
 }
 
+// Dot Functions
+
+uint32_t row_major(Dot dot) {
+    return dot.y * width + dot.x;
+}
+
 // Sorting Functions
 
 /**
@@ -155,7 +166,7 @@ void swap(Dot *dots, size_t i, size_t ii) {
 }
 
 /**
- * Sort the given `dots` using the quicksort algorithm.
+ * Sort the given `dots` by row-major order using the quicksort algorithm.
  * 
  * A dot's value is equal to `dot.y * width + dot.x`.
  * 
@@ -164,20 +175,20 @@ void swap(Dot *dots, size_t i, size_t ii) {
  * @param high
  * @param width needed to calculate a dot's value
  */
-void quicksort_recursive(Dot *dots, size_t low, size_t high, uint32_t width) {
+void quicksort_recursive(Dot *dots, size_t low, size_t high) {
 
     if (low < high) {
 
         // Calculate Pivot Value
 
-        uint32_t pivot = dots[high].y * width + dots[high].x;
+        uint32_t pivot = row_major(dots[high]);
 
         // Move Smaller Elements to the Left
 
         size_t p = low;
 
         for (size_t i = low; i < high; i++)
-            if (dots[i].y * width + dots[i].x < pivot)
+            if (row_major(dots[i]) < pivot)
                 swap(dots, p++, i);
 
         // Move Pivot to After Smaller Elements
@@ -187,8 +198,8 @@ void quicksort_recursive(Dot *dots, size_t low, size_t high, uint32_t width) {
         // Recursion
 
         if (p > low)
-            quicksort_recursive(dots, low, p - 1, width);
-        quicksort_recursive(dots, p + 1, high, width);
+            quicksort_recursive(dots, low, p - 1);
+        quicksort_recursive(dots, p + 1, high);
 
     }
 
@@ -684,13 +695,15 @@ void smooth_coastlines(
     size_t land_start, size_t land_end, size_t water_start, size_t water_end,
     Dot *dots, const Dot* land_tree_dots, const Dot *water_tree_dots,
     uint32_t num_land_dots, uint32_t num_water_dots,
-    int32_t *swapped_to_land_counts_ptr, _Atomic uint32_t *section_progress
+    uint32_t *swapped_to_land_counts_ptr, uint32_t *swapped_to_water_counts_ptr,
+    _Atomic uint32_t *section_progress
 ) {
 
     uint32_t dists_same_sq[coastline_smoothing];
     uint32_t dists_opp_sq[coastline_smoothing];
 
-    int32_t swapped_to_land_counts = 0;
+    uint32_t swapped_to_land_counts = 0;
+    uint32_t swapped_to_water_counts = 0;
 
     // Setup for Land
 
@@ -768,7 +781,10 @@ void smooth_coastlines(
 
         if (sum_same > sum_opp) {
             dots[i].type = opp_type;
-            (opp_type == LAND) ? swapped_to_land_counts++ : swapped_to_land_counts--;
+            if (opp_type == LAND)
+                swapped_to_land_counts++;
+            else
+                swapped_to_water_counts++;
         }
 
         atomic_fetch_add(&section_progress[3], 1);
@@ -776,6 +792,7 @@ void smooth_coastlines(
     }
 
     *swapped_to_land_counts_ptr = swapped_to_land_counts;
+    *swapped_to_water_counts_ptr = swapped_to_water_counts;
 
 }
 
@@ -957,8 +974,9 @@ int main(int argc, char *argv[]) {
 
     bool auto_mode = (argc == 1);
     char output_file[229];
-    uint32_t width, height, map_resolution, island_abundance, island_size,
+    uint32_t height, map_resolution, island_abundance, island_size,
         coastline_smoothing, processes;
+    // width is global
 
     if (auto_mode) {
 
@@ -1194,7 +1212,7 @@ int main(int argc, char *argv[]) {
 
     // Sort Regular Dots
 
-    quicksort_recursive(dots, num_special_dots, num_dots - 1, width);
+    quicksort_recursive(dots, num_special_dots, num_dots - 1);
 
     // Create Regular Dot Piece Starts
 
@@ -1243,8 +1261,13 @@ int main(int argc, char *argv[]) {
     // Swapped Dots Counter
     // Used to optimize start of biome generation
 
-    int32_t *swapped_to_land_counts = mmap(
-        NULL, sizeof(int32_t) * processes, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0
+    uint32_t *swapped_to_land_counts = mmap(
+        NULL, sizeof(uint32_t) * processes,
+        PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0
+    );
+    uint32_t *swapped_to_water_counts = mmap(
+        NULL, sizeof(uint32_t) * processes,
+        PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0
     );
 
     // Count Land and Water Dots
@@ -1271,9 +1294,9 @@ int main(int argc, char *argv[]) {
         for (size_t i = num_special_dots; i < num_dots; i++) {
             // Only includes "Land" and "Water" dots
             if (dots[i].type == LAND) 
-                memcpy(&land_dots[land_counter++], &dots[i], sizeof(Dot));
+                land_dots[land_counter++] = dots[i];
             else
-                memcpy(&water_dots[water_counter++], &dots[i], sizeof(Dot));
+                water_dots[water_counter++] = dots[i];
         }
 
         memcpy(&dots[num_special_dots], land_dots, sizeof(Dot) * num_land_dots);
@@ -1321,7 +1344,7 @@ int main(int argc, char *argv[]) {
                 land_piece_starts[i], land_piece_starts[i + 1],
                 water_piece_starts[i], water_piece_starts[i + 1],
                 dots, land_tree_dots, water_dots, num_land_dots, num_water_dots,
-                &swapped_to_land_counts[i], section_progress
+                &swapped_to_land_counts[i], &swapped_to_water_counts[i], section_progress
             );
             exit(0);
 
@@ -1357,12 +1380,17 @@ int main(int argc, char *argv[]) {
 
     // Calculate Number of Land and Water Dots
 
-    int32_t num_swapped_to_land = 0;
-    for (size_t i = 0; i < processes; i++)
+    uint32_t num_swapped_to_land = 0;
+    uint32_t num_swapped_to_water = 0;
+    for (size_t i = 0; i < processes; i++) {
         num_swapped_to_land += swapped_to_land_counts[i];
-    munmap(swapped_to_land_counts, sizeof(int32_t) * processes);
-    num_land_dots += num_origin_dots + num_swapped_to_land;
-    num_water_dots += num_origin_dots - num_swapped_to_land;
+        num_swapped_to_water += swapped_to_water_counts[i];
+    }
+    int32_t num_swapped_net = (int32_t)num_swapped_to_land - num_swapped_to_water; // land is pos
+    munmap(swapped_to_land_counts, sizeof(uint32_t) * processes);
+    munmap(swapped_to_water_counts, sizeof(uint32_t) * processes);
+    num_land_dots += num_origin_dots + num_swapped_net;
+    num_water_dots += num_origin_dots - num_swapped_net;
     // num_origin_dots = num_water_forced_dots (assumed below as well)
 
     // Allocate Memory
@@ -1382,24 +1410,34 @@ int main(int argc, char *argv[]) {
     size_t water_counter = num_origin_dots;
     for (size_t i = num_special_dots; i < num_dots; i++) {
         if (dots[i].type == LAND)
-            memcpy(&land_tree_dots[land_counter++], &dots[i], sizeof(Dot));
+            land_tree_dots[land_counter++] = dots[i];
         else
-            memcpy(&water_dots_unsorted[water_counter++], &dots[i], sizeof(Dot));
+            water_dots_unsorted[water_counter++] = dots[i];
     }
 
     // Sort Former Land and Water Dots
 
-    quicksort_recursive(land_tree_dots, 0, num_origin_dots - 1, width);
-    quicksort_recursive(water_dots_unsorted, 0, num_origin_dots - 1, width);
+    quicksort_recursive(land_tree_dots, 0, num_origin_dots - 1);
+    quicksort_recursive(water_dots_unsorted, 0, num_origin_dots - 1);
 
     // Merge Parts of Unsorted Dots into Sorted Dots
 
-    size_t i1, i2, i3, ii = 0;
-    // section 1 len = num_origin_dots, section2 len = num_land_dots - num_switched to water
-    // section 3 = num_switched_to_land
-    while (i1 + i2 + i3 < num_land_dots) {
-
-        ii++;
+    const size_t end1 = num_origin_dots;
+    const size_t end2 = end1 + num_land_dots - num_swapped_to_water;
+    const size_t end3 = end2 + num_swapped_to_land;
+    size_t i1 = 0;
+    size_t i2 = end1;
+    size_t i3 = end2;
+    size_t i = 0;
+    while (i1 < end1 && i2 < end2 && i3 < end3) { // Going to rewrite this
+        land_dots_sorted[i++] = (row_major(land_tree_dots[i1]) < row_major(land_tree_dots[i2])) ?
+            (
+                (row_major(land_tree_dots[i1]) < row_major(land_tree_dots[i3])) ?
+                land_tree_dots[i1++] : land_tree_dots[i3++]
+            ) : (
+                (row_major(land_tree_dots[i3]) < row_major(land_tree_dots[i2])) ?
+                land_tree_dots[i3++] : land_tree_dots[i2++]
+            );
     }
 
     // Create Water Biomes
