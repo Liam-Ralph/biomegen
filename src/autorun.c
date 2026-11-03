@@ -2,6 +2,7 @@
 
 #include <math.h>
 #include <stdbool.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -23,9 +24,9 @@ int main() {
     // Setting Process Title
 
     #ifdef __linux__
-        prctl(PR_SET_NAME, "biogen-autorun", 0, 0, 0);
+        prctl(PR_SET_NAME, "bg-autorun", 0, 0, 0);
     #elif BSD || __Apple__
-        setproctitle("biogen-autorun");
+        setproctitle("bg-autorun");
     #endif
 
     printf("\n");
@@ -53,46 +54,30 @@ int main() {
     // Opening Autorun Tasks
 
     fptr = fopen(PATH_AUTORUN_TASKS, "r");
-    char raw_line[256]; // Max task length is 256 chars
+    char line[256]; // Max task length is 256 chars
 
-    while (fgets(raw_line, 256, fptr)) {
+    while (fgets(line, 256, fptr)) {
 
         // Getting Task Parameters
 
-        char line_copy[256];
-        strcpy(line_copy, raw_line);
-
         char token[250];
-        strtok(line_copy, ":");
-        int reps = atoi(line_copy); // Repetitions
+        strncpy(token, strtok(line, ":"), 5);
+        uint32_t reps = abs(atoi(token)); // Repetitions
 
         strncpy(token, strtok(NULL, ":"), 2);
         bool show_rep_times = false; // Whether to show rep times
-        if (strcmp(token, "y") == 0) {
+        if (token[0] == 'y')
             show_rep_times = true;
-        }
 
         strncpy(token, strtok(NULL, ":"), 2);
         bool save_png = false; // Whether to save png outputs
-        if (strcmp(token, "y") == 0) {
+        if (token[0] == 'y')
             save_png = true;
-        }
 
-        strncpy(token, strtok(NULL, ":\n"), 250);
-        char inputs[256]; // Inputs for main program
-        strncpy(inputs, token, 256);
+        char inputs[250]; // Inputs for main program
+        strncpy(inputs, strtok(NULL, ":\n"), 249);
 
-        printf("Running task \"%s\" for %d reps.\n", inputs, reps);
-
-        // Prepping Save Path
-
-        if (save_png) {
-            const int len_inputs = strlen(inputs);
-            char inputs_copy[257];
-            strncpy(inputs_copy, inputs, len_inputs - 4);
-            snprintf(inputs, len_inputs + 3, "%s0.png", inputs_copy);
-        }
-        // "1920 1080 100 120 50 5 8 file.png" --> "1920 1080 100 120 50 5 8 file0.png"
+        printf("Running task \"%s\" for %u reps.\n", inputs, reps);
 
         // Running Repetitions
 
@@ -105,7 +90,7 @@ int main() {
         fflush(stdout);
 
         float rep_times[reps];
-        for (int i = 0; i < reps; i++) {
+        for (uint32_t i = 0; i < reps; i++) {
 
             if (save_png) {
 
