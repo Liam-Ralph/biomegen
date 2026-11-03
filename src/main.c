@@ -205,6 +205,33 @@ void quicksort_recursive(Dot *dots, size_t low, size_t high) {
 
 }
 
+/**
+ * Merge two sorted sections of `dots_unsorted` into `dots_sorted`.
+ * 
+ * The second section must directly follow the first, so `dots_unsorted[len1]`
+ * is the first dot in the second section.
+ * 
+ * @param dots_unsorted
+ * @param dots_sorted
+ * @param len1 length of first section of `dots_unsorted`
+ * @param len2 length of second section
+ */
+void merge(Dot *dots_unsorted, Dot *dots_sorted, size_t len1, size_t len2) {
+
+    size_t i1, i2 = 0;
+
+    while (i1 + i2 < len1 + len2) {
+        if (
+            i2 == len2 ||
+            (i1 < len1 && row_major(dots_unsorted[i1]) < row_major(dots_unsorted[len1 + i2]))
+        )
+            dots_sorted[i1 + i2] = dots_unsorted[i1++];
+        else
+            dots_sorted[i1 + i2] = dots_unsorted[len1 + i2++];
+    }
+
+}
+
 
 // KDTree Functions
 
@@ -292,7 +319,6 @@ void build_recursive(Dot *dots, Dot *tree_dots, size_t index, size_t low, size_t
     // it seems this is faster than storing axis and doing !axis in each recursive call
 
     // Add Median Node to Tree
-    // Every recursion adds one node
 
     tree_dots[index] = dots[med_pos];
 
@@ -797,55 +823,61 @@ void smooth_coastlines(
 }
 
 /**
- * Generate water biomes for DOTS between START_INDEX and END_INDEX. Water
- * biomes are generated based on a dot's distance to the equator and the
- * distance to the nearest land dot.
+ * Generate water biomes.
+ * 
+ * Generate water biomes for `dots` from `start_index` to `end_index`. Water
+ * biomes are generated based on distance to the equator and to land.
+ * 
+ * @param start_index
+ * @param end_index
+ * @param land_tree_dots
+ * @param num_land_dots
+ * @param height
+ * @param dots
+ * @param section_progress
  */
 void generate_biomes_water(
-    const int start_index, const int end_index, const int *water_dots, Node *land_tree_root,
-    const int height, const int num_dots, Dot *dots, _Atomic int *section_progress
+    size_t start_index, size_t end_index, const Dot *land_tree_dots, size_t num_land_dots,
+    uint32_t height, Dot *dots, _Atomic timespec *section_progress
 ) {
 
-    int land_dist;
+    uint32_t land_dist_sq;
 
-    for (int i = start_index; i < end_index; i++) {
+    for (size_t i = start_index; i < end_index; i++) {
 
         // Calculate Distance to Equator
 
-        const double equator_dist =
-            fabs((double)water_dots[i * 3 + 1] - height / 2.0) / height * 20.0;
+        const uint32_t equator_dist =
+            (uint32_t)(fabs((double)dots[i].y - height / 2.0) / height * 20);
 
         // Calculate Maximum Land Distance
 
-        if (i != start_index && water_dots[i * 3 + 1] == water_dots[(i - 1) * 3 + 1]) {
-            int min_dist_sq =
-                (int)sqrt(land_dist) + 1 + water_dots[i * 3] - water_dots[(i - 1) * 3];
-            land_dist = min_dist_sq * min_dist_sq;
+        if (i != start_index && dots[i].y == dots[i - 1].y) {
+            land_dist_sq = (uint32_t)sqrt(land_dist_sq) + dots[i].x - dots[i - 1].x;
+            land_dist_sq *= land_dist_sq;
         } else {
-            land_dist = INT_MAX;
+            land_dist_sq = UINT32_MAX;
         }
 
         // Calculate Distance to Land
 
-        const int coord[2] = {water_dots[i * 3], water_dots[i * 3 + 1]};
-        query_recursive(land_tree_root, coord, 0, NULL, &land_dist);
+        const uint32_t coord[2] = {dots[i].x, dots[i].y};
+        nearest_neighbor_recursive(
+            land_tree_dots, num_land_dots, 0, coord, 0, &land_dist_sq, NULL, 225
+        );
 
         // Set Water Biome
 
-        char dot_type = 'W';
-        if ( // Remember: all land distances are squared for efficiency
-            (land_dist < 35 * 35 && equator_dist > 9) ||
-            (land_dist < 25 * 25 && equator_dist > 8) ||
-            (land_dist < 15 * 15 && equator_dist > 7)
-        ) {
-            dot_type = 'I';
-        } else if (land_dist < 18 * 18) {
-            dot_type = 's';
-        } else if (land_dist >= 35 * 35) {
-            dot_type = 'd';
-        }
-
-        dots[water_dots[i * 3 + 2]].type = dot_type;
+        if (
+            (land_dist_sq < 1225 && equator_dist >= 9) ||
+            (land_dist_sq < 625 && equator_dist >= 8) ||
+            (land_dist_sq < 225 && equator_dist >= 7)
+        )
+            dots[i].type = ICE;
+        else if (land_dist_sq < 324)
+            dots[i].type = SHALLOW_WATER;
+        else if (land_dist_sq >= 1225)
+            dots[i].type = DEEP_WATER;
 
         atomic_fetch_add(&section_progress[4], 1);
 
@@ -1206,7 +1238,7 @@ int main(int argc, char *argv[]) {
     // Create Land Origin KD Tree
 
     Dot *tree_dots_temp = malloc(sizeof(Dot) * num_origin_dots);
-    build_recursive(dots, tree_dots_temp, 0, 0, num_origin_dots, 0);
+    build_recursive(dots, tree_dots_temp, 0, 0, num_origin_dots - 1, 0);
     memcpy(dots, tree_dots_temp, sizeof(Dot) * num_origin_dots);
     free(tree_dots_temp);
 
@@ -1306,12 +1338,12 @@ int main(int argc, char *argv[]) {
 
         Dot *land_tree_dots = malloc(sizeof(Dot) * num_land_dots);
         memcpy(land_tree_dots, land_dots, sizeof(Dot) * num_land_dots);
-        build_recursive(land_dots, land_tree_dots, 0, 0, num_land_dots, 0);
+        build_recursive(land_dots, land_tree_dots, 0, 0, num_land_dots - 1, 0);
         free(land_dots);
 
         Dot *water_tree_dots = malloc(sizeof(Dot) * num_water_dots);
         memcpy(water_tree_dots, water_dots, sizeof(Dot) * num_water_dots);
-        build_recursive(water_dots, water_tree_dots, 0, 0, num_water_dots, 0);
+        build_recursive(water_dots, water_tree_dots, 0, 0, num_water_dots - 1, 0);
         free(water_dots);
 
         // Create Piece Starts
@@ -1343,7 +1375,7 @@ int main(int argc, char *argv[]) {
                 coastline_smoothing,
                 land_piece_starts[i], land_piece_starts[i + 1],
                 water_piece_starts[i], water_piece_starts[i + 1],
-                dots, land_tree_dots, water_dots, num_land_dots, num_water_dots,
+                dots, land_tree_dots, water_tree_dots, num_land_dots, num_water_dots,
                 &swapped_to_land_counts[i], &swapped_to_water_counts[i], section_progress
             );
             exit(0);
@@ -1380,12 +1412,16 @@ int main(int argc, char *argv[]) {
 
     // Calculate Number of Land and Water Dots
 
+    const uint32_t former_num_land_dots = num_land_dots;
+    const uint32_t former_num_water_dots = num_water_dots;
+
     uint32_t num_swapped_to_land = 0;
     uint32_t num_swapped_to_water = 0;
     for (size_t i = 0; i < processes; i++) {
         num_swapped_to_land += swapped_to_land_counts[i];
         num_swapped_to_water += swapped_to_water_counts[i];
     }
+
     int32_t num_swapped_net = (int32_t)num_swapped_to_land - num_swapped_to_water; // land is pos
     munmap(swapped_to_land_counts, sizeof(uint32_t) * processes);
     munmap(swapped_to_water_counts, sizeof(uint32_t) * processes);
@@ -1395,88 +1431,57 @@ int main(int argc, char *argv[]) {
 
     // Allocate Memory
 
-    Dot *land_tree_dots = malloc(sizeof(Dot) * num_land_dots); // land_dots_unsorted
-    Dot *land_dots_sorted = malloc(sizeof(Dot) * num_land_dots);
-
+    Dot *land_dots_unsorted = malloc(sizeof(Dot) * num_land_dots);
     Dot *water_dots_unsorted = malloc(sizeof(Dot) * num_water_dots);
-    Dot *water_dots_sorted = malloc(sizeof(Dot) * num_water_dots);
 
     // Split Land and Water Dots from Dots
 
-    memcpy(land_tree_dots, dots, sizeof(Dot) * num_origin_dots);
+    memcpy(land_dots_unsorted, dots, sizeof(Dot) * num_origin_dots);
     memcpy(water_dots_unsorted, &dots[num_origin_dots], sizeof(Dot) * num_origin_dots);
 
     size_t land_counter = num_origin_dots;
     size_t water_counter = num_origin_dots;
     for (size_t i = num_special_dots; i < num_dots; i++) {
         if (dots[i].type == LAND)
-            land_tree_dots[land_counter++] = dots[i];
+            land_dots_unsorted[land_counter++] = dots[i];
         else
             water_dots_unsorted[water_counter++] = dots[i];
     }
 
-    // Sort Former Land and Water Dots
+    // Sort Former Land Origin and Water Forced Dots
 
-    quicksort_recursive(land_tree_dots, 0, num_origin_dots - 1);
+    quicksort_recursive(land_dots_unsorted, 0, num_origin_dots - 1);
     quicksort_recursive(water_dots_unsorted, 0, num_origin_dots - 1);
 
     // Merge Parts of Unsorted Dots into Sorted Dots
 
-    const size_t end1 = num_origin_dots;
-    const size_t end2 = end1 + num_land_dots - num_swapped_to_water;
-    const size_t end3 = end2 + num_swapped_to_land;
-    size_t i1 = 0;
-    size_t i2 = end1;
-    size_t i3 = end2;
-    size_t i = 0;
-    while (i1 < end1 && i2 < end2 && i3 < end3) { // Going to rewrite this
-        land_dots_sorted[i++] = (row_major(land_tree_dots[i1]) < row_major(land_tree_dots[i2])) ?
-            (
-                (row_major(land_tree_dots[i1]) < row_major(land_tree_dots[i3])) ?
-                land_tree_dots[i1++] : land_tree_dots[i3++]
-            ) : (
-                (row_major(land_tree_dots[i3]) < row_major(land_tree_dots[i2])) ?
-                land_tree_dots[i3++] : land_tree_dots[i2++]
-            );
-    }
+    // Section 1 = former land origin dots
+    // Section 2 = former land dots, excluded swapped to water
+    // Section 3 = former water dots swapped to land
+    size_t len1 = num_origin_dots;
+    size_t len2 = former_num_land_dots - num_swapped_to_water;
+    merge(land_dots_unsorted, dots, len1, len2);
+    merge(land_dots_unsorted, dots, len1 + len2, num_swapped_to_land);
+
+    len2 = former_num_water_dots - num_swapped_to_land;
+    merge(water_dots_unsorted, &dots[num_land_dots], len1, len2);
+    merge(water_dots_unsorted, &dots[num_land_dots], len1 + len2, num_swapped_to_water);
+    free(water_dots_unsorted);
 
     // Create Water Biomes
     // Adds ice, depth
 
     // Build Land Dots KDTree
 
-    int *land_dots = malloc(num_dots * 3 * sizeof(int));
-    int *water_dots = malloc(num_dots * 3 * sizeof(int));
-
-    for (int i = 0; i < num_dots; i++) {
-        const Dot *dot = &dots[i];
-        if (dots[i].type == 'L') {
-            land_dots[num_land_dots * 3] = dot->x;
-            land_dots[num_land_dots * 3 + 1] = dot->y;
-            land_dots[num_land_dots * 3 + 2] = i;
-            num_land_dots++;
-        } else {
-            water_dots[num_water_dots * 3] = dot->x;
-            water_dots[num_water_dots * 3 + 1] = dot->y;
-            water_dots[num_water_dots * 3 + 2] = i;
-            num_water_dots++;
-        }
-    }
-
-    Node *land_tree_root = NULL;
-    land_tree_root = build_recursive(land_dots, num_land_dots, 0);
-    free(land_dots);
-
-    // Sort Water Dots
-
-    quicksort_recursive(water_dots, 0, num_water_dots - 1, width);
+    Dot *land_tree_dots = malloc(sizeof(Dot) * num_land_dots);
+    build_recursive(land_dots_unsorted, land_tree_dots, 0, 0, num_land_dots - 1, 0);
 
     // Create Piece Starts Water Dots
 
-    int water_piece_length = num_water_dots / processes;
-    int water_piece_starts[processes + 1];
-    for (int i = 0; i < processes; i++) {
-        water_piece_starts[i] = i * water_piece_length;
+    size_t water_piece_length = num_water_dots / processes;
+    size_t water_piece_starts[processes + 1];
+    for (size_t i = 0; i < processes; i++) {
+        water_piece_starts[i] = num_land_dots + i * water_piece_length;
     }
     water_piece_starts[processes] = num_water_dots;
 
@@ -1485,26 +1490,23 @@ int main(int argc, char *argv[]) {
     for (int i = 0; i < processes; i++) {
 
         fork_pids[i] = fork();
-        if (fork_pids[i] != 0) {
+        if (fork_pids[i] != 0)
             continue;
-        }
 
         set_process_title("worker", i);
         generate_biomes_water(
-            water_piece_starts[i], water_piece_starts[i + 1], water_dots, land_tree_root,
-            height, num_dots, dots, section_progress
+            water_piece_starts[i], water_piece_starts[i + 1], land_tree_dots, num_land_dots,
+            height, dots, section_progress
         );
         exit(0);
 
     }
-    for (int i = 0; i < processes; i++) {
+    for (int i = 0; i < processes; i++)
         waitpid(fork_pids[i], NULL, 0);
-    }
 
-    // Free Water Dots and Land Tree
+    // Free Land Tree Dots
 
-    free(water_dots);
-    free_recursive(land_tree_root);
+    free(land_tree_dots);
 
     // Add Biome Origin Dots
     // The area around a biome origin dot will have the same biome

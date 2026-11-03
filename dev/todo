@@ -25,3 +25,5 @@ for counts map and stored for later (num_land_dots, num_dots_switched_to_land, e
     switching to return value (don't have to pass pointer)
 
 add biome_size option (used in number of biome origin dots)
+
+check that dots are actually sorted properly during start of biome generation
