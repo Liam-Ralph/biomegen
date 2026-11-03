@@ -6,6 +6,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/ioctl.h>
 #include <sys/prctl.h>
 #include <unistd.h>
 
@@ -44,7 +45,7 @@ int main() {
     strncpy(version, file_line + 12, 12);
     version[strlen(version) - 2] = '\0';
 
-    // Compiling Main Program
+    // Checking for Main Program
 
     if (!access("main", F_OK) == 0) {
         printf("main executable missing.");
@@ -55,6 +56,11 @@ int main() {
 
     fptr = fopen(PATH_AUTORUN_TASKS, "r");
     char line[256]; // Max task length is 256 chars
+
+    struct winsize w;
+    ioctl(STDOUT_FILENO, TIOCGWINSZ, &w);
+    uint32_t columns = (uint32_t)w.ws_col - 7;
+    if (100 < columns) columns = 100;
 
     while (fgets(line, 256, fptr)) {
 
@@ -79,15 +85,27 @@ int main() {
 
         printf("Running task \"%s\" for %u reps.\n", inputs, reps);
 
+        // Prep Save path
+
+        if (save_png) {
+            const int len_inputs = strlen(inputs);
+            char inputs_copy[250];
+            strncpy(inputs_copy, inputs, len_inputs - 4);
+            snprintf(inputs, len_inputs + 3, "%s0.png", inputs_copy);
+        }
+        // "1920 1080 100 120 50 5 8 file.png" -> "1920 1080 100 120 50 5 8 file0.png"
+
         // Running Repetitions
 
-        printf("\r\033[K\033[48;5;2m");
-        printf("\033[48;5;1m");
-        for (int ii = 0; ii < 100; ii++) {
-            printf(" ");
+        if (!show_rep_times) {
+
+            printf("[");
+            for (uint32_t ii = 0; ii < columns; ii++)
+                printf(" ");
+            printf("]   0%%");
+            fflush(stdout);
+
         }
-        printf("\033[0m %3d%%", 0);
-        fflush(stdout);
 
         float rep_times[reps];
         for (uint32_t i = 0; i < reps; i++) {
