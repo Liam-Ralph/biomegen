@@ -105,7 +105,6 @@ int main() {
         }
 
         double rep_times[reps];
-        uint32_t prev_bars = 0;
 
         for (uint32_t i = 0; i < reps; i++) {
 
@@ -133,22 +132,27 @@ int main() {
                 if (reps < 10) printf("%u", i + 1);
                 else if (reps < 100) printf("%2u", i + 1);
                 else printf("%3u", i + 1);
-                printf(" Time: %16lfs\n", time);
+                printf(" Time: %lfs\n", time);
             } else {
                 const uint32_t bars = round((i + 1) * columns / reps);
-                
+                printf("\r" ANSI_GREEN);
+                for (uint32_t ii = 0; ii < bars; ii++)
+                    printf("█");
+                printf(ANSI_BLUE);
+                for (uint32_t ii = 0; ii < columns - bars; ii++)
+                    printf("█");
+                printf(ANSI_RESET);
+                printf(" %3u%%", (i + 1) / reps * 100);
                 fflush(stdout);
             }
 
         }
 
-        int width = atoi(strtok(inputs, " "));
-        int height = atoi(strtok(NULL, " "));
-        strtok(NULL, " ");
-        strtok(NULL, " ");
-        strtok(NULL, " ");
-        strtok(NULL, " ");
-        int processes = atoi(strtok(NULL, " "));
+        uint32_t width = atoi(strtok(inputs, " "));
+        uint32_t height = atoi(strtok(NULL, " "));
+        for (uint32_t i = 0; i < 5; i++)
+            strtok(NULL, " ");
+        uint32_t processes = atoi(strtok(NULL, " "));
 
         // Delete Png File if not Saving
 
@@ -160,30 +164,29 @@ int main() {
 
         // Move off of Progress Bar Line
 
-        if (!show_rep_times) {
+        if (!show_rep_times)
             printf("\n");
-        }
 
         // Calculating Mean
 
-        float mean = 0;
-        for (int i = 0; i < reps; i++) {
+        double mean = 0;
+        for (uint32_t i = 0; i < reps; i++)
             mean += rep_times[i];
-        }
         mean /= reps;
-        printf("Mean Time %24lfs\n", mean);
+        printf("Mean Time %lfs\n", mean);
 
         // Calculating Standard Deviation and Pixels Per Second
 
-        float std_deviation = 0;
-        for (int i = 0; i < reps; i++) {
-            std_deviation += pow((rep_times[i] - mean), 2);
+        double std_deviation = 0;
+        for (uint32_t i = 0; i < reps; i++) {
+            double temp = rep_times[i] - mean;
+            std_deviation += temp * temp;
         }
         std_deviation /= reps;
         std_deviation = sqrt(std_deviation);
-        printf("Standard Deviation %15lfs\n", std_deviation);
+        printf("Standard Deviation %lfs\n", std_deviation);
 
-        int pix_per_sec = (int)round(width * height / mean);
+        uint32_t pix_per_sec = (uint32_t)round(width * height / mean);
         printf("Pixels per Second: %d\n", pix_per_sec);
 
         // Saving Results to File
@@ -241,7 +244,7 @@ int main() {
 
                 pctile_times[i] = value;
 
-                printf("%2dth Percentile %18lfs\n", percentiles[i], value);
+                printf("%2dth Percentile %lfs\n", percentiles[i], value);
 
             }
 
@@ -274,7 +277,7 @@ int main() {
                     new_mean -= outliers_list[i];
                 }
                 new_mean /= reps - outliers;
-                printf("\nMean (Outliers Removed) %10lfs\n", new_mean);
+                printf("\nMean (Outliers Removed) %lfs\n", new_mean);
             }
             free(outliers_list);
 

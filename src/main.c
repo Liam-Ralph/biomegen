@@ -1983,7 +1983,7 @@ int main(int argc, char *argv[]) {
 
     } else {
 
-        printf("%f\n", completion_time);
+        printf("%lf\n", completion_time);
 
     }
 
