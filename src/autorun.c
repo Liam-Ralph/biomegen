@@ -100,7 +100,7 @@ int main() {
             printf(ANSI_BLUE);
             for (uint32_t ii = 0; ii < columns; ii++)
                 printf("█");
-            printf("%s   0%%", ANSI_RESET);
+            printf(ANSI_RESET "   0%%");
             fflush(stdout);
         }
 
@@ -128,7 +128,7 @@ int main() {
             // Print Rep Time or Progress Bar
 
             if (show_rep_times) {
-                printf("Repetition: ");
+                printf("Repetition ");
                 if (reps < 10) printf("%u", i + 1);
                 else if (reps < 100) printf("%2u", i + 1);
                 else printf("%3u", i + 1);
@@ -173,7 +173,7 @@ int main() {
         for (uint32_t i = 0; i < reps; i++)
             mean += rep_times[i];
         mean /= reps;
-        printf("Mean Time %lfs\n", mean);
+        printf("Mean Time               %lfs\n", mean);
 
         // Calculating Standard Deviation and Pixels Per Second
 
@@ -184,16 +184,16 @@ int main() {
         }
         std_deviation /= reps;
         std_deviation = sqrt(std_deviation);
-        printf("Standard Deviation %lfs\n", std_deviation);
+        printf("Standard Deviation      %lfs\n", std_deviation);
 
         uint32_t pix_per_sec = (uint32_t)round(width * height / mean);
-        printf("Pixels per Second: %d\n", pix_per_sec);
+        printf("Pixels per Second       %d\n", pix_per_sec);
 
         // Saving Results to File
 
         FILE *fptr_results = fopen(PATH_AUTORUN_RESULTS, "a");
         fprintf(
-            fptr_results, "%s, %d, %d, %d, %d, %f, %f, %d",
+            fptr_results, "%s, %d, %d, %d, %d, %lf, %lf, %d",
             version, width, height, processes, reps, mean, std_deviation, pix_per_sec
         );
 
@@ -213,28 +213,26 @@ int main() {
                         swapped = true;
                     }
                 }
-                if (!swapped) {
+                if (!swapped)
                     break;
-                }
             }
 
             // Percentiles
 
             int percentiles[] = {5, 25, 50, 75, 95};
-            float pctile_times[] = {-1.0, -1.0, -1.0, -1.0, -1.0};
-            float iqr; // interquartile range (q3 - q1)
+            double pctile_times[5];
+            double iqr; // interquartile range (q3 - q1)
 
-            for (int i = 0; i < sizeof(percentiles) / sizeof(percentiles[0]); i++) {
+            for (uint32_t i = 0; i < 5; i++) {
 
-                float exact_index = percentiles[i] * (reps - 1) / 100.0; // 50th index of 8 is 3.5
-                int index = (int)exact_index; // floor of exact index
-                float diff = exact_index - index; // diff between index and exact
+                double exact_index = percentiles[i] * (reps - 1) / 100.0; // 50th index of 8 is 3.5
+                uint32_t index = (uint32_t)exact_index; // floor of exact index
+                double diff = exact_index - index; // diff between index and exact
 
-                float value = rep_times[index]; // rep time at index
-                if (diff > 0.0001) {
+                double value = rep_times[index]; // rep time at index
+                if (diff > 0.0001)
                     // add diff% of next index
                     value += (rep_times[index + 1] - rep_times[index]) * diff;
-                }
 
                 /*
                 Example for 50th percentile of list {1, 2, 3, 4}
@@ -244,36 +242,28 @@ int main() {
 
                 pctile_times[i] = value;
 
-                printf("%2dth Percentile %lfs\n", percentiles[i], value);
+                printf("%2dth Percentile         %lfs\n", percentiles[i], value);
 
             }
 
             // Finding Outliers Using IQR
 
             iqr = pctile_times[3] - pctile_times[1];
-            printf("Interquartile Range %14lfs\n", iqr);
-            int outliers = 0;
-            float *outliers_list = malloc(reps * sizeof(rep_times[0]));
-            int outliers_cap = 0;
-            for (int i = 0; i < reps; i++) {
+            printf("Interquartile Range     %lfs\n", iqr);
+            uint32_t outliers = 0;
+            double *outliers_list = malloc(reps * sizeof(rep_times[0]));
+            for (uint32_t i = 0; i < reps; i++)
                 if (
                     rep_times[i] < pctile_times[1] - iqr * 1.5 || // Low outlier
                     rep_times[i] > pctile_times[3] + iqr * 1.5 // High outlier
-                ) {
-                    if (outliers > outliers_cap) {
-                        outliers_cap = (outliers_cap == 0) ? 1 : outliers_cap * 2;
-                        outliers_list = realloc(outliers_list, outliers_cap * sizeof(rep_times[i]));
-                    }
-                    outliers_list[outliers] = rep_times[i];
-                    outliers++;
-                }
-            }
+                )
+                    outliers_list[outliers++] = rep_times[i];
             printf("Outliers: %d\n", outliers);
             if (outliers > 0) {
                 printf("    ");
-                float new_mean = mean * reps;
-                for (int i = 0; i < outliers; i++) {
-                    printf("%f ", outliers_list[i]);
+                double new_mean = mean * reps;
+                for (uint32_t i = 0; i < outliers; i++) {
+                    printf("%lf ", outliers_list[i]);
                     new_mean -= outliers_list[i];
                 }
                 new_mean /= reps - outliers;
@@ -284,7 +274,7 @@ int main() {
             // Adding Results to File
 
             fprintf(
-                fptr_results, ", %f, %f, %f, %f, %f\n",
+                fptr_results, ", %lf, %lf, %lf, %lf, %lf\n",
                 pctile_times[0], pctile_times[1], pctile_times[2], pctile_times[3], pctile_times[4]
             );
 
