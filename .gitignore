@@ -5,5 +5,5 @@ autorun
 
 /build
 
-#test.c
+test.c
 test
