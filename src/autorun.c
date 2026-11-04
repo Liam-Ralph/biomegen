@@ -17,6 +17,10 @@
 #define PATH_AUTORUN_TASKS "../src/autorun_tasks.txt"
 #define PATH_AUTORUN_RESULTS "../src/autorun_results.csv"
 
+#define ANSI_GREEN "\033[38;5;2m"
+#define ANSI_BLUE "\033[38;5;4m"
+#define ANSI_RESET "\033[0m"
+
 
 // Main Function
 
@@ -67,7 +71,7 @@ int main() {
         // Getting Task Parameters
 
         char token[250];
-        strncpy(token, strtok(line, ":"), 5);
+        strncpy(token, strtok(line, ":"), 4);
         uint32_t reps = abs(atoi(token)); // Repetitions
 
         strncpy(token, strtok(NULL, ":"), 2);
@@ -87,79 +91,52 @@ int main() {
 
         // Prep Save path
 
-        if (save_png) {
-            const int len_inputs = strlen(inputs);
-            char inputs_copy[250];
-            strncpy(inputs_copy, inputs, len_inputs - 4);
-            snprintf(inputs, len_inputs + 3, "%s0.png", inputs_copy);
-        }
-        // "1920 1080 100 120 50 5 8 file.png" -> "1920 1080 100 120 50 5 8 file0.png"
+        if (save_png)
+            inputs[strlen(inputs) - 5] = '\0';
 
         // Running Repetitions
 
         if (!show_rep_times) {
-
-            printf("[");
+            printf(ANSI_BLUE);
             for (uint32_t ii = 0; ii < columns; ii++)
-                printf(" ");
-            printf("]   0%%");
+                printf("█");
+            printf("%s   0%%", ANSI_RESET);
             fflush(stdout);
-
         }
 
-        float rep_times[reps];
+        double rep_times[reps];
+        uint32_t prev_bars = 0;
+
         for (uint32_t i = 0; i < reps; i++) {
-
-            if (save_png) {
-
-                // Preparing Rep's Save Path
-
-                const int len_inputs = strlen(inputs);
-                char inputs_copy[257] = "";
-                strncpy(inputs_copy, inputs, len_inputs - 5);
-                snprintf(inputs, len_inputs + 4, "%s%d.png", inputs_copy, i + 1);
-                // Rep 1 is saved in file1.png, rep2 in file2.png, etc.
-
-            }
 
             // Running Program and Collecting Output
 
-            char output[13];
-            char buffer[13]; // max time 99999.999999 seconds (> 27 hours)
+            char output[13]; // max time 99999.999999 seconds (> 27 hours)
 
-            char command[266] = "./main ";
-            strncat(command, inputs, 256);
+            char command[257];
+            if (save_png)
+                snprintf(command, 257, "./main %s%u.png", inputs, i + 1);
+            else
+                snprintf(command, 257, "./main %s", inputs);
 
             FILE *fp = popen(command, "r");
-            fgets(buffer, 13, fp);
-            strncpy(output, buffer, 13);
+            fgets(output, 13, fp);
             pclose(fp);
 
-            float time = atof(output);
+            double time = atof(output);
             rep_times[i] = time;
 
             // Print Rep Time or Progress Bar
 
             if (show_rep_times) {
-                printf("Repetition ");
-                if (reps < 10) {
-                    printf("%d Time %16lfs\n", (i + 1), time);
-                } else if (reps < 100) {
-                    printf("%2d Time %15lfs\n", (i + 1), time);
-                } else {
-                    printf("%3d Time %14lfs\n", (i + 1), time);
-                }
+                printf("Repetition: ");
+                if (reps < 10) printf("%u", i + 1);
+                else if (reps < 100) printf("%2u", i + 1);
+                else printf("%3u", i + 1);
+                printf(" Time: %16lfs\n", time);
             } else {
-                const int bars = round((i + 1) * 100 / reps);
-                printf("\r\033[K\033[48;5;2m");
-                for (int ii = 0; ii < bars; ii++) {
-                    printf(" ");
-                }
-                printf("\033[48;5;1m");
-                for (int ii = 0; ii < 100 - bars; ii++) {
-                    printf(" ");
-                }
-                printf("\033[0m %3d%%", bars);
+                const uint32_t bars = round((i + 1) * columns / reps);
+                
                 fflush(stdout);
             }
 

@@ -69,25 +69,60 @@ uint32_t width; // Used for row-major order
 // User Input
 
 /**
- * Get a sanitized integer input from the user between `min` and `max`,
- * both inclusive.
+ * Clear screen, print a prompt for user input, and get a sanitized uint32_t
+ * input from the user between `min` and `max` inclusive.
  * 
+ * @param name
+ * @param desc
  * @param min
  * @param max
+ * @param def default, `UINT32_MAX` for no default
+ * @param higher_effect
  * 
  * @return valid user input
  */
-int get_int(int min, int max) {
+uint32_t get_uint(
+    char *name, char *desc, uint32_t min, uint32_t max, uint32_t def, char *higher_effect
+) {
 
-    int result;
+    // Clear Screen
+
+    system("clear");
+
+    // Print Prompt
+
+    print(
+        "%sName%s: %s\n"
+        "%sDescription%s: %s\n"
+        "%sMinimum%s: %u\n"
+        "%sMaximum%s: %u\n"
+        "%sDefault%s: ",
+        ANSI_BLUE, ANSI_RESET, name,
+        ANSI_BLUE, ANSI_RESET, desc,
+        ANSI_BLUE, ANSI_RESET, min,
+        ANSI_BLUE, ANSI_RESET, max,
+        ANSI_BLUE, ANSI_RESET
+    );
+    if (def != UINT32_MAX)
+        printf("%u\n", def);
+    else
+        printf("N/A\n");
+    printf(
+        "%sHigher values%s: %s\n",
+        ANSI_BLUE, ANSI_RESET, higher_effect
+    );
+
+    // Get Input
+
+    uint32_t result;
 
     while (true) {
 
-        int scanf_return = scanf("%d", &result);
+        int scanf_return = scanf("%u", &result);
         while (getchar() != '\n');
 
         if (scanf_return != 1 || result < min || result > max)
-            printf("Input must be an integer between %d and %d (both inclusive).\n", min, max);
+            printf("Input must be a positive integer between %u and %u inclusive.\n", min, max);
         else
             break;
 
@@ -480,7 +515,7 @@ void nearest_neighbors_recursive(
  * @param type the type of process
  * @param num process number if applicable, ignored if below 0
  */
-void set_process_title(const char type[], const int num) {
+void set_process_title(const char *type, const int num) {
 
     // Example: type is "worker", num is 6: "bg-worker006"
 
@@ -681,7 +716,7 @@ void assign_sections(
         // Calculate Chance
 
         double dist = sqrt(min_dist_sq) / sqrt(map_resolution);
-        double threshold = ((nearest_index % 20) / 19.0 * 1.5 + 0.25) * island_size;
+        double threshold = ((nearest_index % 20) / 19.0 * 1.5 + 0.25) * island_size / 10;
 
         int chance = (dist <= threshold) ? 9 : 1;
 
@@ -1004,13 +1039,40 @@ int main(int argc, char *argv[]) {
 
     // Get Inputs
 
-    bool auto_mode = (argc == 1);
+    bool auto_mode = (argc >= 9);
     char output_file[229];
-    uint32_t height, map_resolution, island_abundance, island_size,
-        coastline_smoothing, processes;
     // width is global
+    uint32_t height;
+    uint32_t map_resolution; // controls the number of dots
+    uint32_t island_abundance; // controls the number of "Land Origin" and "Water Forced" dots
+    uint32_t island_size;
+    uint32_t coastline_smoothing;
+    uint32_t processes;
+    uint32_t biome_size;
 
-    if (auto_mode) {
+    // Set Min and Max Values
+
+    const uint32_t DIM_MIN = 500; // Width and height
+    const uint32_t DIM_MAX = 10000; // Width and height
+    const uint32_t MAP_RESOLUTION_MIN = 50;
+    const uint32_t MAP_RESOLUTION_MAX = 500;
+    const uint32_t MAP_RESOLUTION_DEFAULT = 100;
+    const uint32_t ISLAND_ABUNDANCE_MIN = 10;
+    const uint32_t ISLAND_ABUNDANCE_MAX = 1000;
+    const uint32_t ISLAND_ABUNDANCE_DEFAULT = 120;
+    const uint32_t ISLAND_SIZE_MIN = 10;
+    const uint32_t ISLAND_SIZE_MAX = 100;
+    const uint32_t ISLAND_SIZE_DEFAULT = 50;
+    const uint32_t COASTLINE_SMOOTHING_MIN = 0;
+    const uint32_t COASTLINE_SMOOTHING_MAX = 100;
+    const uint32_t COASTLINE_SMOOTHING_DEFAULT = 5;
+    const uint32_t BIOME_SIZE_MIN = 5;
+    const uint32_t BIOME_SIZE_MAX = 30;
+    const uint32_t BIOME_SIZE_DEFAULT = 10;
+
+    // Get Inputs
+
+    if (!auto_mode) {
 
         // Manual Inputs Mode
 
@@ -1042,58 +1104,43 @@ int main(int argc, char *argv[]) {
         getchar();
         system("clear");
 
-        printf("Map Width (pixels):\n");
-        width = get_int(500, 10000);
+        width = get_uint("Map Width", "", DIM_MIN, DIM_MAX, UINT32_MAX, "");
         // if this max is raised multiple types need to be changed, even if the max < 2^16
 
-        printf("\nMap Height:\n");
-        height = get_int(500, 10000);
+        height = get_uint("Map Height", "", DIM_MIN, DIM_MAX, UINT32_MAX, "");
 
-        printf(
-            "\nMap resolution controls the section size of the map.\n"
-            "Choose a number between 50 and 500. 100 is the default.\n"
-            "Larger numbers produce lower resolutions, with larger pieces\n"
-            "while lower numbers take longer to generate.\n"
-            "Map Resolution: "
+        map_resolution = get_uint(
+            "Map Resolution", "Number of polygons the map is divided into",
+            MAP_RESOLUTION_MIN, MAP_RESOLUTION_MAX, MAP_RESOLUTION_DEFAULT,
+            "Lower resolution, larger polygons"
         );
-        map_resolution = get_int(50, 500); // controls the number of dots
 
-        printf(
-            "\nIsland abundance control how many islands there are,\n"
-            "and the ration of land to water.\n"
-            "Choose a number between 10 and 1000. 120 is the default.\n"
-            "Larger numbers produces less land.\n"
-            "Island Abundance: "
+        island_abundance = get_uint(
+            "Island Abundance", "Controls how many islands there are",
+            ISLAND_ABUNDANCE_MIN, ISLAND_ABUNDANCE_MAX, ISLAND_ABUNDANCE_DEFAULT,
+            "Less land, less land overall"
         );
-        island_abundance = get_int(10, 1000);
-        // controls the number of "Land Origin" and "Water Forced" dots
 
-        printf(
-            "\nIsland size controls average island size.\n"
-            "Choose a number between 10 and 100. 50 is the default.\n"
-            "Larger numbers produce larger islands.\n"
-            "Island Size: "
-        );
-        island_size = get_int(10, 100);
 
-        printf(
-            "\nCoastline smoothing controls how smooth or rough coastlines look.\n"
-            "Choose a number between 0 and 100. Larger numbers cause more smoothing.\n"
-            "A value of 0 causes no smoothing. A value of 5 causes some smoothing,\n"
-            "and is the default value.\n"
-            "Coastline Smoothing: "
+        island_size = get_uint(
+            "Island Size", "Controls the average size of islands",
+            ISLAND_SIZE_MIN, ISLAND_SIZE_MAX, ISLAND_SIZE_DEFAULT,
+            "Larger islands, more land overall"
         );
-        coastline_smoothing = get_int(0, 100);
 
-        printf(
-            "\nNow you must choose how many of your CPU's threads to use for map generation.\n"
-            "Values exceeding your CPU's number of threads will slow map generation.\n"
-            "The most efficient number of threads to use varies by hardware, OS,\n"
-            "and CPU load. Values less than 4 threads are usually very inefficient.\n"
-            "Ensure you monitor your CPU for overheating, and halt the program if\n"
-            "high temperatures occur. Using fewer threads may reduce temperatures.\n"
-            "Number of Threads: "
+
+        coastline_smoothing = get_uint(
+            "Coastline Smoothing", "Controls how smooth coastlines look",
+            COASTLINE_SMOOTHING_MIN, COASTLINE_SMOOTHING_MAX, COASTLINE_SMOOTHING_DEFAULT,
+            "More smoothing"
         );
+
+        biome_size = get_uint(
+            "Biome Size", "Controls the average size of biomes",
+            BIOME_SIZE_MIN, BIOME_SIZE_MAX, BIOME_SIZE_DEFAULT,
+            "Larger biomes"
+        );
+
         #ifdef __linux__
             int max_processors = (int)sysconf(_SC_NPROCESSORS_ONLN);
         #elif BSD || __Apple__
@@ -1101,7 +1148,11 @@ int main(int argc, char *argv[]) {
             sysctlbyname("hw.ncpu", &ncpu, &sizeof(int), NULL, 0);
         #endif
         if (max_processors > 9999) max_processors = 9999;
-        processes = get_int(1, max_processors);
+        processes = get_uint(
+            "Processors Used", "Number of CPU threads used in generation",
+            1, max_processors, UINT32_MAX,
+            "Faster generation, increased CPU load, higher CPU temperatures"
+        );
 
         system("clear");
 
@@ -1109,7 +1160,7 @@ int main(int argc, char *argv[]) {
 
         // Automated Inputs Mode
 
-        auto_mode = true;
+
 
         width = atoi(argv[1]);
         height = atoi(argv[2]);
