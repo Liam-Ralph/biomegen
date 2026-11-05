@@ -1068,9 +1068,9 @@ int main(int argc, char *argv[]) {
     const uint32_t COASTLINE_SMOOTHING_MIN = 0;
     const uint32_t COASTLINE_SMOOTHING_MAX = 100;
     const uint32_t COASTLINE_SMOOTHING_DEFAULT = 5;
-    const uint32_t BIOME_SIZE_MIN = 5;
-    const uint32_t BIOME_SIZE_MAX = 30;
-    const uint32_t BIOME_SIZE_DEFAULT = 10;
+    const uint32_t BIOME_SIZE_MIN = 10;
+    const uint32_t BIOME_SIZE_MAX = 60;
+    const uint32_t BIOME_SIZE_DEFAULT = 20;
 
     // Get Inputs
 
@@ -1564,7 +1564,16 @@ int main(int argc, char *argv[]) {
     // Add Biome Origin Dots
     // The area around a biome origin dot will have the same biome
 
-    uint32_t biome_origin_indexes[num_dots / 10];
+    uint32_t num_biome_dots = num_land_dots / biome_size;
+    uint32_t *biome_indexes = malloc(num_biome_dots * sizeof(uint32_t));
+    bool *used_biome_coords = calloc(num_land_dots, sizeof(bool));
+    for (uint32_t i = 0; i < biome_indexes; i++) {
+        uint32_t index;
+        do {
+            index = rand() % num_land_dots;
+        } while (used_biome_coords[index]);
+        biome_indexes[i] = index;
+    }
 
     int ii = 0;
     for (int i = 0; i < num_dots / 10; i++) {

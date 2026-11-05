@@ -4,6 +4,8 @@
  - Greatly reduced memory usage.
  - Switched to CMake.
  - Enabled compiler optimizations by default.
+ - Fixed possible error when biome generation tries to assign more biome origin
+    dots than there are land dots.
  - Cleaned code.
 
 ## Version 3.1.1 (August 2026)
