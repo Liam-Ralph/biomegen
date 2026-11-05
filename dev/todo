@@ -10,8 +10,6 @@ add biome_size option (used in number of biome origin dots)
 
 dont need string format specifier for ansi constants
 
-define custom dots iterator type instead of size_t
-
 check if +1 still needed for floating-point errors
 
 recalculate section percentages

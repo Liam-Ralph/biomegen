@@ -187,13 +187,13 @@ int main() {
         printf("Standard Deviation      %lfs\n", std_deviation);
 
         uint32_t pix_per_sec = (uint32_t)round(width * height / mean);
-        printf("Pixels per Second       %d\n", pix_per_sec);
+        printf("Pixels per Second       %u\n", pix_per_sec);
 
         // Saving Results to File
 
         FILE *fptr_results = fopen(PATH_AUTORUN_RESULTS, "a");
         fprintf(
-            fptr_results, "%s, %d, %d, %d, %d, %lf, %lf, %d",
+            fptr_results, "%s, %u, %u, %u, %u, %lf, %lf, %u",
             version, width, height, processes, reps, mean, std_deviation, pix_per_sec
         );
 
@@ -202,10 +202,10 @@ int main() {
             // Sorting Rep Times
 
             bool swapped;
-            float temp;
-            for (int i = 0; i < reps - 1; i++) {
+            double temp;
+            for (uint32_t i = 0; i < reps - 1; i++) {
                 swapped = false;
-                for (int ii = 0; ii < reps - i - 1; ii++) {
+                for (uint32_t ii = 0; ii < reps - i - 1; ii++) {
                     if (rep_times[ii] > rep_times[ii + 1]) {
                         temp = rep_times[ii];
                         rep_times[ii] = rep_times[ii + 1];
@@ -251,14 +251,14 @@ int main() {
             iqr = pctile_times[3] - pctile_times[1];
             printf("Interquartile Range     %lfs\n", iqr);
             uint32_t outliers = 0;
-            double *outliers_list = malloc(reps * sizeof(rep_times[0]));
+            double *outliers_list = malloc(reps * sizeof(double));
             for (uint32_t i = 0; i < reps; i++)
                 if (
                     rep_times[i] < pctile_times[1] - iqr * 1.5 || // Low outlier
                     rep_times[i] > pctile_times[3] + iqr * 1.5 // High outlier
                 )
                     outliers_list[outliers++] = rep_times[i];
-            printf("Outliers: %d\n", outliers);
+            printf("Outliers: %u\n", outliers);
             if (outliers > 0) {
                 printf("    ");
                 double new_mean = mean * reps;
