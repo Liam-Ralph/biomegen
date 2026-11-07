@@ -1068,9 +1068,9 @@ int main(int argc, char *argv[]) {
     const uint32_t COASTLINE_SMOOTHING_MIN = 0;
     const uint32_t COASTLINE_SMOOTHING_MAX = 100;
     const uint32_t COASTLINE_SMOOTHING_DEFAULT = 5;
-    const uint32_t BIOME_SIZE_MIN = 10;
-    const uint32_t BIOME_SIZE_MAX = 60;
-    const uint32_t BIOME_SIZE_DEFAULT = 20;
+    const uint32_t BIOME_SIZE_MIN = 2;
+    const uint32_t BIOME_SIZE_MAX = 20;
+    const uint32_t BIOME_SIZE_DEFAULT = 5;
 
     // Get Inputs
 
