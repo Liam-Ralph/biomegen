@@ -1529,7 +1529,7 @@ int main(int argc, char *argv[]) {
     Dot *land_tree_dots = malloc(sizeof(Dot) * num_land_dots);
     build_recursive(land_dots_unsorted, land_tree_dots, 0, 0, num_land_dots - 1, 0);
 
-    // Create Piece Starts Water Dots
+    // Create Water Dots Piece Starts
 
     uint32_t water_piece_length = num_water_dots / processes;
     uint32_t water_piece_starts[processes + 1];
@@ -1564,139 +1564,65 @@ int main(int argc, char *argv[]) {
     // Add Biome Origin Dots
     // The area around a biome origin dot will have the same biome
 
+    // Create Biome Origin Dot Indexes and Tree
+
     uint32_t num_biome_dots = num_land_dots / biome_size;
-    uint32_t *biome_indexes = malloc(num_biome_dots * sizeof(uint32_t));
+    Dot *biome_dots = malloc(sizeof(Dot) * num_biome_dots);
+    Dot *biome_tree_dots = malloc(sizeof(Dot) * num_biome_dots);
     bool *used_biome_coords = calloc(num_land_dots, sizeof(bool));
-    for (uint32_t i = 0; i < biome_indexes; i++) {
+
+    // Biome Probablities
+    DotType probs[10][10] = {
+        {ROCK, DESERT, DESERT, DESERT, JUNGLE, JUNGLE, JUNGLE, FOREST, FOREST, PLAINS},
+        {ROCK, DESERT, DESERT, DESERT, JUNGLE, JUNGLE, FOREST, FOREST, PLAINS, PLAINS},
+        {ROCK, DESERT, DESERT, JUNGLE, FOREST, FOREST, FOREST, PLAINS, PLAINS, PLAINS},
+        {ROCK, DESERT, JUNGLE, FOREST, FOREST, FOREST, PLAINS, PLAINS, PLAINS, PLAINS},
+        {ROCK, DESERT, FOREST, FOREST, FOREST, FOREST, PLAINS, PLAINS, PLAINS, PLAINS},
+        {ROCK, FOREST, FOREST, FOREST, FOREST, FOREST, PLAINS, PLAINS, PLAINS, PLAINS},
+        {ROCK, TAIGA, FOREST, FOREST, FOREST, FOREST, FOREST, PLAINS, PLAINS, PLAINS},
+        {ROCK, SNOW, SNOW, TAIGA, TAIGA, FOREST, FOREST, FOREST, PLAINS, PLAINS},
+        {SNOW, SNOW, SNOW, SNOW, TAIGA, TAIGA, TAIGA, TAIGA, TAIGA, FOREST},
+        {SNOW, SNOW, SNOW, SNOW, SNOW, SNOW, SNOW, SNOW, SNOW, SNOW}
+    };
+
+    for (uint32_t i = 0; i < num_biome_dots; i++) {
+
+        // Choose Index
+
         uint32_t index;
         do {
             index = rand() % num_land_dots;
         } while (used_biome_coords[index]);
-        biome_indexes[i] = index;
-    }
 
-    int ii = 0;
-    for (int i = 0; i < num_dots / 10; i++) {
+        // Choose Biome Type
 
-        // Biome origin dot must be land
-        while (dots[ii].type != 'L') {
-            ii++;
-        }
-        biome_origin_indexes[i] = ii;
+        dots[index].type = probs[
+            (dots[i].y == 0 || dots[i].y == height) ?
+            9 : (uint32_t)abs((int)((dots[i].y - height / 2.0) / height * 20)) // Equator distance
+        ][rand() % 10];
 
-        Dot *dot = &dots[ii];
+        // Add to Biome Indexes and Dots
 
-        const double equator_dist = fabs((double)dot->y - height / 2.0) / height * 20.0;
+        memcpy(&biome_dots[i], &dots[index], sizeof(Dot));
 
-        char probs[10];
-        if (equator_dist < 1) {
-            memcpy(
-                probs, (char[]){'R', 'D', 'D', 'D', 'J', 'J', 'J', 'F', 'F', 'P'}, sizeof(probs)
-            );
-        } else if (equator_dist < 2) {
-            memcpy(
-                probs, (char[]){'R', 'D', 'D', 'D', 'J', 'J', 'F', 'F', 'P', 'P'}, sizeof(probs)
-            );
-        } else if (equator_dist < 3) {
-            memcpy(
-                probs, (char[]){'R', 'D', 'D', 'J', 'F', 'F', 'F', 'P', 'P', 'P'}, sizeof(probs)
-            );
-        } else if (equator_dist < 4) {
-            memcpy(
-                probs, (char[]){'R', 'D', 'J', 'F', 'F', 'F', 'P', 'P', 'P', 'P'}, sizeof(probs)
-            );
-        } else if (equator_dist < 5) {
-            memcpy(
-                probs, (char[]){'R', 'D', 'F', 'F', 'F', 'F', 'P', 'P', 'P', 'P'}, sizeof(probs)
-            );
-        } else if (equator_dist < 6) {
-            memcpy(
-                probs, (char[]){'R', 'F', 'F', 'F', 'F', 'F', 'P', 'P', 'P', 'P'}, sizeof(probs)
-            );
-        } else if (equator_dist < 7) {
-            memcpy(
-                probs, (char[]){'R', 'T', 'F', 'F', 'F', 'F', 'F', 'P', 'P', 'P'}, sizeof(probs)
-            );
-        } else if (equator_dist < 8) {
-            memcpy(
-                probs, (char[]){'R', 'S', 'S', 'T', 'T', 'F', 'F', 'F', 'P', 'P'}, sizeof(probs)
-            );
-        } else if (equator_dist < 9) {
-            memcpy(
-                probs, (char[]){'S', 'S', 'S', 'S', 'T', 'T', 'T', 'T', 'T', 'F'}, sizeof(probs)
-            );
-        } else {
-            for (int ii = 0; ii < 10; ii++) {
-                probs[ii] = 'S';
-            }
-        }
-
-        /*
-        Probability Chart, 1 box = 10% Chance
-        Uppercase/lowercase are an attempt to make it easier to read, they mean nothing
-        This also means s represents snow, not shallow water
-        0-1 | r D D D J J J f f P
-        1-2 | r D D D J J f f P P
-        2-3 | r D D J f f f P P P
-        3-4 | r D J f f f P P P P
-        4-5 | r D f f f f P P P P
-        5-6 | r f f f f f P P P P
-        6-7 | r T f f f f f P P P
-        7-8 | r s s T T f f f P P
-        8-9 | s s s s T T T T f f
-        9-10| s s s s s s s s s s
-        */
-
-        dot->type = probs[rand() % 10];
-
-        ii++;
+        // Increment Progress
 
         atomic_fetch_add(&section_progress[4], 1);
 
     }
 
-    // Create Land Biomes
-    // Land dots are assigned the biome of the nearest biome origin dot
-
-    // Create Biome Origin KDTree
-
-    int num_biome_dots = num_dots / 10;
-    int *biome_dots = malloc(num_biome_dots * 3 * sizeof(int));
-    for (int i = 0; i < num_biome_dots; i++) {
-        const Dot *dot = &dots[biome_origin_indexes[i]];
-        biome_dots[i * 3] = dot->x;
-        biome_dots[i * 3 + 1] = dot->y;
-        biome_dots[i * 3 + 2] = biome_origin_indexes[i];
-    }
-    Node *biome_tree_root = NULL;
-    biome_tree_root = build_recursive(biome_dots, num_biome_dots, 0);
+    memcpy(biome_dots, biome_tree_dots, sizeof(uint32_t) * num_biome_dots);
+    build_recursive(biome_dots, biome_tree_dots, 0, 0, num_biome_dots - 1, 0);
     free(biome_dots);
 
-    // Create and Sort Lands
-    // Original "land_dots" was freed in water biome generation
+    // Create Land Dots Piece Starts
 
-    int num_land_dots2 = 0;
-    int *land_dots2 = malloc(num_dots * 3 * sizeof(int));
-    for (int i = 0; i < num_dots; i++) {
-        const Dot *dot = &dots[i];
-        if (dot->type == 'L') {
-            land_dots2[num_land_dots2 * 3] = dot->x;
-            land_dots2[num_land_dots2 * 3 + 1] = dot->y;
-            land_dots2[num_land_dots2 * 3 + 2] = i;
-            num_land_dots2++;
-        }
-    }
-
-    quicksort_recursive(land_dots2, 0, num_land_dots2 - 1, width);
-
-    // Create Piece Starts Land Dots
-
-    int land_piece_length = num_land_dots2 / processes;
-    int land_piece_starts[processes + 1];
-    for (int i = 0; i < processes; i++) {
+    uint32_t land_piece_length = num_land_dots / processes;
+    uint32_t land_piece_starts[processes + 1];
+    for (uint32_t i = 0; i < processes; i++) {
         land_piece_starts[i] = i * land_piece_length;
     }
-    land_piece_starts[processes] = num_land_dots2;
+    land_piece_starts[processes] = num_land_dots;
 
     // Run Workers
 
