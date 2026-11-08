@@ -4,9 +4,6 @@ rewrite all docstrings
 rewrite docstring to use `foo` instead of FOO
 remove const from function arg when passed by value
 store section times as a timespec
-check if any timespec functions unused
-store island_size as integer
-add biome_size option (used in number of biome origin dots)
 
 dont need string format specifier for ansi constants
 
@@ -16,11 +13,14 @@ recalculate section percentages
 
 make timespecs pass by reference where applicable for functions
 
-review parameter order of nearest_neighbor_recursive and build_recursive
+check usage of const
+
+build_recursive order: tree_dots, dots, low, high, index, depth
+review parameter order of nearest_neighbor_recursive
+
+check all malloc and mmap are freed
 
 update readme file
-
-check if quicksort can ever run on a sorted dots (can only happen on initial call)
 
 consider switching to pthread
 

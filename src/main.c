@@ -1670,9 +1670,8 @@ int main(int argc, char *argv[]) {
 
     // Create Section Starts
 
-    const int section_height = height / processes;
-
-    int section_starts[processes + 1];
+    uint32_t section_height = height / processes;
+    uint32_t section_starts[processes + 1];
     for (int i = 0; i < processes; i++) {
         section_starts[i] = i * section_height;
     }
@@ -1680,27 +1679,35 @@ int main(int argc, char *argv[]) {
 
     // Create Dots KDTree
 
-    int *dot_coords = malloc(num_dots * 3 * sizeof(int));
-    for (int i = 0; i < num_dots; i++) {
-        const Dot *dot = &dots[i];
-        dot_coords[i * 3] = dot->x;
-        dot_coords[i * 3 + 1] = dot->y;
-        dot_coords[i * 3 + 2] = i;
-    }
-    Node *tree_root = NULL;
-    tree_root = build_recursive(dot_coords, num_dots, 0);
-    free(dot_coords);
+    Dot *tree_dots = malloc(sizeof(Dot) * num_dots);
+    build_recursive(dots, tree_dots, 0, 0, num_dots - 1, 0);
+    munmap(dots, sizeof(Dot) * num_dots);
+
+    // Setup PNG
+
+    png_structp png_ptr = png_create_write_struct(PNG_LIBPNG_VER_STRING, NULL, NULL, NULL);
+    png_infop info_ptr = png_create_info_struct(png_ptr);
+    png_set_IHDR(
+        png_ptr, info_ptr, width, height,
+        8, PNG_COLOR_TYPE_RGB, PNG_INTERLACE_NONE,
+        PNG_COMPRESSION_TYPE_DEFAULT, PNG_FILTER_TYPE_DEFAULT
+    );
+
+    // Setup PNG Row Pointers
+
+    png_bytepp row_pointers = png_malloc(png_ptr, sizeof(png_bytep) * height);
+    for (uint32_t i = 0; i < height; i++)
+        row_pointers[i] = png_malloc(png_ptr, sizeof(png_byte) * 3 * width); // need to make this thread safe
 
     // Run Workers
 
-    for (int i = 0; i < processes; i++) {
+    for (uint32_t i = 0; i < processes; i++) {
 
         fork_pids[i] = fork();
-        if (fork_pids[i] != 0) {
+        if (fork_pids[i] != 0)
             continue;
-        }
 
-        set_process_title("worker", i);
+        set_process_title("ig-worker", i);
         generate_image(
             section_starts[i], section_starts[i + 1], width, tree_root,
             num_dots, dots, image_indexes, type_counts, section_progress
@@ -1708,9 +1715,8 @@ int main(int argc, char *argv[]) {
         exit(0);
 
     }
-    for (int i = 0; i < processes; i++) {
+    for (int i = 0; i < processes; i++)
         waitpid(fork_pids[i], NULL, 0);
-    }
 
     // Free Tree
 
@@ -1729,14 +1735,7 @@ int main(int argc, char *argv[]) {
     // Create Image
 
     FILE *fptr = fopen(output_file, "w");
-    png_structp png_ptr = png_create_write_struct(PNG_LIBPNG_VER_STRING, NULL, NULL, NULL);
-    png_infop info_ptr = png_create_info_struct(png_ptr);
 
-    png_set_IHDR(
-        png_ptr, info_ptr, width, height,
-        8, PNG_COLOR_TYPE_RGB, PNG_INTERLACE_NONE,
-        PNG_COMPRESSION_TYPE_DEFAULT, PNG_FILTER_TYPE_DEFAULT
-    );
 
     // Assign Image Pixels
 
