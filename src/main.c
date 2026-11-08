@@ -42,6 +42,9 @@ BiomeGen, a terminal application for generating png maps.
 #define ANSI_BLUE "\033[38;5;4m"
 #define ANSI_RESET "\033[0m"
 
+#define NUM_SECTIONS 7
+#define NUM_DOTTYPES_IMAGE 11
+
 #define DIM_MIN 500 // Width and height
 #define DIM_MAX 10000 // Width and height
 #define MAP_RESOLUTION_MIN 50
@@ -577,11 +580,11 @@ void track_progress(
     _Atomic uint32_t *section_progress, uint32_t *section_progress_total, timespec *section_times
 ) {
 
-    char section_names[7][20] = {
+    char section_names[NUM_SECTIONS][20] = {
         "Setup", "Section Generation", "Section Assignment", "Coastline Smoothing",
         "Biome Generation", "Image Generation", "Finish"
     };
-    double section_weights[7] = {0.01, 0.01, 0.03, 0.24, 0.04, 0.53, 0.14};
+    double section_weights[NUM_SECTIONS] = {0.01, 0.01, 0.03, 0.24, 0.04, 0.53, 0.14};
     // Used for overall progress bar (e.g. Setup takes ~1% of total time)
 
     struct winsize w;
@@ -602,7 +605,7 @@ void track_progress(
 
         double total_progress = 0.0;
 
-        for (int i = 0; i < 7; i++) {
+        for (uint32_t i = 0; i < NUM_SECTIONS; i++) {
 
             // Calculate Section Progress
 
@@ -629,9 +632,9 @@ void track_progress(
             // Print Output for Section Progress
 
             printf(
-                "%s[%d/7] %-20s%8.2lf%% %s",
-                color, i + 1, section_names[i], progress_section * 100, ANSI_GREEN
-            ); // "[1/7] Setup               100.00% "
+                "%s[%d/%d] %-20s%8.2lf%% %s",
+                color, i + 1, NUM_SECTIONS, section_names[i], progress_section * 100, ANSI_GREEN
+            ); // "[1/NUM_SECTIONS] Setup               100.00% "
             uint32_t green_bars = (uint32_t)round(columns * progress_section);
             for (uint32_t ii = 0; ii < green_bars; ii++)
                 printf("█");
@@ -650,9 +653,9 @@ void track_progress(
         char color[10];
         timespec total_time;
         bool break_now = false;
-        if (section_times[7].tv_nsec != 0 || section_times[7].tv_sec != 0) {
+        if (section_times[NUM_SECTIONS].tv_nsec != 0 || section_times[NUM_SECTIONS].tv_sec != 0) {
             strncpy(color, ANSI_GREEN, 10);
-            total_time = section_times[7];
+            total_time = section_times[NUM_SECTIONS];
             break_now = true;
         } else {
             strncpy(color, ANSI_BLUE, 10);
@@ -712,7 +715,7 @@ void assign_sections(
     uint32_t min_dist_sq;
     uint32_t land_dots_count = 0;
 
-    for (int i = start_index; i < end_index; i++) {
+    for (uint32_t i = start_index; i < end_index; i++) {
         // Non-water dots are not included
 
         // Calculate Maximum Distance
@@ -1192,23 +1195,26 @@ int main(int argc, char *argv[]) {
     // Shared Memory
 
     _Atomic uint32_t *section_progress = mmap(
-        NULL, sizeof(uint32_t) * 7, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0
+        NULL, sizeof(uint32_t) * NUM_SECTIONS,
+        PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0
     );
 
     uint32_t *section_progress_total = mmap(
-        NULL, sizeof(uint32_t) * 7, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0
+        NULL, sizeof(uint32_t) * NUM_SECTIONS,
+        PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0
     );
 
     timespec *section_times = mmap(
-        NULL, sizeof(timespec) * 8, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0
+        NULL, sizeof(timespec) * NUM_SECTIONS + 1,
+        PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0
     );
 
-    for (uint32_t i = 0; i < 7; i++) {
+    for (uint32_t i = 0; i < NUM_SECTIONS; i++) {
         atomic_init(&section_progress[i], 0);
         section_progress_total[i] = 1;
         section_times[i] = (timespec){0, 0};
     }
-    section_times[7] = (timespec){0, 0};
+    section_times[NUM_SECTIONS] = (timespec){0, 0};
 
     const uint32_t num_dots = width * height / map_resolution;
 
@@ -1248,12 +1254,12 @@ int main(int argc, char *argv[]) {
 
     const uint32_t num_special_dots = num_dots / island_abundance * 2;
     const uint32_t num_reg_dots = num_dots - num_special_dots;
-    const uint32_t num_origin_dots = num_special_dots / 2;
+    const uint32_t num_origin_dots = num_special_dots >> 1;
     // Assumed in biome generation that num_water_forced_dots = num_origin_dots
 
     bool *used_coords = calloc(width * height, sizeof(bool));
 
-    for (int i = 0; i < num_dots; i++) {
+    for (uint32_t i = 0; i < num_dots; i++) {
 
         // Find Unused Coordinate
 
@@ -1418,7 +1424,7 @@ int main(int argc, char *argv[]) {
 
         // Run Workers
 
-        for (int i = 0; i < processes; i++) {
+        for (uint32_t i = 0; i < processes; i++) {
 
             fork_pids[i] = fork();
             if (fork_pids[i] != 0)
@@ -1435,7 +1441,7 @@ int main(int argc, char *argv[]) {
             exit(0);
 
         }
-        for (int i = 0; i < processes; i++)
+        for (uint32_t i = 0; i < processes; i++)
             waitpid(fork_pids[i], NULL, 0);
 
         // Free Tree Dots
@@ -1542,7 +1548,7 @@ int main(int argc, char *argv[]) {
 
     // Run Workers
 
-    for (int i = 0; i < processes; i++) {
+    for (uint32_t i = 0; i < processes; i++) {
 
         fork_pids[i] = fork();
         if (fork_pids[i] != 0)
@@ -1556,7 +1562,7 @@ int main(int argc, char *argv[]) {
         exit(0);
 
     }
-    for (int i = 0; i < processes; i++)
+    for (uint32_t i = 0; i < processes; i++)
         waitpid(fork_pids[i], NULL, 0);
 
     // Free Land Tree Dots
@@ -1600,7 +1606,8 @@ int main(int argc, char *argv[]) {
 
         dots[index].type = probs[
             (dots[i].y == 0 || dots[i].y == height) ?
-            9 : (uint32_t)abs((int)((dots[i].y - height / 2.0) / height * 20)) // Equator distance
+            9 : (uint32_t)abs((int)((dots[i].y - height / 2.0) / height * 20))
+            // Equator distance
         ][rand() % 10];
 
         // Add to Biome Indexes and Dots
@@ -1642,7 +1649,7 @@ int main(int argc, char *argv[]) {
         exit(0);
 
     }
-    for (int i = 0; i < processes; i++)
+    for (uint32_t i = 0; i < processes; i++)
         waitpid(fork_pids[i], NULL, 0);
 
     // Free Biome Origin Tree Dots
@@ -1662,7 +1669,8 @@ int main(int argc, char *argv[]) {
     // Used by map statistics
 
     uint32_t *type_counts = mmap(
-        NULL, sizeof(uint32_t) * 11, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0
+        NULL, sizeof(uint32_t) * NUM_DOTTYPES_IMAGE,
+        PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0
     );
 
     // Create Dots KDTree
@@ -1702,7 +1710,7 @@ int main(int argc, char *argv[]) {
         exit(0);
 
     }
-    for (int i = 0; i < processes; i++)
+    for (uint32_t i = 0; i < processes; i++)
         waitpid(fork_pids[i], NULL, 0);
 
     // Free Tree
@@ -1712,8 +1720,7 @@ int main(int argc, char *argv[]) {
     // Set Section Completion Time
 
     clock_gettime(CLOCK_MONOTONIC, &time_now);
-    section_times[5] = (double)(time_now.tv_sec - start_time.tv_sec) +
-        (time_now.tv_nsec - start_time.tv_nsec) / 1000000000.0 - sum_list_double(section_times, 7);
+    section_times[5] = calc_section_timespec(time_now, start_time, section_times, 5);
 
     // --Finish--
 
@@ -1855,11 +1862,10 @@ int main(int argc, char *argv[]) {
 
     // Shared Memory Cleanup
 
-    munmap(section_progress, sizeof(int) * 7);
-    munmap(section_progress_total, sizeof(int) * 7);
-    munmap(section_times, sizeof(double) * 8);
-    munmap(dots, sizeof(Dot) * num_dots);
-    munmap(image_indexes, sizeof(int) * width * height);
+    munmap(section_progress, sizeof(int) * NUM_SECTIONS);
+    munmap(section_progress_total, sizeof(int) * NUM_SECTIONS);
+    munmap(section_times, sizeof(double) * NUM_SECTIONS + 1);
+    munmap(pixels, sizeof(png_byte) * 3 * width * height);
 
     // Completion
 
@@ -1925,7 +1931,7 @@ int main(int argc, char *argv[]) {
 
     }
 
-    munmap(type_counts, sizeof(int) * 11);
+    munmap(type_counts, sizeof(int) * NUM_DOTTYPES_IMAGE);
 
     return 0;
 
