@@ -15,6 +15,8 @@ make timespecs pass by reference where applicable for functions
 
 check usage of const
 
+add definitions of number of sections and dottypes (all and image only)
+
 build_recursive order: tree_dots, dots, low, high, index, depth
 review parameter order of nearest_neighbor_recursive
 
@@ -25,3 +27,5 @@ update readme file
 consider switching to pthread
 
 check that dots are actually sorted properly during start of biome generation
+
+add error checking for every function that can return an error code

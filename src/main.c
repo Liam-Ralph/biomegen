@@ -42,10 +42,28 @@ BiomeGen, a terminal application for generating png maps.
 #define ANSI_BLUE "\033[38;5;4m"
 #define ANSI_RESET "\033[0m"
 
+#define DIM_MIN 500 // Width and height
+#define DIM_MAX 10000 // Width and height
+#define MAP_RESOLUTION_MIN 50
+#define MAP_RESOLUTION_MAX 500
+#define MAP_RESOLUTION_DEFAULT 100
+#define ISLAND_ABUNDANCE_MIN 10
+#define ISLAND_ABUNDANCE_MAX 1000
+#define ISLAND_ABUNDANCE_DEFAULT 120
+#define ISLAND_SIZE_MIN 10
+#define ISLAND_SIZE_MAX 100
+#define ISLAND_SIZE_DEFAULT 50
+#define COASTLINE_SMOOTHING_MIN 0
+#define COASTLINE_SMOOTHING_MAX 100
+#define COASTLINE_SMOOTHING_DEFAULT 5
+#define BIOME_SIZE_MIN 2
+#define BIOME_SIZE_MAX 20
+#define BIOME_SIZE_DEFAULT 5
+
 
 // Structs
 
-typedef enum DotType : uint8_t {
+typedef enum : uint8_t {
     ICE, SHALLOW_WATER, WATER, DEEP_WATER, ROCK, DESERT, JUNGLE, FOREST, PLAINS, TAIGA, SNOW,
     WATER_FORCED, LAND, LAND_ORIGIN
 } DotType;
@@ -762,8 +780,9 @@ void smooth_coastlines(
     _Atomic uint32_t *section_progress
 ) {
 
-    uint32_t dists_same_sq[coastline_smoothing];
-    uint32_t dists_opp_sq[coastline_smoothing];
+    uint32_t dists_same_sq[COASTLINE_SMOOTHING_MAX];
+    uint32_t dists_opp_sq[COASTLINE_SMOOTHING_MAX];
+    // Avoiding VLAs
 
     uint32_t swapped_to_land_counts = 0;
     uint32_t swapped_to_water_counts = 0;
@@ -972,14 +991,17 @@ void generate_biomes_land(
 }
 
 /**
+ * Generate a section of `pixels`.
+ * 
+ * Pixel color chosen based on the type of the nearest dot from `tree_dots`.
+ * 
  * Generate a section of the IMAGE_INDEXES, which contains the index in DOTS of
  * the nearest dot to each pixel. Also count the number of pixels of each type
  * for TYPE_COUNTS, to be used in statistics at the end of the main program.
  */
 void generate_image(
-    const int start_height, const int end_height, const int width, Node *tree_root,
-    const int num_dots, const Dot *dots,
-    int *image_indexes, int *type_counts, _Atomic int *section_progress
+    uint32_t start_height, uint32_t end_height, const Dot *tree_dots, uint32_t num_dots,
+    uint32_t *type_counts, uint32_t *section_progress
 ) {
 
     // Dot type counts for statistics, not used in image generation
@@ -1060,26 +1082,6 @@ int main(int argc, char *argv[]) {
     uint32_t coastline_smoothing;
     uint32_t processes;
     uint32_t biome_size;
-
-    // Set Min and Max Values
-
-    const uint32_t DIM_MIN = 500; // Width and height
-    const uint32_t DIM_MAX = 10000; // Width and height
-    const uint32_t MAP_RESOLUTION_MIN = 50;
-    const uint32_t MAP_RESOLUTION_MAX = 500;
-    const uint32_t MAP_RESOLUTION_DEFAULT = 100;
-    const uint32_t ISLAND_ABUNDANCE_MIN = 10;
-    const uint32_t ISLAND_ABUNDANCE_MAX = 1000;
-    const uint32_t ISLAND_ABUNDANCE_DEFAULT = 120;
-    const uint32_t ISLAND_SIZE_MIN = 10;
-    const uint32_t ISLAND_SIZE_MAX = 100;
-    const uint32_t ISLAND_SIZE_DEFAULT = 50;
-    const uint32_t COASTLINE_SMOOTHING_MIN = 0;
-    const uint32_t COASTLINE_SMOOTHING_MAX = 100;
-    const uint32_t COASTLINE_SMOOTHING_DEFAULT = 5;
-    const uint32_t BIOME_SIZE_MIN = 2;
-    const uint32_t BIOME_SIZE_MAX = 20;
-    const uint32_t BIOME_SIZE_DEFAULT = 5;
 
     // Get Inputs
 
@@ -1171,8 +1173,6 @@ int main(int argc, char *argv[]) {
 
         // Automated Inputs Mode
 
-
-
         width = atoi(argv[1]);
         height = atoi(argv[2]);
         map_resolution = atoi(argv[3]);
@@ -1215,12 +1215,6 @@ int main(int argc, char *argv[]) {
     Dot *dots = mmap(
         NULL, sizeof(Dot) * num_dots, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0
     );
-
-    uint32_t *type_counts = mmap(
-        NULL, sizeof(uint32_t) * 11, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0
-    );
-    for (uint32_t i = 0; i < 11; i++)
-        type_counts[i] = 0;
 
     pid_t tracker_process_pid = -1;
 
@@ -1412,16 +1406,14 @@ int main(int argc, char *argv[]) {
 
         uint32_t land_piece_length = num_land_dots / processes;
         uint32_t land_piece_starts[processes + 1];
-        for (uint32_t i = 0; i < processes; i++) {
+        for (uint32_t i = 0; i < processes; i++)
             land_piece_starts[i] = num_special_dots + i * land_piece_length;
-        }
         land_piece_starts[processes] = num_dots;
 
         uint32_t water_piece_length = num_water_dots / processes;
         uint32_t water_piece_starts[processes + 1];
-        for (uint32_t i = 0; i < processes; i++) {
+        for (uint32_t i = 0; i < processes; i++)
             water_piece_starts[i] = num_special_dots + i * water_piece_length;
-        }
         water_piece_starts[processes] = num_dots;
 
         // Run Workers
@@ -1544,9 +1536,8 @@ int main(int argc, char *argv[]) {
 
     uint32_t water_piece_length = num_water_dots / processes;
     uint32_t water_piece_starts[processes + 1];
-    for (uint32_t i = 0; i < processes; i++) {
+    for (uint32_t i = 0; i < processes; i++)
         water_piece_starts[i] = num_land_dots + i * water_piece_length;
-    }
     water_piece_starts[processes] = num_water_dots;
 
     // Run Workers
@@ -1631,9 +1622,8 @@ int main(int argc, char *argv[]) {
 
     uint32_t land_piece_length = num_land_dots / processes;
     uint32_t land_piece_starts[processes + 1];
-    for (uint32_t i = 0; i < processes; i++) {
+    for (uint32_t i = 0; i < processes; i++)
         land_piece_starts[i] = i * land_piece_length;
-    }
     land_piece_starts[processes] = num_land_dots;
 
     // Run Workers
@@ -1668,14 +1658,12 @@ int main(int argc, char *argv[]) {
 
     section_progress_total[5] = height;
 
-    // Create Section Starts
+    // Create Type Counts
+    // Used by map statistics
 
-    uint32_t section_height = height / processes;
-    uint32_t section_starts[processes + 1];
-    for (int i = 0; i < processes; i++) {
-        section_starts[i] = i * section_height;
-    }
-    section_starts[processes] = height;
+    uint32_t *type_counts = mmap(
+        NULL, sizeof(uint32_t) * 11, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0
+    );
 
     // Create Dots KDTree
 
@@ -1683,21 +1671,20 @@ int main(int argc, char *argv[]) {
     build_recursive(dots, tree_dots, 0, 0, num_dots - 1, 0);
     munmap(dots, sizeof(Dot) * num_dots);
 
-    // Setup PNG
+    // Create Pixels
 
-    png_structp png_ptr = png_create_write_struct(PNG_LIBPNG_VER_STRING, NULL, NULL, NULL);
-    png_infop info_ptr = png_create_info_struct(png_ptr);
-    png_set_IHDR(
-        png_ptr, info_ptr, width, height,
-        8, PNG_COLOR_TYPE_RGB, PNG_INTERLACE_NONE,
-        PNG_COMPRESSION_TYPE_DEFAULT, PNG_FILTER_TYPE_DEFAULT
+    png_byte *pixels = mmap(
+        NULL, sizeof(png_byte) * 3 * width * height,
+        PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0
     );
 
-    // Setup PNG Row Pointers
+    // Create Section Starts
 
-    png_bytepp row_pointers = png_malloc(png_ptr, sizeof(png_bytep) * height);
-    for (uint32_t i = 0; i < height; i++)
-        row_pointers[i] = png_malloc(png_ptr, sizeof(png_byte) * 3 * width); // need to make this thread safe
+    uint32_t section_height = height / processes;
+    uint32_t section_starts[processes + 1];
+    for (uint32_t i = 0; i < processes; i++)
+        section_starts[i] = i * section_height;
+    section_starts[processes] = height;
 
     // Run Workers
 
@@ -1709,8 +1696,8 @@ int main(int argc, char *argv[]) {
 
         set_process_title("ig-worker", i);
         generate_image(
-            section_starts[i], section_starts[i + 1], width, tree_root,
-            num_dots, dots, image_indexes, type_counts, section_progress
+            section_starts[i], section_starts[i + 1], tree_dots, num_dots,
+            type_counts, section_progress
         );
         exit(0);
 
@@ -1720,7 +1707,7 @@ int main(int argc, char *argv[]) {
 
     // Free Tree
 
-    free_recursive(tree_root);
+    free(tree_dots);
 
     // Set Section Completion Time
 
@@ -1735,7 +1722,14 @@ int main(int argc, char *argv[]) {
     // Create Image
 
     FILE *fptr = fopen(output_file, "w");
+    png_structp png_ptr = png_create_write_struct(PNG_LIBPNG_VER_STRING, NULL, NULL, NULL);
+    png_infop info_ptr = png_create_info_struct(png_ptr);
 
+    png_set_IHDR(
+        png_ptr, info_ptr, width, height,
+        8, PNG_COLOR_TYPE_RGB, PNG_INTERLACE_NONE,
+        PNG_COMPRESSION_TYPE_DEFAULT, PNG_FILTER_TYPE_DEFAULT
+    );
 
     // Assign Image Pixels
 
