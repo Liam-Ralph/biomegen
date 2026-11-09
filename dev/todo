@@ -1,10 +1,3 @@
-consider using uintXX_t etc.
-use enum for type
-rewrite all docstrings
-rewrite docstring to use `foo` instead of FOO
-remove const from function arg when passed by value
-store section times as a timespec
-
 dont need string format specifier for ansi constants
 
 check if +1 still needed for floating-point errors

@@ -114,7 +114,7 @@ uint32_t get_uint(
 
     // Print Prompt
 
-    print(
+    printf(
         "%sName%s: %s\n"
         "%sDescription%s: %s\n"
         "%sMinimum%s: %u\n"
@@ -179,22 +179,22 @@ timespec diff_timespecs(timespec start, timespec end) {
 /**
  * Calculate a section's time.
  * 
- * Calculates `time_now - start_time - ∑(prev_sections)`.
+ * Calculates `time_now - start_time - sum(section_times[:len])`.
  * 
  * @param time_now
  * @param start_time
- * @param prev_sections
- * @param len length of `prev_sections` (or the part thereof to be used)
+ * @param section_times
+ * @param len length of `section_times` (or the part thereof to be used)
  */
 timespec calc_section_timespec(
-    timespec time_now, timespec start_time, const timespec *prev_sections, uint32_t len
+    timespec time_now, timespec start_time, const timespec *section_times, uint32_t len
 ) {
     timespec result = time_now;
     result.tv_sec -= start_time.tv_sec;
     result.tv_nsec -= start_time.tv_nsec;
     for (uint32_t i = 0; i < len; i++) {
-        result.tv_sec -= prev_sections[i].tv_sec;
-        result.tv_nsec -= prev_sections[i].tv_nsec;
+        result.tv_sec -= section_times[i].tv_sec;
+        result.tv_nsec -= section_times[i].tv_nsec;
     }
     while (result.tv_nsec < 0) {
         result.tv_nsec += 1000000000;
@@ -408,7 +408,7 @@ void build_recursive(
  * regular calls
  */
 void nearest_neighbor_recursive(
-    Dot *tree_dots, uint32_t len, uint32_t index, const uint32_t coord[2], uint32_t depth,
+    const Dot *tree_dots, uint32_t len, uint32_t index, const uint32_t coord[2], uint32_t depth,
     uint32_t *min_dist_sq_ptr, uint32_t *nearest_index_ptr, uint32_t min_dist_sq_care
 ) {
 
@@ -473,7 +473,7 @@ void nearest_neighbor_recursive(
  * @param depth current depth, must be 0 in initial call
  */
 void nearest_neighbors_recursive(
-    Dot *tree_dots, uint32_t len, uint32_t index, const uint32_t coord[2],
+    const Dot *tree_dots, uint32_t len, uint32_t index, const uint32_t coord[2],
     uint32_t *dists_sq, uint32_t dists_sq_len, uint32_t depth
 ) {
 
@@ -645,7 +645,7 @@ void track_progress(
                 printf("█");
             printf(
                 "%s%2d:%08.5lf\n", ANSI_RESET, section_time.tv_sec / 60,
-                section_time.tv_sec + section_time.tv_nsec / 1000000000.0
+                fmod(section_time.tv_sec, 60.0) + section_time.tv_nsec / 1000000000.0
             );
 
         }
@@ -673,7 +673,7 @@ void track_progress(
             printf("█");
         printf(
             "%s%2d:%08.5f\n", ANSI_RESET, total_time.tv_sec / 60,
-            total_time.tv_sec + total_time.tv_nsec / 1000000000.0
+            fmod(total_time.tv_sec, 60.0) + total_time.tv_nsec / 1000000000.0
         );
 
         // Check Exit Status
@@ -770,8 +770,8 @@ void assign_sections(
  * @param water_start
  * @param water_end
  * @param dots
- * @param land_tree_dots
- * @param water_tree_dots
+ * @param land_tree_dots const can't be applied, but these dots are read-only
+ * @param water_tree_dots const can't be applied, but these dots are read-only
  * @param num_land_dots
  * @param num_water_dots
  * @param section_progress
@@ -779,7 +779,7 @@ void assign_sections(
 void smooth_coastlines(
     uint32_t coastline_smoothing,
     uint32_t land_start, uint32_t land_end, uint32_t water_start, uint32_t water_end,
-    Dot *dots, const Dot* land_tree_dots, const Dot *water_tree_dots,
+    Dot *dots, Dot* land_tree_dots, Dot *water_tree_dots,
     uint32_t num_land_dots, uint32_t num_water_dots,
     uint32_t *swapped_to_land_counts_ptr, uint32_t *swapped_to_water_counts_ptr,
     _Atomic uint32_t *section_progress
@@ -899,7 +899,7 @@ void smooth_coastlines(
  */
 void generate_biomes_water(
     uint32_t start_index, uint32_t end_index, const Dot *land_tree_dots, uint32_t num_land_dots,
-    uint32_t height, Dot *dots, _Atomic timespec *section_progress
+    uint32_t height, Dot *dots, _Atomic uint32_t *section_progress
 ) {
 
     uint32_t land_dist_sq;
@@ -1737,11 +1737,10 @@ int main(int argc, char *argv[]) {
 
     // --Finish--
 
-    section_progress_total[6] = height * 5;
+    section_progress_total[6] = 1;
 
     // Create Image
 
-    FILE *fptr = fopen(output_file, "w");
     png_structp png_ptr = png_create_write_struct(PNG_LIBPNG_VER_STRING, NULL, NULL, NULL);
     png_infop info_ptr = png_create_info_struct(png_ptr);
 
@@ -1753,131 +1752,44 @@ int main(int argc, char *argv[]) {
 
     // Assign Image Pixels
 
-    png_byte **row_pointers = png_malloc(png_ptr, height * sizeof(png_byte *));
-    for (int y = 0; y < height; y++) {
-        png_byte *row = png_malloc(png_ptr, 3 * sizeof(unsigned char) * width);
-        row_pointers[y] = row;
-        for (int x = 0; x < width; x++) {
-            int rgb[3] = {20, 0, 0};
-            const int image_index = image_indexes[y * width + x];
-            switch (dots[image_index].type) {
-                case 'I':
-                    rgb[0] = 153;
-                    rgb[1] = 221;
-                    rgb[2] = 255;
-                    break;
-                case 's':
-                    rgb[0] = 0;
-                    rgb[1] = 0;
-                    rgb[2] = 255;
-                    break;
-                case 'W':
-                    rgb[0] = 0;
-                    rgb[1] = 0;
-                    rgb[2] = 179;
-                    break;
-                case 'd':
-                    rgb[0] = 0;
-                    rgb[1] = 0;
-                    rgb[2] = 128;
-                    break;
-                case 'R':
-                    rgb[0] = 128;
-                    rgb[1] = 128;
-                    rgb[2] = 128;
-                    break;
-                case 'D':
-                    rgb[0] = 255;
-                    rgb[1] = 185;
-                    rgb[2] = 109;
-                    break;
-                case 'J':
-                    rgb[0] = 0;
-                    rgb[1] = 77;
-                    rgb[2] = 0;
-                    break;
-                case 'F':
-                    rgb[0] = 0;
-                    rgb[1] = 128;
-                    rgb[2] = 0;
-                    break;
-                case 'P':
-                    rgb[0] = 0;
-                    rgb[1] = 179;
-                    rgb[2] = 0;
-                    break;
-                case 'T':
-                    rgb[0] = 152;
-                    rgb[1] = 251;
-                    rgb[2] = 152;
-                    break;
-                case 'S':
-                    rgb[0] = 245;
-                    rgb[1] = 245;
-                    rgb[2] = 245;
-                    break;
-                default:
-                    rgb[0] = 40;
-                    rgb[1] = 0;
-                    rgb[2] = 0;
-                    break;
-            }
-            for (int i = 0; i < 3; i++) {
-                /*
-                Adds slight color variation
-                Every pixel around the same dot has the same variation
-                */
-                int rgb_val = rgb[i];
-                rgb_val += image_index % 20 - 10;
-                if (rgb_val > 255){
-                    rgb_val = 255;
-                } else if (rgb_val < 0) {
-                    rgb_val = 0;
-                }
-                rgb[i] = rgb_val;
-            }
-            *row++ = rgb[0];
-            *row++ = rgb[1];
-            *row++ = rgb[2];
-        }
-        atomic_fetch_add(&section_progress[6], 1);
-    }
+    png_bytepp row_pointers = png_malloc(png_ptr, sizeof(png_bytep) * height);
+    for (uint32_t i = 0; i < height; i++)
+        row_pointers[i] = (png_bytep)&pixels[3 * i * width];
 
     // Write Image to File
 
+    FILE *fptr = fopen(output_file, "w");
     png_init_io(png_ptr, fptr);
     png_set_rows(png_ptr, info_ptr, row_pointers);
     png_write_png(png_ptr, info_ptr, PNG_TRANSFORM_IDENTITY, NULL);
 
-    for (int y = 0; y < height; y++) {
-        png_free(png_ptr, row_pointers[y]);
-    }
-    png_free(png_ptr, row_pointers);
+    // Close File and Free Data
 
     fclose(fptr);
 
-    atomic_store(&section_progress[6], height * 5);
+    png_free(png_ptr, row_pointers);
+
+    munmap(pixels, sizeof(png_byte) * 3 * width * height);
 
     // Set Section Completion Time
 
-    clock_gettime(CLOCK_MONOTONIC, &time_now);
-    section_times[6] = (double)(time_now.tv_sec - start_time.tv_sec) +
-        (time_now.tv_nsec - start_time.tv_nsec) / 1000000000.0 - sum_list_double(section_times, 7);
+    atomic_store(&section_progress[6], 1);
 
-    section_times[7] = (double)(time_now.tv_sec - start_time.tv_sec) +
-        (time_now.tv_nsec - start_time.tv_nsec) / 1000000000.0;
+    clock_gettime(CLOCK_MONOTONIC, &time_now);
+    section_times[6] = calc_section_timespec(time_now, start_time, section_times, 6);
+
+    section_times[7] = calc_section_timespec(time_now, start_time, section_times, 7);
 
     // Wait for Tracker Process
 
-    if (!auto_mode) {
+    if (!auto_mode)
         waitpid(tracker_process_pid, NULL, 0);
-    }
 
     // Shared Memory Cleanup
 
-    munmap(section_progress, sizeof(int) * NUM_SECTIONS);
-    munmap(section_progress_total, sizeof(int) * NUM_SECTIONS);
-    munmap(section_times, sizeof(double) * NUM_SECTIONS + 1);
+    munmap(section_progress, sizeof(uint32_t) * NUM_SECTIONS);
+    munmap(section_progress_total, sizeof(uint32_t) * NUM_SECTIONS);
+    munmap(section_times, sizeof(timespec) * NUM_SECTIONS + 1);
     munmap(pixels, sizeof(png_byte) * 3 * width * height);
 
     // Completion
@@ -1885,10 +1797,10 @@ int main(int argc, char *argv[]) {
     struct timespec end_time;
     clock_gettime(CLOCK_MONOTONIC, &end_time);
     char formatted_time[32];
-    double completion_time = (double)(time_now.tv_sec - start_time.tv_sec) +
-        (time_now.tv_nsec - start_time.tv_nsec) / 1000000000.0;
+    timespec completion_time = diff_timespecs(start_time, end_time);
     snprintf(
-        formatted_time, 32, "%2d:%08.5f", (int)completion_time / 60, fmod(completion_time, 60.0)
+        formatted_time, 32, "%2d:%08.5f", completion_time.tv_sec / 60,
+            fmod(completion_time.tv_sec, 60.0) + completion_time.tv_nsec / 1000000000.0
     );
 
     if (!auto_mode) {
@@ -1899,43 +1811,34 @@ int main(int argc, char *argv[]) {
             "%sGeneration Complete%s %s\n\nStatistics\n", ANSI_GREEN, ANSI_RESET, formatted_time
         );
 
-        int count_water = 0;
-        int count_land = 0;
-        for (int i = 0; i < 4; i++) {
+        uint32_t count_water = 0;
+        uint32_t count_land = 0;
+        for (uint32_t i = ICE; i < DEEP_WATER; i++)
             count_water += type_counts[i];
-        }
-        for (int i = 4; i < 11; i++) {
+        for (uint32_t i = ROCK; i < NUM_DOTTYPES_IMAGE; i++)
             count_land += type_counts[i];
-        }
         double tot_pct_fact = 100.0 / (height * width); // total percentage factor
         printf(
             "Water %6.2f%%\nLand  %6.2f%%\n",
             count_water * tot_pct_fact, count_land * tot_pct_fact
         );
 
-        int text_colors[11] = {117, 21, 19, 17, 243, 229, 22, 28, 40, 48, 255};
-        char types[11][14] = {
+        uint32_t text_colors[NUM_DOTTYPES_IMAGE] = {117, 21, 19, 17, 243, 229, 22, 28, 40, 48, 255};
+        char dottype_names[NUM_DOTTYPES_IMAGE][14] = {
             "Ice", "Shallow Water", "Water", "Deep Water",
             "Rock", "Desert", "Jungle", "Forest", "Plains", "Taiga", "Snow"
         };
 
         printf("       %% of Land/Water | %% of Total\n");
-        for (int i = 0; i < 11; i++) {
-
-            double group_pct_fact = 100.0;
-            if (i < 4) {
-                group_pct_fact /= count_water;
-            } else {
-                group_pct_fact /= count_land;
-            }
-
+        double group_pct_fact = 100.0 / count_water;
+        for (uint32_t i = 0; i < NUM_DOTTYPES_IMAGE; i++) {
+            if (i == ROCK) group_pct_fact = 100 / count_land;
             printf(
                 "\033[48;5;%dm%-14s%s" // Label
                 "%7.2f%% | %6.2f%%\n", // Pct of Group | Pct of Total
-                text_colors[i], types[i], ANSI_RESET,
+                text_colors[i], dottype_names[i], ANSI_RESET,
                 type_counts[i] * group_pct_fact, type_counts[i] * tot_pct_fact
             );
-
         }
 
     } else {
@@ -1944,7 +1847,7 @@ int main(int argc, char *argv[]) {
 
     }
 
-    munmap(type_counts, sizeof(int) * NUM_DOTTYPES_IMAGE);
+    munmap(type_counts, sizeof(uint32_t) * NUM_DOTTYPES_IMAGE);
 
     return 0;
 
