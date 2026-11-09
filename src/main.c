@@ -44,6 +44,7 @@ BiomeGen, a terminal application for generating png maps.
 
 #define NUM_SECTIONS 7
 #define NUM_DOTTYPES_IMAGE 11
+#define NUM_DOTTYPES_TOTAL 14
 
 #define DIM_MIN 500 // Width and height
 #define DIM_MAX 10000 // Width and height
@@ -70,6 +71,7 @@ typedef enum : uint8_t {
     ICE, SHALLOW_WATER, WATER, DEEP_WATER, ROCK, DESERT, JUNGLE, FOREST, PLAINS, TAIGA, SNOW,
     WATER_FORCED, LAND, LAND_ORIGIN
 } DotType;
+// The underlying order here is used in dottype_colors and type_counts
 
 typedef struct Dot {
     uint16_t x;
@@ -985,7 +987,7 @@ void generate_biomes_land(
 
         // Set Dot Type
 
-        dots[i].type = biome_tree_dots[i].type;
+        dots[i].type = biome_tree_dots[nearest_index].type;
 
         atomic_fetch_add(&section_progress[4], 1);
 
@@ -998,66 +1000,77 @@ void generate_biomes_land(
  * 
  * Pixel color chosen based on the type of the nearest dot from `tree_dots`.
  * 
- * Generate a section of the IMAGE_INDEXES, which contains the index in DOTS of
- * the nearest dot to each pixel. Also count the number of pixels of each type
- * for TYPE_COUNTS, to be used in statistics at the end of the main program.
+ * @param start_height
+ * @param end_height
+ * @param tree_dots
+ * @param num_dots
+ * @param pixels
+ * @param type_counts
+ * @param section_progress
  */
 void generate_image(
     uint32_t start_height, uint32_t end_height, const Dot *tree_dots, uint32_t num_dots,
-    uint32_t *type_counts, uint32_t *section_progress
+    png_byte *pixels, uint32_t *type_counts, _Atomic uint32_t *section_progress
 ) {
 
-    // Dot type counts for statistics, not used in image generation
-    int local_type_counts[11] = {0};
-    const char types[11] = {'I', 's', 'W', 'd', 'R', 'D', 'J', 'F', 'P', 'T', 'S'};
+    const png_byte dottype_colors[NUM_DOTTYPES_IMAGE][3] = {
+        {153, 221, 255}, {0, 0, 255}, {0, 0, 179}, {0, 0, 128},
+        //    Ice        Shallow Water    Water     Deep Water
+        {128, 128, 128}, {255, 185, 109}, {0, 77, 0}, {0, 128, 0},
+        //   Rock            Desert         Jungle       Forest
+        {0, 179, 0}, {152, 251, 152}, {245, 245, 245}
+        // Plains         Taiga             Snow
+    };
+    uint32_t local_type_counts[NUM_DOTTYPES_IMAGE] = {0};
 
     // Generate Image
 
-    for (int y = start_height; y < end_height; y++) {
+    for (uint32_t y = start_height; y < end_height; y++) {
 
-        int min_dist = INT_MAX;
+        uint32_t min_dist_sq = UINT32_MAX;
 
-        for (int x = 0; x < width; x++) {
+        for (uint32_t x = 0; x < width; x++) {
 
-            int nearest_index = 0;
-
-            if (min_dist != INT_MAX) {
-                const int min_dist_sq = (int)sqrt(min_dist) + 2;
-                /*
-                max_dist = dist(previous x, previous nearest dot) + dist(previous x, current x)
-                         = previous max_dist + 1
-                +1 for floating point errors (ceil didn't work)
-                */
-                min_dist = min_dist_sq * min_dist_sq;
+            if (x != 0) {
+                min_dist_sq = (uint32_t)sqrt(min_dist_sq) + 2;
+                min_dist_sq *= min_dist_sq;
             }
 
             // Find Nearest Dot
 
-            const int coord[2] = {x, y};
-            query_recursive(tree_root, coord, 0, &nearest_index, &min_dist);
+            const uint32_t coord[2] = {x, y};
+            uint32_t nearest_index = 0;
+            nearest_neighbor_recursive(
+                tree_dots, num_dots, 0, coord, 0, &min_dist_sq, &nearest_index, 0
+            );
 
-            // Add to Image Indexes and Local Type Counts
+            // Add to Pixels
 
-            image_indexes[y * width + x] = nearest_index;
-            for (int i = 0; i < 11; i++) {
-                if (dots[nearest_index].type == types[i]) {
-                    local_type_counts[i]++;
-                    break;
-                }
+            png_byte color[3];
+            memcpy(color, &dottype_colors[tree_dots[nearest_index].type][0], sizeof(png_byte) * 3);
+            int32_t shift = nearest_index % 21 - 10;
+            for (uint32_t i = 0; i < 3; i++) {
+                int32_t byte = color[i];
+                byte += shift;
+                if (byte > 255) byte = 255;
+                else if (byte < 0) byte = 0;
+                color[i] = (png_byte)byte;
             }
+
+            // Update Local Type Counts
+
+            local_type_counts[tree_dots[nearest_index].type]++;
 
         }
 
-        // Only update for each row of pixels
         atomic_fetch_add(&section_progress[5], 1);
 
     }
 
     // Update Shared Type Counts
 
-    for (int i = 0; i < 11; i++) {
+    for (int i = 0; i < 11; i++)
         type_counts[i] += local_type_counts[i];
-    }
 
 }
 
@@ -1704,7 +1717,7 @@ int main(int argc, char *argv[]) {
 
         set_process_title("ig-worker", i);
         generate_image(
-            section_starts[i], section_starts[i + 1], tree_dots, num_dots,
+            section_starts[i], section_starts[i + 1], tree_dots, num_dots, pixels,
             type_counts, section_progress
         );
         exit(0);

@@ -27,3 +27,5 @@ consider switching to pthread
 check that dots are actually sorted properly during start of biome generation
 
 add error checking for every function that can return an error code
+
+make all statistics counters thread_safe (type_counts, num_land_dots, num_swapped)
