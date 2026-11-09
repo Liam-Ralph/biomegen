@@ -13,5 +13,8 @@ add_executable(autorun
     src/autorun.c
 )
 
+target_compile_options(main PRIVATE -Wall -Wextra -Wpedantic -Werror)
+target_compile_options(autorun PRIVATE -Wall -Wextra -Wpedantic -Werror)
+
 target_link_libraries(main PRIVATE m PNG::PNG)
 target_link_libraries(autorun PRIVATE m)

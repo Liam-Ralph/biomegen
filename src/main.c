@@ -200,6 +200,7 @@ timespec calc_section_timespec(
         result.tv_nsec += 1000000000;
         result.tv_sec--;
     }
+    return result;
 }
 
 // Dot Functions
@@ -276,16 +277,20 @@ void quicksort_recursive(Dot *dots, uint32_t low, uint32_t high) {
  */
 void merge(Dot *dots_unsorted, Dot *dots_sorted, uint32_t len1, uint32_t len2) {
 
-    uint32_t i1, i2 = 0;
+    uint32_t i1 = 0;
+    uint32_t i2 = 0;
 
     while (i1 + i2 < len1 + len2) {
         if (
             i2 == len2 ||
             (i1 < len1 && row_major(dots_unsorted[i1]) < row_major(dots_unsorted[len1 + i2]))
-        )
-            dots_sorted[i1 + i2] = dots_unsorted[i1++];
-        else
-            dots_sorted[i1 + i2] = dots_unsorted[len1 + i2++];
+        ) {
+            dots_sorted[i1 + i2] = dots_unsorted[i1];
+            i1++;
+        } else {
+            dots_sorted[i1 + i2] = dots_unsorted[len1 + i2];
+            i2++;
+        }
     }
 
 }
@@ -360,7 +365,7 @@ void median_select(Dot *dots, uint32_t low, uint32_t high, uint32_t med_index, b
  * @param depth current depth, must be 0 in initial call
  */
 void build_recursive(
-    Dot *dots, Dot *tree_dots, uint32_t index, uint32_t low, uint32_t high, int depth
+    Dot *dots, Dot *tree_dots, uint32_t index, uint32_t low, uint32_t high, uint32_t depth
 ) {
 
     // Base Cases
@@ -494,7 +499,8 @@ void nearest_neighbors_recursive(
                 break;
             }
             // After insertion position, shift element
-            dists_sq[i] = dists_sq[--i];
+            --i;
+            dists_sq[i] = dists_sq[i];
         }
     }
 
@@ -617,13 +623,13 @@ void track_progress(
 
             // Check if Section Complete
 
-            char color[10];
+            char color[sizeof(ANSI_GREEN)];
             timespec section_time;
             if (section_times[i].tv_nsec != 0 || section_times[i].tv_sec != 0) {
-                strncpy(color, ANSI_GREEN, 10);
+                memcpy(color, ANSI_GREEN, sizeof(ANSI_GREEN));
                 section_time = section_times[i]; // Section complete
             } else {
-                strncpy(color, ANSI_BLUE, 10);
+                memcpy(color, ANSI_BLUE, sizeof(ANSI_BLUE));
                 if (i == 0 || section_times[i - 1].tv_nsec != 0 || section_times[i - 1].tv_sec != 0)
                     section_time = calc_section_timespec(time_now, start_time, section_times, i);
                     // Section in progress
@@ -644,7 +650,7 @@ void track_progress(
             for (uint32_t ii = 0; ii < columns - green_bars; ii++)
                 printf("█");
             printf(
-                "%s%2d:%08.5lf\n", ANSI_RESET, section_time.tv_sec / 60,
+                "%s%2ld:%08.5lf\n", ANSI_RESET, section_time.tv_sec / 60,
                 fmod(section_time.tv_sec, 60.0) + section_time.tv_nsec / 1000000000.0
             );
 
@@ -652,15 +658,15 @@ void track_progress(
 
         // Total Progress
 
-        char color[10];
+        char color[sizeof(ANSI_GREEN)];
         timespec total_time;
         bool break_now = false;
         if (section_times[NUM_SECTIONS].tv_nsec != 0 || section_times[NUM_SECTIONS].tv_sec != 0) {
-            strncpy(color, ANSI_GREEN, 10);
+            memcpy(color, ANSI_GREEN, sizeof(ANSI_GREEN));
             total_time = section_times[NUM_SECTIONS];
             break_now = true;
         } else {
-            strncpy(color, ANSI_BLUE, 10);
+            memcpy(color, ANSI_BLUE, sizeof(ANSI_BLUE));
             total_time = diff_timespecs(start_time, time_now);
         }
 
@@ -672,7 +678,7 @@ void track_progress(
         for (uint32_t i = 0; i < columns - green_bars; i++)
             printf("█");
         printf(
-            "%s%2d:%08.5f\n", ANSI_RESET, total_time.tv_sec / 60,
+            "%s%2ld:%08.5f\n", ANSI_RESET, total_time.tv_sec / 60,
             fmod(total_time.tv_sec, 60.0) + total_time.tv_nsec / 1000000000.0
         );
 
@@ -1056,6 +1062,7 @@ void generate_image(
                 else if (byte < 0) byte = 0;
                 color[i] = (png_byte)byte;
             }
+            memcpy(&pixels[3 * (y * width + x)], color, sizeof(png_byte) * 3);
 
             // Update Local Type Counts
 
@@ -1088,7 +1095,7 @@ int main(int argc, char *argv[]) {
 
     // Get Inputs
 
-    bool auto_mode = (argc >= 9);
+    bool auto_mode = (argc >= 10);
     char output_file[229];
     // width is global
     uint32_t height;
@@ -1105,7 +1112,8 @@ int main(int argc, char *argv[]) {
 
         // Manual Inputs Mode
 
-        strncpy(output_file, "result.png", 11);
+        strncpy(output_file, "result.png", 10);
+        output_file[10] = '\0';
 
         // Get Program Version
 
@@ -1117,8 +1125,8 @@ int main(int argc, char *argv[]) {
         fclose(fptr);
 
         char version[12];
-        strncpy(version, file_line + 12, 12);
-        version[strlen(version) - 1] = '\0';
+        strncpy(version, file_line + 12, 11);
+        version[11] = '\0';
 
         // Copyright, license notice, etc.
         system("clear");
@@ -1195,8 +1203,10 @@ int main(int argc, char *argv[]) {
         island_abundance = atoi(argv[4]);
         island_size = atoi(argv[5]);
         coastline_smoothing = atoi(argv[6]);
-        processes = atoi(argv[7]);
-        strncpy(output_file, argv[8], 229);
+        biome_size = atoi(argv[7]);
+        processes = atoi(argv[8]);
+        strncpy(output_file, argv[9], 228);
+        output_file[228] = '\0';
 
     }
 
@@ -1412,12 +1422,10 @@ int main(int argc, char *argv[]) {
         // Build Trees
 
         Dot *land_tree_dots = malloc(sizeof(Dot) * num_land_dots);
-        memcpy(land_tree_dots, land_dots, sizeof(Dot) * num_land_dots);
         build_recursive(land_dots, land_tree_dots, 0, 0, num_land_dots - 1, 0);
         free(land_dots);
 
         Dot *water_tree_dots = malloc(sizeof(Dot) * num_water_dots);
-        memcpy(water_tree_dots, water_dots, sizeof(Dot) * num_water_dots);
         build_recursive(water_dots, water_tree_dots, 0, 0, num_water_dots - 1, 0);
         free(water_dots);
 
@@ -1634,7 +1642,6 @@ int main(int argc, char *argv[]) {
     }
 
     free(used_biome_coords);
-    memcpy(biome_dots, biome_tree_dots, sizeof(uint32_t) * num_biome_dots);
     build_recursive(biome_dots, biome_tree_dots, 0, 0, num_biome_dots - 1, 0);
     free(biome_dots);
 
@@ -1799,7 +1806,7 @@ int main(int argc, char *argv[]) {
     char formatted_time[32];
     timespec completion_time = diff_timespecs(start_time, end_time);
     snprintf(
-        formatted_time, 32, "%2d:%08.5f", completion_time.tv_sec / 60,
+        formatted_time, 32, "%2ld:%08.5f", completion_time.tv_sec / 60,
             fmod(completion_time.tv_sec, 60.0) + completion_time.tv_nsec / 1000000000.0
     );
 
@@ -1843,7 +1850,7 @@ int main(int argc, char *argv[]) {
 
     } else {
 
-        printf("%lf\n", completion_time);
+        printf("%lf\n", completion_time.tv_sec + completion_time.tv_nsec / 1000000000.0);
 
     }
 

@@ -46,7 +46,8 @@ int main() {
     fclose(fptr);
 
     char version[12];
-    strncpy(version, file_line + 12, 12);
+    strncpy(version, file_line + 12, 11);
+    version[11] = '\0';
     version[strlen(version) - 2] = '\0';
 
     // Checking for Main Program
@@ -72,20 +73,23 @@ int main() {
 
         char token[250];
         strncpy(token, strtok(line, ":"), 4);
+        token[4] = '\0';
         uint32_t reps = abs(atoi(token)); // Repetitions
 
-        strncpy(token, strtok(NULL, ":"), 2);
+        strncpy(token, strtok(NULL, ":"), 1);
+        token[1] = '\0';
         bool show_rep_times = false; // Whether to show rep times
         if (token[0] == 'y')
             show_rep_times = true;
 
-        strncpy(token, strtok(NULL, ":"), 2);
+        strncpy(token, strtok(NULL, ":"), 1);
         bool save_png = false; // Whether to save png outputs
         if (token[0] == 'y')
             save_png = true;
 
         char inputs[250]; // Inputs for main program
         strncpy(inputs, strtok(NULL, ":\n"), 249);
+        inputs[249] = '\0';
 
         printf("Running task \"%s\" for %u reps.\n", inputs, reps);
 
@@ -158,7 +162,8 @@ int main() {
 
         if (!save_png) {
             char file_path[229];
-            strncpy(file_path, strtok(NULL, ""), 229);
+            strncpy(file_path, strtok(NULL, ""), 228);
+            file_path[228] = '\0';
             remove(file_path);
         }
 
