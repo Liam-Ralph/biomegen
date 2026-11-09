@@ -115,25 +115,18 @@ uint32_t get_uint(
     // Print Prompt
 
     printf(
-        "%sName%s: %s\n"
-        "%sDescription%s: %s\n"
-        "%sMinimum%s: %u\n"
-        "%sMaximum%s: %u\n"
-        "%sDefault%s: ",
-        ANSI_BLUE, ANSI_RESET, name,
-        ANSI_BLUE, ANSI_RESET, desc,
-        ANSI_BLUE, ANSI_RESET, min,
-        ANSI_BLUE, ANSI_RESET, max,
-        ANSI_BLUE, ANSI_RESET
+        ANSI_BLUE "Name" ANSI_RESET ": %s\n"
+        ANSI_BLUE "Description" ANSI_RESET ": %s\n"
+        ANSI_BLUE "Minimum" ANSI_RESET ": %u\n"
+        ANSI_BLUE "Maximum" ANSI_RESET ": %u\n"
+        ANSI_BLUE "Default" ANSI_RESET ": ",
+        name, desc, min, max
     );
     if (def != UINT32_MAX)
         printf("%u\n", def);
     else
         printf("N/A\n");
-    printf(
-        "%sHigher values%s: %s\n",
-        ANSI_BLUE, ANSI_RESET, higher_effect
-    );
+    printf(ANSI_BLUE "Higher values" ANSI_RESET ": %s\n", higher_effect);
 
     // Get Input
 
@@ -645,17 +638,17 @@ void track_progress(
             // Print Output for Section Progress
 
             printf(
-                "%s[%d/%d] %-20s%8.2lf%% %s",
-                color, i + 1, NUM_SECTIONS, section_names[i], progress_section * 100, ANSI_GREEN
+                "%s[%d/%d] %-20s%8.2lf%% " ANSI_GREEN,
+                color, i + 1, NUM_SECTIONS, section_names[i], progress_section * 100
             ); // "[1/NUM_SECTIONS] Setup               100.00% "
             uint32_t green_bars = (uint32_t)round(columns * progress_section);
             for (uint32_t ii = 0; ii < green_bars; ii++)
                 printf("█");
-            printf("%s", ANSI_BLUE);
+            printf(ANSI_BLUE);
             for (uint32_t ii = 0; ii < columns - green_bars; ii++)
                 printf("█");
             printf(
-                "%s%2ld:%08.5lf\n", ANSI_RESET, section_time.tv_sec / 60,
+                ANSI_RESET "%2ld:%08.5lf\n", section_time.tv_sec / 60,
                 fmod(section_time.tv_sec, 60.0) + section_time.tv_nsec / 1000000000.0
             );
 
@@ -675,15 +668,15 @@ void track_progress(
             total_time = diff_timespecs(start_time, time_now);
         }
 
-        printf("%s      Total Progress      %8.2lf%% %s", color, total_progress * 100, ANSI_GREEN);
+        printf("%s      Total Progress      %8.2lf%% " ANSI_GREEN, color, total_progress * 100);
         uint32_t green_bars = (uint32_t)round(columns * total_progress);
         for (uint32_t i = 0; i < green_bars; i++)
             printf("█");
-        printf("%s", ANSI_BLUE);
+        printf(ANSI_BLUE);
         for (uint32_t i = 0; i < columns - green_bars; i++)
             printf("█");
         printf(
-            "%s%2ld:%08.5f\n", ANSI_RESET, total_time.tv_sec / 60,
+            ANSI_RESET "%2ld:%08.5f\n", total_time.tv_sec / 60,
             fmod(total_time.tv_sec, 60.0) + total_time.tv_nsec / 1000000000.0
         );
 
@@ -1824,7 +1817,7 @@ int main(int argc, char *argv[]) {
         // Print Result Statistics
 
         printf(
-            "%sGeneration Complete%s %s\n\nStatistics\n", ANSI_GREEN, ANSI_RESET, formatted_time
+            ANSI_GREEN "Generation Complete" ANSI_RESET " %s\n\nStatistics\n", formatted_time
         );
 
         uint32_t count_water = 0;
@@ -1850,9 +1843,9 @@ int main(int argc, char *argv[]) {
         for (uint32_t i = 0; i < NUM_DOTTYPES_IMAGE; i++) {
             if (i == ROCK) group_pct_fact = 100.0 / count_land;
             printf(
-                "\033[48;5;%dm%-14s%s" // Label
+                "\033[48;5;%dm%-14s" ANSI_RESET // Label
                 "%7.2f%% | %6.2f%%\n", // Pct of Group | Pct of Total
-                text_colors[i], dottype_names[i], ANSI_RESET,
+                text_colors[i], dottype_names[i],
                 type_counts[i] * group_pct_fact, type_counts[i] * tot_pct_fact
             );
         }
