@@ -1155,20 +1155,20 @@ int main(int argc, char *argv[]) {
         height = get_uint("Map Height", "", DIM_MIN, DIM_MAX, UINT32_MAX, "");
 
         map_resolution = get_uint(
-            "Map Resolution", "Number of polygons the map is divided into",
+            "Map Resolution", "Affects number of polygons the map is divided into",
             MAP_RESOLUTION_MIN, MAP_RESOLUTION_MAX, MAP_RESOLUTION_DEFAULT,
             "Lower resolution, larger polygons"
         );
 
         island_abundance = get_uint(
-            "Island Abundance", "Controls how many islands there are",
+            "Island Abundance", "Affects how many islands there are",
             ISLAND_ABUNDANCE_MIN, ISLAND_ABUNDANCE_MAX, ISLAND_ABUNDANCE_DEFAULT,
             "Less land, less land overall"
         );
 
 
         island_size = get_uint(
-            "Island Size", "Controls the average size of islands",
+            "Island Size", "Affects average island size",
             ISLAND_SIZE_MIN, ISLAND_SIZE_MAX, ISLAND_SIZE_DEFAULT,
             "Larger islands, more land overall"
         );
@@ -1181,9 +1181,9 @@ int main(int argc, char *argv[]) {
         );
 
         biome_size = get_uint(
-            "Biome Size", "Controls the average size of biomes",
+            "Biome Size", "Affects average biome size",
             BIOME_SIZE_MIN, BIOME_SIZE_MAX, BIOME_SIZE_DEFAULT,
-            "Larger biomes"
+            "Larger biomes, fewer biomes"
         );
 
         #ifdef __linux__
