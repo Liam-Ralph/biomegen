@@ -1137,7 +1137,7 @@ int main(int argc, char *argv[]) {
             "https://github.com/liam-ralph\n"
             "This project is licensed under the GNU General Public License v3.0,\n"
             "except for result.png, this program's output, licensed under The Unlicense.\n"
-            "Press ENTER to begin.\n", version
+            "Press " ANSI_BLUE "ENTER" ANSI_RESET " to begin.\n", version
         );
         getchar();
         system("clear");
@@ -1156,7 +1156,7 @@ int main(int argc, char *argv[]) {
         island_abundance = get_uint(
             "Island Abundance", "Affects how many islands there are",
             ISLAND_ABUNDANCE_MIN, ISLAND_ABUNDANCE_MAX, ISLAND_ABUNDANCE_DEFAULT,
-            "Less land, less land overall"
+            "Fewer islands, less land overall"
         );
 
 

@@ -1,24 +1,19 @@
-check if +1 still needed for floating-point errors
-
-recalculate section percentages
-
-make timespecs pass by reference where applicable for functions
-
-check usage of const
-
-build_recursive order: tree_dots, dots, low, high, index, depth
-review parameter order of nearest_neighbor_recursive
+make boundaries for equator dist sections more fuzzy (some wave function of x?)
 
 check all malloc and mmap are freed
+build_recursive order: tree_dots, dots, low, high, index, depth
+review parameter order of nearest_neighbor_recursive
+make timespecs pass by reference where applicable for functions
+check usage of const
 
-update readme file
+check if +1 still needed for floating-point errors
+check that dots are actually sorted properly during start of biome generation
+check if land/water_dots needed in biome generation (could you just use part of dots during tree building?)
+
+add error checking for every function that can return an error code
+make all statistics counters thread_safe (type_counts, num_land_dots, num_swapped)
 
 consider switching to pthread
 
-check that dots are actually sorted properly during start of biome generation
-
-add error checking for every function that can return an error code
-
-make all statistics counters thread_safe (type_counts, num_land_dots, num_swapped)
-
-check if land/water_dots needed in biome generation (could you just use part of dots during tree building?)
+recalculate section percentages
+update readme file
