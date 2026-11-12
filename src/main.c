@@ -1559,6 +1559,7 @@ int main(int argc, char *argv[]) {
 
     Dot *land_tree_dots = malloc(sizeof(Dot) * num_land_dots);
     build_recursive(land_dots_unsorted, land_tree_dots, 0, 0, num_land_dots - 1, 0);
+    free(land_dots_unsorted);
 
     // Create Water Dots Piece Starts
 
@@ -1799,7 +1800,6 @@ int main(int argc, char *argv[]) {
     munmap(section_progress, sizeof(uint32_t) * NUM_SECTIONS);
     munmap(section_progress_total, sizeof(uint32_t) * NUM_SECTIONS);
     munmap(section_times, sizeof(timespec) * NUM_SECTIONS + 1);
-    munmap(pixels, sizeof(png_byte) * 3 * width * height);
 
     // Completion
 
