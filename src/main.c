@@ -289,7 +289,7 @@ void merge(Dot *dots_unsorted, Dot *dots_sorted, uint32_t len1, uint32_t len2) {
 }
 
 
-// KDTree Functions
+// KD Tree Functions
 
 /**
  * Sort the given `dots` until index is correctly sorted.
@@ -357,7 +357,8 @@ void quickselect(Dot *dots, uint32_t low, uint32_t high, uint32_t index, bool ax
  * @param depth current depth, must be 0 in initial call
  */
 void build_recursive(
-    Dot *dots, Dot *tree_dots, uint32_t index, uint32_t low, uint32_t high, uint32_t depth
+    Dot *tree_dots, uint32_t index, Dot *dots, uint32_t low, uint32_t high,
+    uint32_t full_dots, uint32_t left_cap, uint32_t depth
 ) {
 
     // Base Cases
@@ -370,15 +371,8 @@ void build_recursive(
 
     // Quickselect Dots
 
-    const uint32_t count = high - low + 1;
-    uint32_t level_capacity = 1;
-    while (level_capacity <= count / 2)
-        level_capacity *= 2;
-    const uint32_t last_level_count = count - (level_capacity - 1);
-    const uint32_t half_level_capacity = level_capacity / 2;
-    const uint32_t left_count = half_level_capacity - 1 +
-        (last_level_count < half_level_capacity ? last_level_count : half_level_capacity);
-    const uint32_t dots_index = low + left_count;
+    const uint32_t extra_dots = high + 1 - low - full_dots;
+    uint32_t dots_index = low + full_dots / 2 + ((extra_dots < left_cap) ? extra_dots : left_cap);
 
     quickselect(dots, low, high, dots_index, depth % 2);
     // it seems this is faster than storing axis and doing !axis in each recursive call
@@ -390,9 +384,32 @@ void build_recursive(
     // Recursion
 
     const uint32_t left_index = index * 2 + 1;
+    full_dots -= left_cap;
+    left_cap /= 2;
     depth++;
-    build_recursive(dots, tree_dots, left_index, low, dots_index - 1, depth);
-    build_recursive(dots, tree_dots, left_index + 1, dots_index + 1, high, depth);
+    build_recursive(tree_dots, left_index, dots, low, dots_index - 1, full_dots, left_cap, depth);
+    build_recursive(
+        tree_dots, left_index + 1, dots, dots_index + 1, high, full_dots, left_cap, depth
+    );
+
+}
+
+void build_kd_tree(Dot *tree_dots, Dot *dots, uint32_t low, uint32_t high, uint32_t len) {
+
+    // Calculate Values
+
+    uint32_t left_cap = 1; // Capacity of left side of last level
+    uint32_t full_dots = 1; // Dots used by full levels
+    while (full_dots <= len) {
+        left_cap *= 2;
+        full_dots += left_cap;
+    }
+    full_dots -= left_cap;
+    left_cap /= 2;
+
+    // Run Recursive Function
+
+    build_recursive(tree_dots, 0, dots, low, high, full_dots, left_cap, 0);
 
 }
 
@@ -1278,7 +1295,7 @@ int main(int argc, char *argv[]) {
 
     const uint32_t num_special_dots = num_dots / island_abundance * 2;
     const uint32_t num_reg_dots = num_dots - num_special_dots;
-    const uint32_t num_origin_dots = num_special_dots >> 1;
+    const uint32_t num_origin_dots = num_special_dots / 2;
     // Assumed in biome generation that num_water_forced_dots = num_origin_dots
 
     bool *used_coords = calloc(width * height, sizeof(bool));
@@ -1324,7 +1341,7 @@ int main(int argc, char *argv[]) {
     // Create Land Origin KD Tree
 
     Dot *tree_dots_temp = malloc(sizeof(Dot) * num_origin_dots);
-    build_recursive(dots, tree_dots_temp, 0, 0, num_origin_dots - 1, 0);
+    build_kd_tree(tree_dots_temp, dots, 0, num_origin_dots - 1, num_origin_dots);
     memcpy(dots, tree_dots_temp, sizeof(Dot) * num_origin_dots);
     free(tree_dots_temp);
 
@@ -1423,11 +1440,11 @@ int main(int argc, char *argv[]) {
         // Build Trees
 
         Dot *land_tree_dots = malloc(sizeof(Dot) * num_land_dots);
-        build_recursive(land_dots, land_tree_dots, 0, 0, num_land_dots - 1, 0);
+        build_kd_tree(land_tree_dots, land_dots, 0, num_land_dots - 1, num_land_dots);
         free(land_dots);
 
         Dot *water_tree_dots = malloc(sizeof(Dot) * num_water_dots);
-        build_recursive(water_dots, water_tree_dots, 0, 0, num_water_dots - 1, 0);
+        build_kd_tree(water_tree_dots, water_dots, 0, num_water_dots - 1, num_water_dots);
         free(water_dots);
 
         // Create Piece Starts
@@ -1555,10 +1572,10 @@ int main(int argc, char *argv[]) {
     // Create Water Biomes
     // Adds ice, depth
 
-    // Build Land Dots KDTree
+    // Build Land Dots KD Tree
 
     Dot *land_tree_dots = malloc(sizeof(Dot) * num_land_dots);
-    build_recursive(land_dots_unsorted, land_tree_dots, 0, 0, num_land_dots - 1, 0);
+    build_kd_tree(land_tree_dots, land_dots_unsorted, 0, num_land_dots - 1, num_land_dots);
     free(land_dots_unsorted);
 
     // Create Water Dots Piece Starts
@@ -1645,7 +1662,7 @@ int main(int argc, char *argv[]) {
     }
 
     free(used_biome_coords);
-    build_recursive(biome_dots, biome_tree_dots, 0, 0, num_biome_dots - 1, 0);
+    build_kd_tree(biome_tree_dots, biome_dots, 0, num_biome_dots - 1, num_biome_dots);
     free(biome_dots);
 
     // Create Land Dots Piece Starts
@@ -1696,10 +1713,10 @@ int main(int argc, char *argv[]) {
         PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0
     );
 
-    // Create Dots KDTree
+    // Create Dots KD Tree
 
     Dot *tree_dots = malloc(sizeof(Dot) * num_dots);
-    build_recursive(dots, tree_dots, 0, 0, num_dots - 1, 0);
+    build_kd_tree(tree_dots, dots, 0, num_dots - 1, num_dots);
     munmap(dots, sizeof(Dot) * num_dots);
 
     // Create Pixels
