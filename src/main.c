@@ -439,17 +439,18 @@ void build_kd_tree(Dot *tree_dots, Dot *dots, uint32_t low, uint32_t high, uint3
  * 
  * @param tree_dots kd tree to search
  * @param len length of `tree_dots`
- * @param index index of Dot to check, must be 0 in initial call
  * @param coord coordinate to search with, of form {x, y}
- * @param depth current depth, must be 0 in initial call
  * @param min_dist_sq_ptr pointer to store squared minimum distance in
  * @param nearest_index_ptr pointer to store nearest neighbor index, or NULL
  * @param min_dist_care query ends if a distance below this is found, make 0 for
  * regular calls
+ * @param index index of Dot to check, must be 0 in initial call
+ * @param depth current depth, must be 0 in initial call
  */
 void nearest_neighbor_recursive(
-    const Dot *tree_dots, uint32_t len, uint32_t index, const uint32_t coord[2], uint32_t depth,
-    uint32_t *min_dist_sq_ptr, uint32_t *nearest_index_ptr, uint32_t min_dist_sq_care
+    const Dot *tree_dots, uint32_t len, const uint32_t coord[2],
+    uint32_t *min_dist_sq_ptr, uint32_t *nearest_index_ptr, uint32_t min_dist_sq_care,
+    uint32_t index, uint32_t depth
 ) {
 
     // Calculate Distance
@@ -485,14 +486,14 @@ void nearest_neighbor_recursive(
         be inside bounds of left child
         */
         nearest_neighbor_recursive(
-            tree_dots, len, index_child, coord, depth,
-            min_dist_sq_ptr, nearest_index_ptr, min_dist_sq_care
+            tree_dots, len, coord, min_dist_sq_ptr, nearest_index_ptr, min_dist_sq_care,
+            index_child, depth
         );
     index_child++;
     if (index_child < len && (dist_line_sq < *min_dist_sq_ptr || coord[axis] >= dot_value))
         nearest_neighbor_recursive(
-            tree_dots, len, index_child, coord, depth,
-            min_dist_sq_ptr, nearest_index_ptr, min_dist_sq_care
+            tree_dots, len, coord, min_dist_sq_ptr, nearest_index_ptr, min_dist_sq_care,
+            index_child, depth
         );
 
 }
@@ -504,16 +505,16 @@ void nearest_neighbor_recursive(
  * 
  * @param tree_dots kd tree to search
  * @param len length of `tree_dots`
- * @param index index of Dot to check, must be 0 in initial call
  * @param coord coordinate to search with, of form {x, y}
  * @param dists_sq array to write neighbor squared distances to,
- * must be initialized with all 0s
+ * must be initialized with all `UINT32_MAX`
  * @param dists_sq_len number of neighbors to track, must be greater than 0
+ * @param index index of Dot to check, must be 0 in initial call
  * @param depth current depth, must be 0 in initial call
  */
 void nearest_neighbors_recursive(
-    const Dot *tree_dots, uint32_t len, uint32_t index, const uint32_t coord[2],
-    uint32_t *dists_sq, uint32_t dists_sq_len, uint32_t depth
+    const Dot *tree_dots, uint32_t len, const uint32_t coord[2],
+    uint32_t *dists_sq, uint32_t dists_sq_len, uint32_t index, uint32_t depth
 ) {
 
     // Calculate Distance
@@ -553,12 +554,12 @@ void nearest_neighbors_recursive(
         be inside bounds of left child
         */
         nearest_neighbors_recursive(
-            tree_dots, len, index_child, coord, dists_sq, dists_sq_len, depth
+            tree_dots, len, coord, dists_sq, dists_sq_len, index_child, depth
         );
     index_child++;
     if (index_child < len && (dist_line_sq < max_dist || coord[axis] >= dot_value))
         nearest_neighbors_recursive(
-            tree_dots, len, index_child, coord, dists_sq, dists_sq_len, depth
+            tree_dots, len, coord, dists_sq, dists_sq_len, index_child, depth
         );
 
 }
