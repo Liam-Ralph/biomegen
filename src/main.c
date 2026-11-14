@@ -445,11 +445,10 @@ void nearest_neighbor_recursive(
 
     if (dist_sq < *min_dist_sq_ptr) {
         *min_dist_sq_ptr = dist_sq;
-        if (nearest_index_ptr != NULL) {
+        if (nearest_index_ptr != NULL)
             *nearest_index_ptr = index;
-        } else if (dist_sq < min_dist_sq_care) {
+        else if (dist_sq < min_dist_sq_care)
             return;
-        }
     }
 
     // Decide Whether Recursion is Needed
