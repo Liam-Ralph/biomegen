@@ -630,8 +630,13 @@ void track_progress(
 
     struct winsize w;
     ioctl(STDOUT_FILENO, TIOCGWINSZ, &w);
-    uint32_t columns = (uint32_t)w.ws_col - 47;
-    if (100 < columns) columns = 100;
+    uint32_t columns;
+    if (w.ws_col < 47)
+        columns = 0;
+    else if (w.ws_col > 147)
+        columns = 100;
+    else
+        columns = w.ws_col - 47;
 
     while (true) {
 
@@ -659,15 +664,17 @@ void track_progress(
             char color[sizeof(ANSI_GREEN)];
             timespec section_time;
             if (section_times[i].tv_nsec != 0 || section_times[i].tv_sec != 0) {
+                // Section complete
                 memcpy(color, ANSI_GREEN, sizeof(ANSI_GREEN));
-                section_time = section_times[i]; // Section complete
+                section_time = section_times[i];
             } else {
                 memcpy(color, ANSI_BLUE, sizeof(ANSI_BLUE));
                 if (i == 0 || section_times[i - 1].tv_nsec != 0 || section_times[i - 1].tv_sec != 0)
-                    section_time = calc_section_timespec(time_now, start_time, section_times, i);
                     // Section in progress
+                    section_time = calc_section_timespec(time_now, start_time, section_times, i);
                 else
-                    section_time = (timespec){0, 0}; // Section hasn't started
+                    // Section hasn't started
+                    section_time = (timespec){0, 0};
             }
 
             // Print Output for Section Progress
@@ -722,7 +729,7 @@ void track_progress(
 
         // Sleep 0.1 Seconds
 
-        struct timespec sleep_time;
+        timespec sleep_time;
         sleep_time.tv_sec = 0;
         sleep_time.tv_nsec = 100000000;
         nanosleep(&sleep_time, NULL);
@@ -778,7 +785,7 @@ void assign_sections(
         const uint32_t coord[2] = {dots[i].x, dots[i].y};
         uint32_t nearest_index;
         nearest_neighbor_recursive(
-            dots, num_origin_dots, 0, coord, 0, &min_dist_sq, &nearest_index, 0
+            dots, num_origin_dots, coord, &min_dist_sq, &nearest_index, 0, 0, 0
         );
 
         // Calculate Chance
@@ -890,7 +897,7 @@ void smooth_coastlines(
         uint64_t sum_opp = 0;
 
         nearest_neighbors_recursive(
-            same_tree_dots, num_same_dots, 0, dot_coord, dists_same_sq, coastline_smoothing, 0
+            same_tree_dots, num_same_dots, dot_coord, dists_same_sq, coastline_smoothing, 0, 0
         );
         for (uint32_t ii = 0; ii < coastline_smoothing; ii++)
             sum_same += dists_same_sq[ii];
@@ -902,7 +909,7 @@ void smooth_coastlines(
         }
 
         nearest_neighbors_recursive(
-            opp_tree_dots, num_opp_dots, 0, dot_coord, dists_opp_sq, coastline_smoothing, 0
+            opp_tree_dots, num_opp_dots, dot_coord, dists_opp_sq, coastline_smoothing, 0, 0
         );
         for (uint32_t ii = 0; ii < coastline_smoothing; ii++)
             sum_opp += dists_opp_sq[ii];
@@ -967,7 +974,7 @@ void generate_biomes_water(
 
         const uint32_t coord[2] = {dots[i].x, dots[i].y};
         nearest_neighbor_recursive(
-            land_tree_dots, num_land_dots, 0, coord, 0, &land_dist_sq, NULL, 225
+            land_tree_dots, num_land_dots, coord, &land_dist_sq, NULL, 225, 0, 0
         );
 
         // Set Water Biome
@@ -1028,7 +1035,7 @@ void generate_biomes_land(
         uint32_t coord[2] = {dots[i].x, dots[i].y};
         uint32_t nearest_index;
         nearest_neighbor_recursive(
-            biome_tree_dots, num_biome_dots, 0, coord, 0, &min_dist_sq, &nearest_index, 0
+            biome_tree_dots, num_biome_dots, coord, &min_dist_sq, &nearest_index, 0, 0, 0
         );
 
         // Set Dot Type
@@ -1087,7 +1094,7 @@ void generate_image(
             const uint32_t coord[2] = {x, y};
             uint32_t nearest_index = 0;
             nearest_neighbor_recursive(
-                tree_dots, num_dots, 0, coord, 0, &min_dist_sq, &nearest_index, 0
+                tree_dots, num_dots, coord, &min_dist_sq, &nearest_index, 0, 0, 0
             );
 
             // Add to Pixels
@@ -1846,7 +1853,7 @@ int main(int argc, char *argv[]) {
 
     // Completion
 
-    struct timespec end_time;
+    timespec end_time;
     clock_gettime(CLOCK_MONOTONIC, &end_time);
     char formatted_time[32];
     timespec completion_time = diff_timespecs(start_time, end_time);
