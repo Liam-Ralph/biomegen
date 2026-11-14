@@ -146,7 +146,7 @@ int main() {
                 for (uint32_t ii = 0; ii < columns - bars; ii++)
                     printf("█");
                 printf(ANSI_RESET);
-                printf(" %3u%%", (i + 1) / reps * 100);
+                printf(" %3u%%", (i + 1) * 100 / reps);
                 fflush(stdout);
             }
 
