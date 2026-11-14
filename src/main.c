@@ -154,16 +154,33 @@ uint32_t get_uint(
 // Timespec Functions
 
 /**
+ * Add two timespecs together.
+ * 
+ * Adds `addend` onto `result`.
+ * 
+ * @param result
+ * @param addend
+ */
+void add_timespec(timespec *result, timespec addend) {
+    result->tv_sec += addend.tv_sec;
+    result->tv_nsec += addend.tv_nsec;
+    if (result->tv_nsec > 1000000000) {
+        result->tv_nsec -= 1000000000;
+        result->tv_sec++;
+    }
+}
+
+/**
  * Calculate the difference between two timespecs.
  * 
  * Calculates `end - start`.
  * 
- * @param start
  * @param end
+ * @param start
  * 
  * @return difference
  */
-timespec diff_timespecs(timespec start, timespec end) {
+timespec diff_timespecs(timespec end, timespec start) {
     timespec diff = {end.tv_sec - start.tv_sec, end.tv_nsec - start.tv_nsec};
     if (diff.tv_nsec < 0) {
         diff.tv_nsec += 1000000000;
@@ -172,36 +189,9 @@ timespec diff_timespecs(timespec start, timespec end) {
     return diff;
 }
 
-/**
- * Calculate a section's time.
- * 
- * Calculates `time_now - start_time - sum(section_times[:len])`.
- * 
- * @param time_now
- * @param start_time
- * @param section_times
- * @param len length of `section_times` (or the part thereof to be used)
- */
-timespec calc_section_timespec(
-    timespec time_now, timespec start_time, const timespec *section_times, uint32_t len
-) {
-    timespec result = time_now;
-    result.tv_sec -= start_time.tv_sec;
-    result.tv_nsec -= start_time.tv_nsec;
-    for (uint32_t i = 0; i < len; i++) {
-        result.tv_sec -= section_times[i].tv_sec;
-        result.tv_nsec -= section_times[i].tv_nsec;
-    }
-    while (result.tv_nsec < 0) {
-        result.tv_nsec += 1000000000;
-        result.tv_sec--;
-    }
-    return result;
-}
-
 // Dot Functions
 
-uint32_t row_major(Dot dot) {
+inline uint32_t row_major(Dot dot) {
     return dot.y * width + dot.x;
 }
 
@@ -214,7 +204,7 @@ uint32_t row_major(Dot dot) {
  * @param i first index to swap with
  * @param ii second index to swap with
  */
-void swap(Dot *dots, uint32_t i, uint32_t ii) {
+inline void swap(Dot *dots, uint32_t i, uint32_t ii) {
     const Dot temp = dots[i];
     dots[i] = dots[ii];
     dots[ii] = temp;
@@ -236,7 +226,7 @@ void quicksort_recursive(Dot *dots, uint32_t low, uint32_t high) {
 
         // Calculate Pivot Value
 
-        uint32_t pivot = row_major(dots[high]);
+        const uint32_t pivot = row_major(dots[high]);
 
         // Move Smaller Elements to the Left
 
@@ -252,7 +242,7 @@ void quicksort_recursive(Dot *dots, uint32_t low, uint32_t high) {
 
         // Recursion
 
-        if (p > low)
+        if (p > low) // Prevent p - 1 from underflowing
             quicksort_recursive(dots, low, p - 1);
         quicksort_recursive(dots, p + 1, high);
 
@@ -291,19 +281,18 @@ void merge(Dot *dots_unsorted, Dot *dots_sorted, uint32_t len1, uint32_t len2) {
 
 }
 
-
 // KD Tree Functions
 
 /**
  * Sort the given `dots` until index is correctly sorted.
  * 
- * After completion, index will be in the correct place, everything to the left
- * will be lower or equal, and everything right will be greater or equal.
+ * After completion, `index` will be in the correct place, everything to the
+ * left will be lower or equal, and everything right will be greater or equal.
  * 
  * @param dots array to sort
  * @param low
  * @param high
- * @param index
+ * @param index index to select
  * @param axis determines whether to sort by x (false) or y (true) values
  */
 void quickselect(Dot *dots, uint32_t low, uint32_t high, uint32_t index, bool axis) {
@@ -313,7 +302,7 @@ void quickselect(Dot *dots, uint32_t low, uint32_t high, uint32_t index, bool ax
         // Calculate Pivot Value
 
         uint32_t pi = low + rand() % (high - low);
-        uint16_t pivot = axis ? dots[pi].y : dots[pi].x;
+        const uint16_t pivot = axis ? dots[pi].y : dots[pi].x;
 
         // Sort Based on Pivot
 
@@ -322,7 +311,7 @@ void quickselect(Dot *dots, uint32_t low, uint32_t high, uint32_t index, bool ax
         uint32_t gt = high;
 
         while (i <= gt) {
-            uint16_t key = axis ? dots[i].y : dots[i].x;
+            const uint16_t key = axis ? dots[i].y : dots[i].x;
             if (key < pivot)
                 swap(dots, lt++, i++);
             else if (key > pivot)
@@ -564,7 +553,6 @@ void nearest_neighbors_recursive(
 
 }
 
-
 // Multiprocessing Functions
 // (Order of use)
 
@@ -638,6 +626,9 @@ void track_progress(
     else
         columns = w.ws_col - 47;
 
+    uint32_t current_section = 0;
+    timespec current_start = start_time;
+
     while (true) {
 
         // Clear Screen
@@ -669,12 +660,20 @@ void track_progress(
                 section_time = section_times[i];
             } else {
                 memcpy(color, ANSI_BLUE, sizeof(ANSI_BLUE));
-                if (i == 0 || section_times[i - 1].tv_nsec != 0 || section_times[i - 1].tv_sec != 0)
+                if (
+                    i == 0 ||
+                    section_times[i - 1].tv_nsec != 0 || section_times[i - 1].tv_sec != 0
+                ) {
                     // Section in progress
-                    section_time = calc_section_timespec(time_now, start_time, section_times, i);
-                else
+                    if (i > current_section) {
+                        current_section++;
+                        add_timespec(&current_start, section_times[i - 1]);
+                    }
+                    section_time = diff_timespecs(time_now, current_start);
+                } else {
                     // Section hasn't started
                     section_time = (timespec){0, 0};
+                }
             }
 
             // Print Output for Section Progress
@@ -707,7 +706,7 @@ void track_progress(
             break_now = true;
         } else {
             memcpy(color, ANSI_BLUE, sizeof(ANSI_BLUE));
-            total_time = diff_timespecs(start_time, time_now);
+            total_time = diff_timespecs(time_now, start_time);
         }
 
         printf("%s      Total Progress      %8.2lf%% " ANSI_GREEN, color, total_progress * 100);
@@ -1205,13 +1204,11 @@ int main(int argc, char *argv[]) {
             "Fewer islands, less land overall"
         );
 
-
         island_size = get_uint(
             "Island Size", "Affects average island size",
             ISLAND_SIZE_MIN, ISLAND_SIZE_MAX, ISLAND_SIZE_DEFAULT,
             "Larger islands, more land overall"
         );
-
 
         coastline_smoothing = get_uint(
             "Coastline Smoothing", "Controls how smooth coastlines look",
@@ -1259,6 +1256,7 @@ int main(int argc, char *argv[]) {
 
     timespec start_time;
     clock_gettime(CLOCK_MONOTONIC, &start_time);
+    timespec section_start = start_time;
 
     // --Setup--
 
@@ -1311,8 +1309,10 @@ int main(int argc, char *argv[]) {
     // Set Section Completion Time
 
     timespec time_now;
+
     clock_gettime(CLOCK_MONOTONIC, &time_now);
-    section_times[0] = diff_timespecs(start_time, time_now);
+    section_times[0] = diff_timespecs(time_now, section_start);
+    section_start = time_now;
     atomic_store(&section_progress[0], 1);
 
     // --Section Generation--
@@ -1364,7 +1364,8 @@ int main(int argc, char *argv[]) {
     // Set Section Completion Time
 
     clock_gettime(CLOCK_MONOTONIC, &time_now);
-    section_times[1] = calc_section_timespec(time_now, start_time, section_times, 1);
+    section_times[1] = diff_timespecs(time_now, section_start);
+    section_start = time_now;
 
     // --Section Assignment--
     // Assign dots as "Land", "Land Origin", "Water", or "Water Forced"
@@ -1422,7 +1423,8 @@ int main(int argc, char *argv[]) {
     // Set Section Completion Time
 
     clock_gettime(CLOCK_MONOTONIC, &time_now);
-    section_times[2] = calc_section_timespec(time_now, start_time, section_times, 2);
+    section_times[2] = diff_timespecs(time_now, section_start);
+    section_start = time_now;
 
     // --Coastline Smoothing--
 
@@ -1531,7 +1533,8 @@ int main(int argc, char *argv[]) {
     // Set Section Completion Time
 
     clock_gettime(CLOCK_MONOTONIC, &time_now);
-    section_times[3] = calc_section_timespec(time_now, start_time, section_times, 3);
+    section_times[3] = diff_timespecs(time_now, section_start);
+    section_start = time_now;
 
     // --Biome Generation--
 
@@ -1686,7 +1689,7 @@ int main(int argc, char *argv[]) {
 
         // Add to Biome Indexes and Dots
 
-        memcpy(&biome_dots[i], &dots[index], sizeof(Dot));
+        biome_dots[i] = dots[index];
 
         // Increment Progress
 
@@ -1732,7 +1735,8 @@ int main(int argc, char *argv[]) {
     // Set Section Completion Time
 
     clock_gettime(CLOCK_MONOTONIC, &time_now);
-    section_times[4] = calc_section_timespec(time_now, start_time, section_times, 4);
+    section_times[4] = diff_timespecs(time_now, section_start);
+    section_start = time_now;
 
     // --Image Generation--
 
@@ -1793,7 +1797,8 @@ int main(int argc, char *argv[]) {
     // Set Section Completion Time
 
     clock_gettime(CLOCK_MONOTONIC, &time_now);
-    section_times[5] = calc_section_timespec(time_now, start_time, section_times, 5);
+    section_times[5] = diff_timespecs(time_now, section_start);
+    section_start = time_now;
 
     // --Finish--
 
@@ -1836,9 +1841,10 @@ int main(int argc, char *argv[]) {
     atomic_store(&section_progress[6], 1);
 
     clock_gettime(CLOCK_MONOTONIC, &time_now);
-    section_times[6] = calc_section_timespec(time_now, start_time, section_times, 6);
+    section_times[6] = diff_timespecs(time_now, section_start);
+    section_start = time_now;
 
-    section_times[NUM_SECTIONS] = diff_timespecs(start_time, time_now);
+    section_times[NUM_SECTIONS] = diff_timespecs(time_now, start_time);
 
     // Wait for Tracker Process
 
@@ -1856,7 +1862,7 @@ int main(int argc, char *argv[]) {
     timespec end_time;
     clock_gettime(CLOCK_MONOTONIC, &end_time);
     char formatted_time[32];
-    timespec completion_time = diff_timespecs(start_time, end_time);
+    timespec completion_time = diff_timespecs(end_time, start_time);
     snprintf(
         formatted_time, 32, "%2ld:%08.5f", completion_time.tv_sec / 60,
             fmod(completion_time.tv_sec, 60.0) + completion_time.tv_nsec / 1000000000.0

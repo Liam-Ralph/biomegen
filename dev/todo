@@ -1,4 +1,3 @@
-make timespecs pass by reference where applicable for functions
 check usage of const
 
 check if +1 still needed for floating-point errors
