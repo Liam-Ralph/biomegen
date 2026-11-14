@@ -108,7 +108,8 @@ uint32_t width; // Used for row-major order
  * @return valid user input
  */
 uint32_t get_uint(
-    char *name, char *desc, uint32_t min, uint32_t max, uint32_t def, char *higher_effect
+    char *name, char *desc,
+    const uint32_t min, const uint32_t max, const uint32_t def, char *higher_effect
 ) {
 
     // Clear Screen
@@ -161,7 +162,7 @@ uint32_t get_uint(
  * @param result
  * @param addend
  */
-void add_timespec(timespec *result, timespec addend) {
+void add_timespec(timespec *result, const timespec addend) {
     result->tv_sec += addend.tv_sec;
     result->tv_nsec += addend.tv_nsec;
     if (result->tv_nsec > 1000000000) {
@@ -180,7 +181,7 @@ void add_timespec(timespec *result, timespec addend) {
  * 
  * @return difference
  */
-timespec diff_timespecs(timespec end, timespec start) {
+timespec diff_timespecs(const timespec end, const timespec start) {
     timespec diff = {end.tv_sec - start.tv_sec, end.tv_nsec - start.tv_nsec};
     if (diff.tv_nsec < 0) {
         diff.tv_nsec += 1000000000;
@@ -191,7 +192,7 @@ timespec diff_timespecs(timespec end, timespec start) {
 
 // Dot Functions
 
-inline uint32_t row_major(Dot dot) {
+inline uint32_t row_major(const Dot dot) {
     return dot.y * width + dot.x;
 }
 
@@ -204,7 +205,7 @@ inline uint32_t row_major(Dot dot) {
  * @param i first index to swap with
  * @param ii second index to swap with
  */
-inline void swap(Dot *dots, uint32_t i, uint32_t ii) {
+inline void swap(Dot *dots, const uint32_t i, const uint32_t ii) {
     const Dot temp = dots[i];
     dots[i] = dots[ii];
     dots[ii] = temp;
@@ -261,7 +262,7 @@ void quicksort_recursive(Dot *dots, uint32_t low, uint32_t high) {
  * @param len1 length of first section of `dots_unsorted`
  * @param len2 length of second section
  */
-void merge(Dot *dots_unsorted, Dot *dots_sorted, uint32_t len1, uint32_t len2) {
+void merge(Dot *dots_unsorted, Dot *dots_sorted, const uint32_t len1, const uint32_t len2) {
 
     uint32_t i1 = 0;
     uint32_t i2 = 0;
@@ -295,7 +296,7 @@ void merge(Dot *dots_unsorted, Dot *dots_sorted, uint32_t len1, uint32_t len2) {
  * @param index index to select
  * @param axis determines whether to sort by x (false) or y (true) values
  */
-void quickselect(Dot *dots, uint32_t low, uint32_t high, uint32_t index, bool axis) {
+void quickselect(Dot *dots, uint32_t low, uint32_t high, const uint32_t index, const bool axis) {
 
     while (low < high) {
 
@@ -351,7 +352,7 @@ void quickselect(Dot *dots, uint32_t low, uint32_t high, uint32_t index, bool ax
  * @param depth current depth, must be 0 in initial call
  */
 void build_recursive(
-    Dot *tree_dots, uint32_t index, Dot *dots, uint32_t low, uint32_t high,
+    Dot *tree_dots, const uint32_t index, Dot *dots, const uint32_t low, const uint32_t high,
     uint32_t full_dots, uint32_t left_cap, uint32_t depth
 ) {
 
@@ -366,7 +367,8 @@ void build_recursive(
     // Quickselect Dots
 
     const uint32_t extra_dots = high + 1 - low - full_dots;
-    uint32_t dots_index = low + full_dots / 2 + ((extra_dots < left_cap) ? extra_dots : left_cap);
+    const uint32_t dots_index =
+        low + full_dots / 2 + ((extra_dots < left_cap) ? extra_dots : left_cap);
 
     quickselect(dots, low, high, dots_index, depth % 2);
     // it seems this is faster than storing axis and doing !axis in each recursive call
@@ -401,7 +403,9 @@ void build_recursive(
  * @param len (high + 1 - low), not necessary but always calculated by caller
  * beforehand anyways
  */
-void build_kd_tree(Dot *tree_dots, Dot *dots, uint32_t low, uint32_t high, uint32_t len) {
+void build_kd_tree(
+    Dot *tree_dots, Dot *dots, const uint32_t low, const uint32_t high, const uint32_t len
+) {
 
     // Calculate Values
 
@@ -437,9 +441,9 @@ void build_kd_tree(Dot *tree_dots, Dot *dots, uint32_t low, uint32_t high, uint3
  * @param depth current depth, must be 0 in initial call
  */
 void nearest_neighbor_recursive(
-    const Dot *tree_dots, uint32_t len, const uint32_t coord[2],
-    uint32_t *min_dist_sq_ptr, uint32_t *nearest_index_ptr, uint32_t min_dist_sq_care,
-    uint32_t index, uint32_t depth
+    const Dot *tree_dots, const uint32_t len, const uint32_t coord[2],
+    uint32_t *min_dist_sq_ptr, uint32_t *nearest_index_ptr, const uint32_t min_dist_sq_care,
+    const uint32_t index, uint32_t depth
 ) {
 
     // Calculate Distance
@@ -502,8 +506,8 @@ void nearest_neighbor_recursive(
  * @param depth current depth, must be 0 in initial call
  */
 void nearest_neighbors_recursive(
-    const Dot *tree_dots, uint32_t len, const uint32_t coord[2],
-    uint32_t *dists_sq, uint32_t dists_sq_len, uint32_t index, uint32_t depth
+    const Dot *tree_dots, const uint32_t len, const uint32_t coord[2],
+    uint32_t *dists_sq, const uint32_t dists_sq_len, const uint32_t index, uint32_t depth
 ) {
 
     // Calculate Distance
@@ -609,11 +613,11 @@ void track_progress(
     _Atomic uint32_t *section_progress, uint32_t *section_progress_total, timespec *section_times
 ) {
 
-    char section_names[NUM_SECTIONS][20] = {
+    const char section_names[NUM_SECTIONS][20] = {
         "Setup", "Section Generation", "Section Assignment", "Coastline Smoothing",
         "Biome Generation", "Image Generation", "Finish"
     };
-    double section_weights[NUM_SECTIONS] = {0.01, 0.01, 0.03, 0.24, 0.04, 0.53, 0.14};
+    const double section_weights[NUM_SECTIONS] = {0.01, 0.01, 0.03, 0.24, 0.04, 0.53, 0.14};
     // Used for overall progress bar (e.g. Setup takes ~1% of total time)
 
     struct winsize w;
@@ -646,7 +650,7 @@ void track_progress(
 
             // Calculate Section Progress
 
-            double progress_section =
+            const double progress_section =
                 atomic_load(&section_progress[i]) / (double)section_progress_total[i];
             total_progress += progress_section * section_weights[i];
 
@@ -682,7 +686,7 @@ void track_progress(
                 "%s[%d/%d] %-20s%8.2lf%% " ANSI_GREEN,
                 color, i + 1, NUM_SECTIONS, section_names[i], progress_section * 100
             ); // "[1/NUM_SECTIONS] Setup               100.00% "
-            uint32_t green_bars = (uint32_t)round(columns * progress_section);
+            const uint32_t green_bars = (uint32_t)round(columns * progress_section);
             for (uint32_t ii = 0; ii < green_bars; ii++)
                 printf("█");
             printf(ANSI_BLUE);
@@ -710,7 +714,7 @@ void track_progress(
         }
 
         printf("%s      Total Progress      %8.2lf%% " ANSI_GREEN, color, total_progress * 100);
-        uint32_t green_bars = (uint32_t)round(columns * total_progress);
+        const uint32_t green_bars = (uint32_t)round(columns * total_progress);
         for (uint32_t i = 0; i < green_bars; i++)
             printf("█");
         printf(ANSI_BLUE);
@@ -728,10 +732,7 @@ void track_progress(
 
         // Sleep 0.1 Seconds
 
-        timespec sleep_time;
-        sleep_time.tv_sec = 0;
-        sleep_time.tv_nsec = 100000000;
-        nanosleep(&sleep_time, NULL);
+        nanosleep(&(timespec){0, 100000000}, NULL);
 
     }
 
@@ -752,8 +753,8 @@ void track_progress(
  * @param section_progress
  */
 void assign_sections(
-    uint32_t map_resolution, uint32_t island_size,
-    uint32_t start_index, uint32_t end_index, uint32_t num_origin_dots,
+    const uint32_t map_resolution, const uint32_t island_size,
+    const uint32_t start_index, const uint32_t end_index, const uint32_t num_origin_dots,
     Dot *dots, uint32_t *land_dots_count_ptr, _Atomic uint32_t *section_progress
 ) {
 
@@ -826,10 +827,11 @@ void assign_sections(
  * @param section_progress
  */
 void smooth_coastlines(
-    uint32_t coastline_smoothing,
-    uint32_t land_start, uint32_t land_end, uint32_t water_start, uint32_t water_end,
+    const uint32_t coastline_smoothing,
+    const uint32_t land_start, const uint32_t land_end,
+    const uint32_t water_start, const uint32_t water_end,
     Dot *dots, Dot* land_tree_dots, Dot *water_tree_dots,
-    uint32_t num_land_dots, uint32_t num_water_dots,
+    const uint32_t num_land_dots, const uint32_t num_water_dots,
     uint32_t *swapped_to_land_counts_ptr, uint32_t *swapped_to_water_counts_ptr,
     _Atomic uint32_t *section_progress
 ) {
@@ -890,7 +892,7 @@ void smooth_coastlines(
 
         // Get Nearest Distances for Each Type
 
-        uint32_t dot_coord[2] = {dots[i].x, dots[i].y};
+        const uint32_t dot_coord[2] = {dots[i].x, dots[i].y};
 
         uint64_t sum_same = 0;
         uint64_t sum_opp = 0;
@@ -947,26 +949,25 @@ void smooth_coastlines(
  * @param section_progress
  */
 void generate_biomes_water(
-    uint32_t start_index, uint32_t end_index, const Dot *land_tree_dots, uint32_t num_land_dots,
-    uint32_t height, Dot *dots, _Atomic uint32_t *section_progress
+    const uint32_t start_index, const uint32_t end_index,
+    const Dot *land_tree_dots, const uint32_t num_land_dots,
+    const uint32_t height, Dot *dots, _Atomic uint32_t *section_progress
 ) {
 
     uint32_t land_dist_sq;
+    uint32_t equator_dist = 0;
 
     for (uint32_t i = start_index; i < end_index; i++) {
 
-        // Calculate Distance to Equator
-
-        const uint32_t equator_dist =
-            (uint32_t)(fabs((double)dots[i].y - height / 2.0) / height * 20);
-
-        // Calculate Maximum Land Distance
+        // Calculate Maximum Land Distance and Distance to Equator
 
         if (i != start_index && dots[i].y == dots[i - 1].y) {
             land_dist_sq = (uint32_t)sqrt(land_dist_sq) + dots[i].x - dots[i - 1].x;
             land_dist_sq *= land_dist_sq;
         } else {
             land_dist_sq = UINT32_MAX;
+            equator_dist =
+                (uint32_t)(fabs((double)dots[i].y - height / 2.0) / height * 20);
         }
 
         // Calculate Distance to Land
@@ -1009,7 +1010,8 @@ void generate_biomes_water(
  * @param section_progress
  */
 void generate_biomes_land(
-    uint32_t start_index, uint32_t end_index, const Dot *biome_tree_dots, uint32_t num_biome_dots,
+    const uint32_t start_index, const uint32_t end_index,
+    const Dot *biome_tree_dots, const uint32_t num_biome_dots,
     Dot *dots, _Atomic uint32_t *section_progress
 ) {
 
@@ -1031,7 +1033,7 @@ void generate_biomes_land(
 
         // Find Nearest Biome Origin Dot
 
-        uint32_t coord[2] = {dots[i].x, dots[i].y};
+        const uint32_t coord[2] = {dots[i].x, dots[i].y};
         uint32_t nearest_index;
         nearest_neighbor_recursive(
             biome_tree_dots, num_biome_dots, coord, &min_dist_sq, &nearest_index, 0, 0, 0
@@ -1061,7 +1063,8 @@ void generate_biomes_land(
  * @param section_progress
  */
 void generate_image(
-    uint32_t start_height, uint32_t end_height, const Dot *tree_dots, uint32_t num_dots,
+    const uint32_t start_height, const uint32_t end_height,
+    const Dot *tree_dots, const uint32_t num_dots,
     png_byte *pixels, uint32_t *type_counts, _Atomic uint32_t *section_progress
 ) {
 
@@ -1091,7 +1094,7 @@ void generate_image(
             // Find Nearest Dot
 
             const uint32_t coord[2] = {x, y};
-            uint32_t nearest_index = 0;
+            uint32_t nearest_index;
             nearest_neighbor_recursive(
                 tree_dots, num_dots, coord, &min_dist_sq, &nearest_index, 0, 0, 0
             );
@@ -1122,7 +1125,7 @@ void generate_image(
 
     // Update Shared Type Counts
 
-    for (int i = 0; i < 11; i++)
+    for (uint32_t i = 0; i < NUM_DOTTYPES_IMAGE; i++)
         type_counts[i] += local_type_counts[i];
 
 }
@@ -1141,7 +1144,7 @@ int main(int argc, char *argv[]) {
 
     // Get Inputs
 
-    bool auto_mode = (argc >= 10);
+    const bool auto_mode = (argc >= 10);
     char output_file[229];
     // width is global
     uint32_t height;
@@ -1223,7 +1226,7 @@ int main(int argc, char *argv[]) {
         );
 
         #ifdef __linux__
-            int max_processors = (int)sysconf(_SC_NPROCESSORS_ONLN);
+            uint32_t max_processors = (uint32_t)sysconf(_SC_NPROCESSORS_ONLN);
         #elif BSD || __Apple__
             int max_processors;
             sysctlbyname("hw.ncpu", &ncpu, &sizeof(int), NULL, 0);
@@ -1290,7 +1293,7 @@ int main(int argc, char *argv[]) {
         NULL, sizeof(Dot) * num_dots, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0
     );
 
-    pid_t tracker_process_pid = -1;
+    pid_t tracker_process_pid;
 
     if (!auto_mode) {
 
@@ -1341,19 +1344,17 @@ int main(int argc, char *argv[]) {
         do {
             ii = rand() % (width * height);
         } while (used_coords[ii]);
+        used_coords[ii] = true;
 
         // Create Dot
 
-        used_coords[ii] = true;
-
         dots[i] = (Dot){ .x = ii % width, .y = ii / width };
-        if (i < num_origin_dots) {
+        if (i < num_origin_dots)
             dots[i].type = LAND_ORIGIN; // origin points for islands
-        } else if (i < num_special_dots) {
+        else if (i < num_special_dots)
             dots[i].type = WATER_FORCED; // good for making lakes
-        } else {
+        else
             dots[i].type = WATER; // default
-        }
 
         atomic_fetch_add(&section_progress[1], 1);
 
@@ -1385,7 +1386,7 @@ int main(int argc, char *argv[]) {
 
     // Create Regular Dot Piece Starts
 
-    uint32_t reg_piece_length = num_reg_dots / processes;
+    const uint32_t reg_piece_length = num_reg_dots / processes;
     uint32_t reg_piece_starts[processes + 1];
     for (uint32_t i = 0; i < processes; i++)
         reg_piece_starts[i] = num_special_dots + i * reg_piece_length;
@@ -1484,13 +1485,13 @@ int main(int argc, char *argv[]) {
 
         // Create Piece Starts
 
-        uint32_t land_piece_length = num_land_dots / processes;
+        const uint32_t land_piece_length = num_land_dots / processes;
         uint32_t land_piece_starts[processes + 1];
         for (uint32_t i = 0; i < processes; i++)
             land_piece_starts[i] = num_special_dots + i * land_piece_length;
         land_piece_starts[processes] = num_special_dots + num_land_dots;
 
-        uint32_t water_piece_length = num_water_dots / processes;
+        const uint32_t water_piece_length = num_water_dots / processes;
         uint32_t water_piece_starts[processes + 1];
         for (uint32_t i = 0; i < processes; i++)
             water_piece_starts[i] = num_special_dots + num_land_dots + i * water_piece_length;
@@ -1559,7 +1560,7 @@ int main(int argc, char *argv[]) {
         num_swapped_to_water += swapped_to_water_counts[i];
     }
 
-    int32_t num_swapped_net = (int32_t)num_swapped_to_land - num_swapped_to_water;
+    const int32_t num_swapped_net = (int32_t)num_swapped_to_land - num_swapped_to_water;
     munmap(swapped_to_land_counts, sizeof(uint32_t) * processes);
     munmap(swapped_to_water_counts, sizeof(uint32_t) * processes);
     num_land_dots += num_origin_dots + num_swapped_net;
@@ -1595,14 +1596,13 @@ int main(int argc, char *argv[]) {
     // Section 1 = former land origin dots
     // Section 2 = former land dots, excluded swapped to water
     // Section 3 = former water dots swapped to land
-    uint32_t len1 = num_origin_dots;
     uint32_t len2 = former_num_land_dots - num_swapped_to_water;
-    merge(land_dots_unsorted, dots, len1, len2);
-    merge(land_dots_unsorted, dots, len1 + len2, num_swapped_to_land);
+    merge(land_dots_unsorted, dots, num_origin_dots, len2);
+    merge(land_dots_unsorted, dots, num_origin_dots + len2, num_swapped_to_land);
 
     len2 = former_num_water_dots - num_swapped_to_land;
-    merge(water_dots_unsorted, &dots[num_land_dots], len1, len2);
-    merge(water_dots_unsorted, &dots[num_land_dots], len1 + len2, num_swapped_to_water);
+    merge(water_dots_unsorted, &dots[num_land_dots], num_origin_dots, len2);
+    merge(water_dots_unsorted, &dots[num_land_dots], num_origin_dots + len2, num_swapped_to_water);
     free(water_dots_unsorted);
 
     // Create Water Biomes
@@ -1616,7 +1616,7 @@ int main(int argc, char *argv[]) {
 
     // Create Water Dots Piece Starts
 
-    uint32_t water_piece_length = num_water_dots / processes;
+    const uint32_t water_piece_length = num_water_dots / processes;
     uint32_t water_piece_starts[processes + 1];
     for (uint32_t i = 0; i < processes; i++)
         water_piece_starts[i] = num_land_dots + i * water_piece_length;
@@ -1650,13 +1650,13 @@ int main(int argc, char *argv[]) {
 
     // Create Biome Origin Dot Indexes and Tree
 
-    uint32_t num_biome_dots = num_land_dots / biome_size;
+    const uint32_t num_biome_dots = num_land_dots / biome_size;
     Dot *biome_dots = malloc(sizeof(Dot) * num_biome_dots);
     Dot *biome_tree_dots = malloc(sizeof(Dot) * num_biome_dots);
     bool *used_biome_coords = calloc(num_land_dots, sizeof(bool));
 
     // Biome Probablities
-    DotType probs[10][10] = {
+    const DotType probs[10][10] = {
         {ROCK, DESERT, DESERT, DESERT, JUNGLE, JUNGLE, JUNGLE, FOREST, FOREST, PLAINS},
         {ROCK, DESERT, DESERT, DESERT, JUNGLE, JUNGLE, FOREST, FOREST, PLAINS, PLAINS},
         {ROCK, DESERT, DESERT, JUNGLE, FOREST, FOREST, FOREST, PLAINS, PLAINS, PLAINS},
@@ -1703,7 +1703,7 @@ int main(int argc, char *argv[]) {
 
     // Create Land Dots Piece Starts
 
-    uint32_t land_piece_length = num_land_dots / processes;
+    const uint32_t land_piece_length = num_land_dots / processes;
     uint32_t land_piece_starts[processes + 1];
     for (uint32_t i = 0; i < processes; i++)
         land_piece_starts[i] = i * land_piece_length;
@@ -1765,7 +1765,7 @@ int main(int argc, char *argv[]) {
 
     // Create Section Starts
 
-    uint32_t section_height = height / processes;
+    const uint32_t section_height = height / processes;
     uint32_t section_starts[processes + 1];
     for (uint32_t i = 0; i < processes; i++)
         section_starts[i] = i * section_height;
@@ -1806,8 +1806,8 @@ int main(int argc, char *argv[]) {
 
     // Create Image
 
-    png_structp png_ptr = png_create_write_struct(PNG_LIBPNG_VER_STRING, NULL, NULL, NULL);
-    png_infop info_ptr = png_create_info_struct(png_ptr);
+    const png_structp png_ptr = png_create_write_struct(PNG_LIBPNG_VER_STRING, NULL, NULL, NULL);
+    const png_infop info_ptr = png_create_info_struct(png_ptr);
 
     png_set_IHDR(
         png_ptr, info_ptr, width, height,
@@ -1862,7 +1862,7 @@ int main(int argc, char *argv[]) {
     timespec end_time;
     clock_gettime(CLOCK_MONOTONIC, &end_time);
     char formatted_time[32];
-    timespec completion_time = diff_timespecs(end_time, start_time);
+    const timespec completion_time = diff_timespecs(end_time, start_time);
     snprintf(
         formatted_time, 32, "%2ld:%08.5f", completion_time.tv_sec / 60,
             fmod(completion_time.tv_sec, 60.0) + completion_time.tv_nsec / 1000000000.0
@@ -1882,14 +1882,16 @@ int main(int argc, char *argv[]) {
             count_water += type_counts[i];
         for (uint32_t i = ROCK; i < NUM_DOTTYPES_IMAGE; i++)
             count_land += type_counts[i];
-        double tot_pct_fact = 100.0 / (height * width); // total percentage factor
+        const double tot_pct_fact = 100.0 / (height * width); // total percentage factor
         printf(
             "Water %6.2f%%\nLand  %6.2f%%\n",
             count_water * tot_pct_fact, count_land * tot_pct_fact
         );
 
-        uint32_t text_colors[NUM_DOTTYPES_IMAGE] = {117, 21, 19, 17, 243, 229, 22, 28, 40, 48, 255};
-        char dottype_names[NUM_DOTTYPES_IMAGE][14] = {
+        const uint32_t text_colors[NUM_DOTTYPES_IMAGE] = {
+            117, 21, 19, 17, 243, 229, 22, 28, 40, 48, 255
+        };
+        const char dottype_names[NUM_DOTTYPES_IMAGE][14] = {
             "Ice", "Shallow Water", "Water", "Deep Water",
             "Rock", "Desert", "Jungle", "Forest", "Plains", "Taiga", "Snow"
         };

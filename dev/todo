@@ -1,5 +1,3 @@
-check usage of const
-
 check if +1 still needed for floating-point errors
 check that dots are actually sorted properly during start of biome generation
 check if land/water_dots needed in biome generation (could you just use part of dots during tree building?)
