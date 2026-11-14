@@ -36,6 +36,9 @@ BiomeGen, a terminal application for generating png maps.
 
 // Definitions
 
+#define ENABLE_RANDOM true
+// false to check if a change still produces the same output
+
 #define PATH_README "../README.md"
 
 #define ANSI_GREEN "\033[38;5;2m"
@@ -310,7 +313,7 @@ void quickselect(Dot *dots, uint32_t low, uint32_t high, uint32_t index, bool ax
         // Calculate Pivot Value
 
         uint32_t pi = low + rand() % (high - low);
-        uint16_t pivot = axis ? dots[pi].y : dots[pi].x;
+        uint16_t pivot = *(&dots[pi].x + axis);
 
         // Sort Based on Pivot
 
@@ -319,7 +322,7 @@ void quickselect(Dot *dots, uint32_t low, uint32_t high, uint32_t index, bool ax
         uint32_t gt = high;
 
         while (i <= gt) {
-            uint16_t key = axis ? dots[i].y : dots[i].x;
+            uint16_t key = *(&dots[i].x + axis);
             if (key < pivot)
                 swap(dots, lt++, i++);
             else if (key > pivot)
@@ -342,18 +345,20 @@ void quickselect(Dot *dots, uint32_t low, uint32_t high, uint32_t index, bool ax
 }
 
 /**
- * Build a 2D KD Tree within `tree_dot` using `dots`.
+ * Recursively build a 2D kd tree.
  * 
- * Ensures the KD Tree is complete, so it has the smallest height for effiency,
+ * Call build_kd_tree instead of calling this function directly.
+ * Ensures the kd tree is complete, so it has the smallest height for effiency,
  * and so it fits within the array. `low` and `high` must be non-negative, and
  * `low + high` must not overflow in a signed int.
  * 
- * @param dots array to build using. Won't contain the tree, but will still be
- * modified
- * @param tree_dots array to build tree in. Must have same capacity.
+ * @param tree_dots array to build tree on, may be empty
  * @param index the index to build on this call, must be 0 in initial call
+ * @param dots array of dots to build with, data will be shuffled
  * @param low
  * @param high
+ * @param full_dots number of dots used be full levels
+ * @param left_cap capacity of the left half of the last (non-full) level
  * @param depth current depth, must be 0 in initial call
  */
 void build_recursive(
@@ -394,6 +399,19 @@ void build_recursive(
 
 }
 
+/**
+ * Build a 2D kd tree.
+ * 
+ * Build a kd tree from `dots` into `tree_dots`. If only one array was used,
+ * shifting would be needed, increasing time complexity to O(n ^ 2).
+ * 
+ * @param tree_dots array to build on, may be empty
+ * @param dots array of dots to build with, data will be shuffled
+ * @param low doesn't have to be 0
+ * @param high
+ * @param len (high + 1 - low), not necessary but always calculated by caller
+ * beforehand anyways
+ */
 void build_kd_tree(Dot *tree_dots, Dot *dots, uint32_t low, uint32_t high, uint32_t len) {
 
     // Calculate Values
@@ -414,12 +432,12 @@ void build_kd_tree(Dot *tree_dots, Dot *dots, uint32_t low, uint32_t high, uint3
 }
 
 /**
- * Query a 2D KD Tree for the nearest neighbor to a coordinate.
+ * Query a 2D kd tree for the nearest neighbor to a coordinate.
  * 
- * Query the 2D KD Tree to get the distance to `coord`'s nearest neighbor. When
+ * Query the 2D kd tree to get the distance to `coord`'s nearest neighbor. When
  * `type_ptr` is not null, it stores the type of the nearest dot.
  * 
- * @param tree_dots KD Tree to search
+ * @param tree_dots kd tree to search
  * @param len length of `tree_dots`
  * @param index index of Dot to check, must be 0 in initial call
  * @param coord coordinate to search with, of form {x, y}
@@ -454,7 +472,7 @@ void nearest_neighbor_recursive(
     // Decide Whether Recursion is Needed
 
     const bool axis = depth % 2;
-    const uint32_t dot_value = (axis ? tree_dots[index].y : tree_dots[index].x);
+    const uint32_t dot_value = *(&tree_dots[index].x + axis);
     const int32_t dist_line = dot_value - coord[axis];
     const uint32_t dist_line_sq = dist_line * dist_line;
     // Whether distance to splitting line is less than current max dist
@@ -480,11 +498,11 @@ void nearest_neighbor_recursive(
 }
 
 /**
- * Query a 2D KD Tree for the nearest neighbors to a coordinate.
+ * Query a 2D kd tree for the nearest neighbors to a coordinate.
  * 
- * Query the 2D KD Tree to get the distance to `coord`'s nearest neighbors.
+ * Query the 2D kd tree to get the distance to `coord`'s nearest neighbors.
  * 
- * @param tree_dots KD Tree to search
+ * @param tree_dots kd tree to search
  * @param len length of `tree_dots`
  * @param index index of Dot to check, must be 0 in initial call
  * @param coord coordinate to search with, of form {x, y}
@@ -522,7 +540,7 @@ void nearest_neighbors_recursive(
 
     const uint32_t max_dist = dists_sq[dists_sq_len - 1];
     const bool axis = depth % 2;
-    const uint32_t dot_value = (axis ? tree_dots[index].y : tree_dots[index].x);
+    const uint32_t dot_value = *(&tree_dots[index].x + axis);
     const int32_t dist_line = dot_value - coord[axis];
     const uint32_t dist_line_sq = dist_line * dist_line;
     // Whether distance to splitting line is less than max_dist
@@ -732,7 +750,11 @@ void assign_sections(
     Dot *dots, uint32_t *land_dots_count_ptr, _Atomic uint32_t *section_progress
 ) {
 
-    srand(time(NULL) + getpid());
+    #if ENABLE_RANDOM
+        srand(time(NULL) + getpid());
+    #else
+        srand(0);
+    #endif
 
     uint32_t min_dist_sq;
     uint32_t land_dots_count = 0;
@@ -1290,7 +1312,11 @@ int main(int argc, char *argv[]) {
 
     section_progress_total[1] = num_dots;
 
-    srand(time(NULL));
+    #if ENABLE_RANDOM
+        srand(time(NULL));
+    #else
+        srand(0);
+    #endif
 
     const uint32_t num_special_dots = num_dots / island_abundance * 2;
     const uint32_t num_reg_dots = num_dots - num_special_dots;
