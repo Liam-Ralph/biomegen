@@ -313,7 +313,7 @@ void quickselect(Dot *dots, uint32_t low, uint32_t high, uint32_t index, bool ax
         // Calculate Pivot Value
 
         uint32_t pi = low + rand() % (high - low);
-        uint16_t pivot = *(&dots[pi].x + axis);
+        uint16_t pivot = axis ? dots[pi].y : dots[pi].x;
 
         // Sort Based on Pivot
 
@@ -322,7 +322,7 @@ void quickselect(Dot *dots, uint32_t low, uint32_t high, uint32_t index, bool ax
         uint32_t gt = high;
 
         while (i <= gt) {
-            uint16_t key = *(&dots[i].x + axis);
+            uint16_t key = axis ? dots[i].y : dots[i].x;
             if (key < pivot)
                 swap(dots, lt++, i++);
             else if (key > pivot)
@@ -472,7 +472,7 @@ void nearest_neighbor_recursive(
     // Decide Whether Recursion is Needed
 
     const bool axis = depth % 2;
-    const uint32_t dot_value = *(&tree_dots[index].x + axis);
+    const uint32_t dot_value = axis ? tree_dots[index].y : tree_dots[index].x;
     const int32_t dist_line = dot_value - coord[axis];
     const uint32_t dist_line_sq = dist_line * dist_line;
     // Whether distance to splitting line is less than current max dist
@@ -540,7 +540,7 @@ void nearest_neighbors_recursive(
 
     const uint32_t max_dist = dists_sq[dists_sq_len - 1];
     const bool axis = depth % 2;
-    const uint32_t dot_value = *(&tree_dots[index].x + axis);
+    const uint32_t dot_value = axis ? tree_dots[index].y : tree_dots[index].x;
     const int32_t dist_line = dot_value - coord[axis];
     const uint32_t dist_line_sq = dist_line * dist_line;
     // Whether distance to splitting line is less than max_dist
