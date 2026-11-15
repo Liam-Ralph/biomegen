@@ -25,6 +25,7 @@ Calculation Speed Test Inputs
 120
 50
 5
+5
 8
 
 3840

@@ -618,7 +618,7 @@ void track_progress(
         "Setup", "Section Generation", "Section Assignment", "Coastline Smoothing",
         "Biome Generation", "Image Generation", "Finish"
     };
-    const double section_weights[NUM_SECTIONS] = {0.01, 0.01, 0.03, 0.24, 0.04, 0.53, 0.14};
+    const double section_weights[NUM_SECTIONS] = {0.01, 0.01, 0.02, 0.14, 0.03, 0.23, 0.56};
     // Used for overall progress bar (e.g. Setup takes ~1% of total time)
 
     struct winsize w;
@@ -733,7 +733,7 @@ void track_progress(
 
         // Sleep 0.1 Seconds
 
-        nanosleep(&(timespec){0, 100000000}, NULL);
+        nanosleep(&(timespec){0, 10000000}, NULL);
 
     }
 
