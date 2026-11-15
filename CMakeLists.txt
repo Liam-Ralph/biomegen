@@ -11,15 +11,15 @@ include(CheckCSourceCompiles)
 check_c_source_compiles(
     "
     enum E : unsigned char { A, B };
-    _Static_assert(sizeof(E) == 1, \"enum underlying type not supported\");
-    int main() { enum E e = B; return (int)B - 1; }
+    _Static_assert(sizeof (enum E) == 1, \"enum underlying type not supported\");
+    int main() { enum E e = B; return (int)e - 1; }
     "
     HAVE_C_ENUM_UNDERLYING_TYPE
 )
-if (NOT HAVE_C_ENUM_UNDERLYING_TYPE)
+if(NOT HAVE_C_ENUM_UNDERLYING_TYPE)
     message(
         FATAL_ERROR
-        "main requires enums with underlying types. (C23, GCC 13+, Clang 20+)"
+        "main requires enums with underlying types (C23, GCC 13+, Clang 20+)."
     )
 endif()
 
