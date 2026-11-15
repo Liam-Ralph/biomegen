@@ -266,19 +266,20 @@ void merge(Dot *dots_unsorted, Dot *dots_sorted, const uint32_t len1, const uint
 
     uint32_t i1 = 0;
     uint32_t i2 = 0;
+    uint32_t si = 0;
 
-    while (i1 + i2 < len1 + len2) {
-        if (
-            i2 == len2 ||
-            (i1 < len1 && row_major(dots_unsorted[i1]) < row_major(dots_unsorted[len1 + i2]))
-        ) {
-            dots_sorted[i1 + i2] = dots_unsorted[i1];
-            i1++;
-        } else {
-            dots_sorted[i1 + i2] = dots_unsorted[len1 + i2];
-            i2++;
-        }
+    while (i1 < len1 && i2 < len2) {
+        if (row_major(dots_unsorted[i1]) < row_major(dots_unsorted[len1 + i2]))
+            dots_sorted[si++] = dots_unsorted[i1++];
+        else
+            dots_sorted[si++] = dots_unsorted[len1 + i2++];
     }
+
+    while (i1 < len1)
+        dots_sorted[si++] = dots_unsorted[i1++];
+
+    while (i2 < len2)
+        dots_sorted[si++] = dots_unsorted[len1 + i2++];
 
 }
 
@@ -1594,15 +1595,24 @@ int main(int argc, char *argv[]) {
     // Merge Parts of Unsorted Dots into Sorted Dots
 
     // Section 1 = former land origin dots
-    // Section 2 = former land dots, excluded swapped to water
+    // Section 2 = former land dots, excluding swapped to water
     // Section 3 = former water dots swapped to land
     uint32_t len2 = former_num_land_dots - num_swapped_to_water;
     merge(land_dots_unsorted, dots, num_origin_dots, len2);
-    merge(land_dots_unsorted, dots, num_origin_dots + len2, num_swapped_to_land);
+    uint32_t len1and2 = num_origin_dots + len2;
+    memcpy(land_dots_unsorted, dots, sizeof(Dot) * len1and2);
+    merge(land_dots_unsorted, dots, len1and2, num_swapped_to_land);
 
-    len2 = former_num_water_dots - num_swapped_to_land;
+    // Section 1 = former water forced dots
+    // Section 2 = former land dots swapped to water
+    // Section 3 = former water dots, excluding swapped to land
+    len2 = num_swapped_to_water;
     merge(water_dots_unsorted, &dots[num_land_dots], num_origin_dots, len2);
-    merge(water_dots_unsorted, &dots[num_land_dots], num_origin_dots + len2, num_swapped_to_water);
+    len1and2 = num_origin_dots + len2;
+    memcpy(water_dots_unsorted, &dots[num_land_dots], sizeof(Dot) * len1and2);
+    merge(water_dots_unsorted, &dots[num_land_dots],
+        len1and2, former_num_water_dots - num_swapped_to_land
+    );
     free(water_dots_unsorted);
 
     // Create Water Biomes
