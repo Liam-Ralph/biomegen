@@ -14,8 +14,8 @@
 // Defintions
 
 #define PATH_README "../README.md"
-#define PATH_AUTORUN_TASKS "../src/autorun_tasks.txt"
-#define PATH_AUTORUN_RESULTS "../src/autorun_results.csv"
+#define PATH_AUTORUN_TASKS "../autorun_tasks.txt"
+#define PATH_AUTORUN_RESULTS "../autorun_results.csv"
 
 #define ANSI_GREEN "\033[38;5;2m"
 #define ANSI_BLUE "\033[38;5;4m"

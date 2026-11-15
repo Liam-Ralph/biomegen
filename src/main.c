@@ -192,7 +192,7 @@ timespec diff_timespecs(const timespec end, const timespec start) {
 
 // Dot Functions
 
-inline uint32_t row_major(const Dot dot) {
+static inline uint32_t row_major(const Dot dot) {
     return dot.y * width + dot.x;
 }
 
@@ -205,7 +205,7 @@ inline uint32_t row_major(const Dot dot) {
  * @param i first index to swap with
  * @param ii second index to swap with
  */
-inline void swap(Dot *dots, const uint32_t i, const uint32_t ii) {
+static inline void swap(Dot *dots, const uint32_t i, const uint32_t ii) {
     const Dot temp = dots[i];
     dots[i] = dots[ii];
     dots[ii] = temp;
@@ -1161,7 +1161,7 @@ int main(int argc, char *argv[]) {
 
         // Manual Inputs Mode
 
-        strncpy(output_file, "result.png", 10);
+        strncpy(output_file, "../result.png", 10);
         output_file[10] = '\0';
 
         // Get Program Version
