@@ -53,7 +53,7 @@ Compilation is setup for CMake, with the following commands:
  - `cmake --build .`
 
 If you wish to compile with GCC, the following should work:
- - `gcc -D_GNU_SOURCE main.c -o main -lm -lpng -Wall`
+ - `gcc main.c -o main -lm -lpng -Wall`
  - `gcc autorun.c -o autorun -lm -Wall`
 
 <br/>
