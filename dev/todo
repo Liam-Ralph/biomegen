@@ -1,3 +1,5 @@
+remove c23 requirements to add compatability for gcc < 15
+
 update readme file
 
 add error checking for every function that can return an error code

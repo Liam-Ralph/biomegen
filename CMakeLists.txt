@@ -1,7 +1,8 @@
 cmake_minimum_required(VERSION 3.25)
 project(biomegen VERSION 3.1.1 LANGUAGES C)
 
-set(C_STANDARD C23)
+set(CMAKE_C_STANDARD C23)
+set(CMAKE_C_STANDARD_REQUIRED ON)
 set(CMAKE_BUILD_TYPE Release)
 
 find_package(PNG REQUIRED)
