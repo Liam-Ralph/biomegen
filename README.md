@@ -8,19 +8,21 @@
 ## Description
 
 BiomeGen is a C map generation tool that provides output in a png format.
-Customization options include map dimensions, island abundance, island size, and
-island abundance relative to water. Generates water, land, and various biomes.
-Uses multiprocessing in C for increased efficiency. Includes automated
-runs and another C program to create multiple images or test generation speed.
+Customization options include map dimensions, island abundance, island size,
+coastline smoothing, and biome size. Generates water of varying depth and land
+with various biomes. Uses multiprocessing in C for increased efficiency.
+Includes a script for automating runs to create multiple results or test
+generation speed.
 
 <br/>
 
 ## Operating System Support
 
 Version 3.0.0 and above
- - Linux supported, tested with Linux Mint 22.2 and antiX 23.2
+ - Linux supported
  - MacOS and BSD OSs should be supported, but haven't been tested
  - Windows is not currently supported, but WSL should work
+ - GCC used, but other compilers should work
 
 Python Versions (v2.1.6 and below)
  - Any OS with Python 3.10+ should work (Linux Mint, antiX, and Windows tested)
@@ -42,14 +44,17 @@ as detailed in LICENSE, with the following exceptions:
 
 ## Compilation
 
-This project requires the `math.h` library for autorun.c, and the `math.h` and `png.h`
-libraries for main.c. Autorun should compile with `gcc autorun.c -o autorun -lm -Wall`.
-If the `gcc` command is available on your system, autorun should be able to properly
-compile main.c. It uses the command `gcc -D_GNU_SOURCE main.c -o main -lm -lpng -Wall`.
-The main executable must be named "main" or "main.exe" on Windows. The `-D_GNU_SOURCE`
-flag shouldn't be required on most Linux distros. Installing the png library may
-be required. On Debian-based systems, I used `sudo apt install libpng-dev`. On Windows
-with MinGW, I used `pacman -S mingw-w64-ucrt-x86_64-libpng mingw-w64-ucrt-x86_64-zlib`.
+Required libraries (outside standard libraries)
+ - `main.c`: `math.h` and `png.h`
+ - `autorun.c`: `math.h`
+
+Compilation is setup for CMake, with the following commands:
+ - `cmake ..`
+ - `cmake --build .`
+
+If you wish to compile with GCC, the following should work:
+ - `gcc -D_GNU_SOURCE main.c -o main -lm -lpng -Wall`
+ - `gcc autorun.c -o autorun -lm -Wall`
 
 <br/>
 
@@ -59,7 +64,7 @@ This project includes the ability to run in an automated mode. There are two way
 to do this:
 
 1. Add arguments when running the main C file. With a command like
-   `./main 1920 1080 100 120 50 5 8 file_path.png`, you can pass arguments
+   `./main 1920 1080 100 120 50 5 5 8 file_path.png`, you can pass arguments
    that will be used by the C program, skipping over manual inputs. The arguments
    passed are: map width, map height, map resolution, island abundance, island size,
    coastline smoothing, cpu processes, and output path. Except for the output path,

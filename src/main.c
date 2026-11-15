@@ -1153,8 +1153,8 @@ int main(int argc, char *argv[]) {
     uint32_t island_abundance; // controls the number of "Land Origin" and "Water Forced" dots
     uint32_t island_size;
     uint32_t coastline_smoothing;
-    uint32_t processes;
     uint32_t biome_size;
+    uint32_t processes;
 
     // Get Inputs
 
