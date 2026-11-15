@@ -2,12 +2,12 @@ check if +1 still needed for floating-point errors
 check that dots are actually sorted properly during start of biome generation
 check if land/water_dots needed in biome generation (could you just use part of dots during tree building?)
 
+recalculate section percentages
+update readme file
+
 add error checking for every function that can return an error code
 make all statistics counters thread_safe (type_counts, num_land_dots, num_swapped)
 
 make boundaries for equator dist sections more fuzzy (some wave function of x?)
 
 consider switching to pthread
-
-recalculate section percentages
-update readme file
