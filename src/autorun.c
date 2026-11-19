@@ -96,7 +96,7 @@ int main() {
         // Prep Save path
 
         if (save_png)
-            inputs[strlen(inputs) - 5] = '\0';
+            inputs[strlen(inputs) - 4] = '\0';
 
         // Running Repetitions
 

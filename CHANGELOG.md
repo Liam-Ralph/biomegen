@@ -7,6 +7,7 @@
  - Fixed possible error when biome generation tries to assign more biome origin
     dots than there are land dots.
  - Cleaned code.
+ - Updated old autorun results due to new benchmarking setup.
 
 ## Version 3.1.1 (August 2026)
 
