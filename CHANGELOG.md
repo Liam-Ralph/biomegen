@@ -1,3 +1,14 @@
+## Version 4.0.0 (November 2026)
+
+ - KD Tree now builds on top of existing array.
+ - Greatly reduced memory usage.
+ - Switched to CMake.
+ - Enabled compiler optimizations by default.
+ - Fixed possible error when biome generation tries to assign more biome origin
+    dots than there are land dots.
+ - Cleaned code.
+ - Updated old autorun results due to new benchmarking setup.
+
 ## Version 3.1.1 (August 2026)
 
  - Cleaned code.
