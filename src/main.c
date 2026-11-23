@@ -72,7 +72,6 @@ BiomeGen, a terminal application for generating png maps.
 typedef enum : uint8_t {
     ICE, SHALLOW_WATER, WATER, DEEP_WATER, ROCK, DESERT, JUNGLE, FOREST, PLAINS, TAIGA, SNOW,
     WATER_FORCED, LAND, LAND_ORIGIN
-
 } DotType;
 // The underlying order here is used in dottype_colors and type_counts
 
