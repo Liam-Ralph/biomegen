@@ -36,7 +36,7 @@ BiomeGen, a terminal application for generating png maps.
 
 // Definitions
 
-#define ENABLE_RANDOM true
+#define ENABLE_RANDOM false
 // false to check if a change still produces the same output
 
 #define PATH_README "../README.md"
@@ -220,31 +220,32 @@ static inline void swap(Dot *dots, const uint32_t i, const uint32_t ii) {
  * @param high
  * @param width needed to calculate a dot's value
  */
-void quicksort_recursive(Dot *dots, uint32_t low, uint32_t high) {
+void quicksort_recursive(Dot *dots, int32_t low, int32_t high) {
 
     if (low < high) {
 
-        // Calculate Pivot Value
-
         const uint32_t pivot = row_major(dots[high]);
+        int32_t left = low; // Must match right's type, otherwise right gets converted to uint32_t
+        int32_t right = high - 1; // Can underflow
 
-        // Move Smaller Elements to the Left
+        while (left <= right) {
+            while (left <= right && row_major(dots[left]) < pivot)
+                left++;
+            while (left <= right && row_major(dots[right]) > pivot)
+                right--;
+            if (left <= right) {
+                swap(dots, left, right);
+                left++;
+                right--;
+            }
+        }
 
-        uint32_t p = low;
+        swap(dots, left, high);
 
-        for (uint32_t i = low; i < high; i++)
-            if (row_major(dots[i]) < pivot)
-                swap(dots, p++, i);
-
-        // Move Pivot to After Smaller Elements
-
-        swap(dots, p, high);
-
-        // Recursion
-
-        if (p > low) // Prevent p - 1 from underflowing
-            quicksort_recursive(dots, low, p - 1);
-        quicksort_recursive(dots, p + 1, high);
+        if (left > low)
+            quicksort_recursive(dots, low, left - 1);
+        if (left < high)
+            quicksort_recursive(dots, left + 1, high);
 
     }
 
